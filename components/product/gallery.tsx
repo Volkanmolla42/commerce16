@@ -12,9 +12,9 @@ export function Gallery({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const imageIndex = searchParams.has("image")
-    ? parseInt(searchParams.get("image")!)
-    : 0;
+  const requestedIndex = Number(searchParams.get("image") ?? 0);
+  const imageIndex = Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < images.length
+    ? requestedIndex : 0;
 
   const updateImage = (index: string) => {
     const params = new URLSearchParams(searchParams.toString());

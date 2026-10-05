@@ -1,36 +1,13 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import schema from "./schema";
+import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { assertAdminApiSecret } from "./adminAuth";
 
-const orderItemValidator = v.object({
-  productId: v.string(),
-  variantId: v.optional(v.string()),
-  title: v.string(),
-  quantity: v.number(),
-  price: v.string(),
-  image: v.optional(v.string()),
-});
-
-const orderStatusValidator = v.union(
-  v.literal("pending"),
-  v.literal("paid"),
-  v.literal("shipped"),
-  v.literal("delivered"),
-  v.literal("cancelled")
-);
-
-const orderValidator = v.object({
-  _id: v.id("orders"),
-  _creationTime: v.number(),
-  userId: v.optional(v.id("users")),
-  customerEmail: v.string(),
-  customerName: v.string(),
-  customerPhone: v.optional(v.string()),
-  items: v.array(orderItemValidator),
-  total: v.string(),
-  status: orderStatusValidator,
-  shippingAddress: v.optional(v.string()),
-});
+const orderValidator = schema.doc("orders");
+const orderItemValidator = orderValidator.fields.items.element;
+const orderStatusValidator = orderValidator.fields.status;
 
 export const getMyOrders = query({
   args: {},
@@ -52,9 +29,12 @@ export const getMyOrders = query({
 });
 
 export const listAllAdmin = query({
-  args: {},
+  args: {
+    adminSecret: v.string(),
+  },
   returns: v.array(orderValidator),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
     return await ctx.db.query("orders").order("desc").take(100);
   },
 });
@@ -69,8 +49,7 @@ export const getOrderById = query({
     if (!order) return null;
 
     const userId = await getAuthUserId(ctx);
-    // If order has userId and logged-in user is someone else, restrict access
-    if (order.userId && userId && order.userId !== userId) {
+    if (!userId || order.userId !== userId) {
       return null;
     }
 
@@ -87,20 +66,38 @@ export const createOrder = mutation({
     total: v.string(),
     shippingAddress: v.optional(v.string()),
     saveAddress: v.optional(
-      v.object({
-        title: v.string(),
-        city: v.string(),
-        district: v.string(),
-        addressLine1: v.string(),
-        addressLine2: v.optional(v.string()),
-        postalCode: v.optional(v.string()),
-        isDefault: v.optional(v.boolean()),
-      })
+      schema.doc("addresses").pick("title", "city", "district", "addressLine1", "addressLine2", "postalCode")
+        .extend({ isDefault: v.optional(v.boolean()) })
     ),
   },
   returns: v.id("orders"),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
+    if (!args.customerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.customerEmail.trim())) {
+      throw new Error("Ad ve geçerli e-posta gereklidir.");
+    }
+    if (args.items.length === 0 || args.items.length > 100) throw new Error("Sipariş 1 ile 100 ürün içermeli.");
+    const items = [];
+    let totalCents = 0;
+    for (const item of args.items) {
+      if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) throw new Error("Ürün adedi 1 ile 999 arasında tam sayı olmalı.");
+      const productId = ctx.db.normalizeId("products", item.productId);
+      const product = productId ? await ctx.db.get(productId) : null;
+      if (!product || !product.availableForSale) throw new Error("Sepetinizdeki ürün satışa uygun değil.");
+      const variants = product.variants ?? [];
+      const variant = item.variantId ? variants.find((candidate) => candidate.id === item.variantId) : undefined;
+      if ((variants.length > 0 && !variant) || (item.variantId && !variant) || (variant && !variant.availableForSale)) throw new Error("Ürün seçeneği satışa uygun değil.");
+      const price = variant?.price ?? product.price;
+      if (!/^\d+(?:\.\d{1,2})?$/.test(price)) throw new Error("Ürün fiyatı geçersiz.");
+      const cents = Math.round(Number(price) * 100);
+      if (!Number.isSafeInteger(cents) || cents < 0 || !Number.isSafeInteger(totalCents + cents * item.quantity)) throw new Error("Sipariş tutarı geçersiz.");
+      if (Number(item.price) !== Number(price)) throw new Error("Sepet fiyatı değişti. Ürünleri yeniden sepete ekleyin.");
+      totalCents += cents * item.quantity;
+      const storageImage = product.storageImages?.[0];
+      const image = product.images[0] ?? (storageImage ? await ctx.storage.getUrl(storageImage.storageId) : null);
+      items.push({ productId: product._id, variantId: variant?.id, title: variant ? `${product.title} — ${variant.title}` : product.title, quantity: item.quantity, price: (cents / 100).toFixed(2), image: image ?? undefined });
+    }
+    if (Number(args.total) !== totalCents / 100) throw new Error("Sepet tutarı değişti. Sepetinizi kontrol edin.");
 
     // 1. Kullanıcı giriş yapmışsa ad-soyad ve telefon bilgisini profiline kaydet / güncelle
     if (userId) {
@@ -117,33 +114,11 @@ export const createOrder = mutation({
 
       // 2. Eğer yeni adres girildiyse ve kaydedilmesi istendiyse adres defterine kaydet
       if (args.saveAddress) {
-        const existingAddresses = await ctx.db
-          .query("addresses")
-          .withIndex("by_userId", (q) => q.eq("userId", userId))
-          .collect();
-
-        const isFirst = existingAddresses.length === 0;
-        const shouldBeDefault = args.saveAddress.isDefault || isFirst;
-
-        if (shouldBeDefault) {
-          for (const addr of existingAddresses) {
-            if (addr.isDefault) {
-              await ctx.db.patch(addr._id, { isDefault: false });
-            }
-          }
-        }
-
-        await ctx.db.insert("addresses", {
-          userId,
-          title: args.saveAddress.title || "Ev",
-          fullName: args.customerName.trim(),
-          phone: args.customerPhone?.trim() || "",
-          city: args.saveAddress.city.trim(),
-          district: args.saveAddress.district.trim(),
-          addressLine1: args.saveAddress.addressLine1.trim(),
-          addressLine2: args.saveAddress.addressLine2?.trim(),
-          postalCode: args.saveAddress.postalCode?.trim(),
-          isDefault: shouldBeDefault,
+        await insertAddress(ctx, userId, {
+          ...args.saveAddress,
+          fullName: args.customerName,
+          phone: args.customerPhone ?? "",
+          isDefault: args.saveAddress.isDefault ?? false,
         });
       }
     }
@@ -154,8 +129,8 @@ export const createOrder = mutation({
       customerEmail: args.customerEmail.trim(),
       customerName: args.customerName.trim(),
       customerPhone: args.customerPhone?.trim(),
-      items: args.items,
-      total: args.total,
+      items,
+      total: (totalCents / 100).toFixed(2),
       status: "pending",
       shippingAddress: args.shippingAddress,
     });
@@ -166,11 +141,13 @@ export const createOrder = mutation({
 
 export const updateStatus = mutation({
   args: {
+    adminSecret: v.string(),
     id: v.id("orders"),
     status: orderStatusValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
     await ctx.db.patch(args.id, { status: args.status });
     return null;
   },

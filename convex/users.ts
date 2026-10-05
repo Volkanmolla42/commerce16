@@ -26,7 +26,7 @@ export const getMyProfile = query({
       _id: user._id,
       email: user.email,
       name: user.name,
-      phone: (user as Record<string, unknown>).phone as string | undefined,
+      phone: user.phone,
       image: user.image,
     };
   },

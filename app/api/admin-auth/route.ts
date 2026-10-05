@@ -1,43 +1,78 @@
-import { NextRequest, NextResponse } from "next/server";
+import { createHmac } from "node:crypto";
+import { getAdminBackend } from "@/lib/admin/backend";
 import { cookies } from "next/headers";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { api } from "@/convex/_generated/api";
+import {
+  ADMIN_COOKIE_NAME,
+  getAdminSessionToken,
+  hasAdminSession,
+  isAdminAuthConfigured,
+  isSameOriginRequest,
+  isValidAdminPin,
+} from "@/lib/admin/session";
 
-const ADMIN_PIN = process.env.ADMIN_PIN || "147258";
-const COOKIE_NAME = "commerce_admin_session";
+function getAttemptKey(request: NextRequest, secret: string) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const clientIp =
+    request.headers.get("x-real-ip")?.trim() ||
+    forwardedFor?.split(",")[0]?.trim() ||
+    "unknown";
 
-function getExpectedToken() {
-  return crypto
-    .createHash("sha256")
-    .update(`admin-salt-${ADMIN_PIN}`)
+  return createHmac("sha256", secret)
+    .update(`commerce-admin-pin-attempt:${clientIp}`)
     .digest("hex");
 }
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-
-  if (token && token === getExpectedToken()) {
-    return NextResponse.json({ authenticated: true });
-  }
-
-  return NextResponse.json({ authenticated: false });
+  return NextResponse.json({ authenticated: await hasAdminSession() });
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const { pin } = await req.json();
+  if (!isSameOriginRequest(req)) {
+    return NextResponse.json({ success: false, error: "İstek reddedildi." }, { status: 403 });
+  }
+  if (!isAdminAuthConfigured()) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "6 haneli ADMIN_PIN, ADMIN_API_SECRET ve NEXT_PUBLIC_CONVEX_URL ayarlarını tamamla.",
+      },
+      { status: 503 },
+    );
+  }
 
-    if (!pin || pin.trim() !== ADMIN_PIN.trim()) {
+  try {
+    const body: unknown = await req.json();
+    const pin = body && typeof body === "object" && "pin" in body
+      ? body.pin
+      : undefined;
+    const { adminSecret: secret, client } = getAdminBackend();
+    const key = getAttemptKey(req, secret);
+    const attempt = await client.mutation(api.adminAuth.consumePinAttempt, {
+      adminSecret: secret,
+      key,
+    });
+
+    if (!attempt.ok) {
+      const retryAfter = Math.max(1, Math.ceil((attempt.retryAfter ?? 0) / 1000));
       return NextResponse.json(
-        { success: false, error: "Hatalı 6 haneli yönetici parolası!" },
-        { status: 401 }
+        { success: false, error: `Çok fazla hatalı deneme. ${retryAfter} saniye sonra tekrar dene.` },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } },
       );
     }
 
-    const token = getExpectedToken();
+    if (!isValidAdminPin(pin)) {
+      return NextResponse.json(
+        { success: false, error: "Yönetici PIN'i hatalı." },
+        { status: 401 },
+      );
+    }
+
+    await client.mutation(api.adminAuth.resetPinAttempts, { adminSecret: secret, key });
     const cookieStore = await cookies();
 
-    cookieStore.set(COOKIE_NAME, token, {
+    cookieStore.set(ADMIN_COOKIE_NAME, getAdminSessionToken(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -48,14 +83,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json(
-      { success: false, error: "Sunucu hatası oluştu" },
-      { status: 500 }
+      { success: false, error: "Sunucu hatası oluştu." },
+      { status: 500 },
     );
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ success: false, error: "İstek reddedildi." }, { status: 403 });
+  }
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(ADMIN_COOKIE_NAME);
   return NextResponse.json({ success: true });
 }

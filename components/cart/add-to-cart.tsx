@@ -1,23 +1,27 @@
 "use client";
 
 import { useCart } from "./cart-context";
-import { Product } from "@/lib/catalog/types";
-import { useState } from "react";
+import type { Product, ProductVariant } from "@/lib/catalog/types";
+import { useEffect, useRef, useState } from "react";
 import { ShoppingBag01Icon, Tick01Icon, ArrowRight01Icon } from "hugeicons-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export function AddToCart({ product }: { product: Product }) {
+export function AddToCart({ product, variant }: { product: Product; variant?: ProductVariant }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const needsSelection = Boolean(product.variants?.length && !variant);
+  const isAvailable = product.availableForSale && !needsSelection && (variant?.availableForSale ?? true);
 
   const handleAdd = () => {
-    addItem(product, 1);
+    if (!isAvailable) return;
+    addItem(variant ? { ...product, price: variant.price.amount, title: `${product.title} — ${variant.title}` } : product, 1, variant?.id);
     setAdded(true);
-    setTimeout(() => setAdded(false), 3000);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setAdded(false), 3000);
   };
-
-  const isAvailable = product.availableForSale;
 
   return (
     <div className="flex flex-col gap-3">
@@ -34,6 +38,8 @@ export function AddToCart({ product }: { product: Product }) {
             <Tick01Icon className="h-5 w-5 text-emerald-400" />
             <span>Sepete Eklendi</span>
           </>
+        ) : needsSelection ? (
+          <span>Seçenekleri seç</span>
         ) : !isAvailable ? (
           <span>Tükendi</span>
         ) : (

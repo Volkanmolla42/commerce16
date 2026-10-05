@@ -1,180 +1,102 @@
-import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { v, type Infer } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import type { Id } from "./_generated/dataModel";
+import schema from "./schema";
+
+const addressValidator = schema.doc("addresses");
+const addressInputValidator = addressValidator.omit("_id", "_creationTime", "userId");
+export type AddressInput = Infer<typeof addressInputValidator>;
+const MAX_ADDRESSES = 100;
+
+async function requireUser(ctx: QueryCtx | MutationCtx) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
+  return userId;
+}
+
+async function ownedAddress(ctx: MutationCtx, addressId: Id<"addresses">) {
+  const userId = await requireUser(ctx);
+  const address = await ctx.db.get(addressId);
+  if (!address || address.userId !== userId) throw new Error("Adres bulunamadı veya yetkiniz yok.");
+  return address;
+}
+
+async function userAddresses(ctx: QueryCtx | MutationCtx, userId: Id<"users">) {
+  return await ctx.db.query("addresses").withIndex("by_userId", (q) => q.eq("userId", userId)).take(MAX_ADDRESSES + 1);
+}
+
+function normalizeAddress(input: AddressInput): AddressInput {
+  return {
+    ...input,
+    title: input.title.trim() || "Ev",
+    fullName: input.fullName.trim(), phone: input.phone.trim(), city: input.city.trim(),
+    district: input.district.trim(), addressLine1: input.addressLine1.trim(),
+    addressLine2: input.addressLine2?.trim(), postalCode: input.postalCode?.trim(),
+  };
+}
+
+export async function insertAddress(ctx: MutationCtx, userId: Id<"users">, input: AddressInput) {
+  const existing = await userAddresses(ctx, userId);
+  if (existing.length >= MAX_ADDRESSES) throw new Error("En fazla 100 adres kaydedebilirsiniz.");
+  const isDefault = input.isDefault || existing.length === 0 || !existing.some((address) => address.isDefault);
+  if (isDefault) {
+    for (const address of existing) if (address.isDefault) await ctx.db.patch(address._id, { isDefault: false });
+  }
+  return await ctx.db.insert("addresses", { userId, ...normalizeAddress(input), isDefault });
+}
+
+async function selectDefault(ctx: MutationCtx, userId: Id<"users">, addressId: Id<"addresses">) {
+  for (const address of await userAddresses(ctx, userId)) {
+    const isDefault = address._id === addressId;
+    if (address.isDefault !== isDefault) await ctx.db.patch(address._id, { isDefault });
+  }
+}
 
 export const getMyAddresses = query({
-  args: {},
+  args: {}, returns: v.array(addressValidator),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    const addresses = await ctx.db
-      .query("addresses")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-
-    // Varsayılan adres en başta olacak şekilde sırala
-    return addresses.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
+    const addresses = await userAddresses(ctx, userId);
+    return addresses.slice(0, MAX_ADDRESSES).sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
   },
 });
-
 export const addAddress = mutation({
-  args: {
-    title: v.string(),
-    fullName: v.string(),
-    phone: v.string(),
-    city: v.string(),
-    district: v.string(),
-    addressLine1: v.string(),
-    addressLine2: v.optional(v.string()),
-    postalCode: v.optional(v.string()),
-    isDefault: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
-
-    const existing = await ctx.db
-      .query("addresses")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-
-    const isFirstAddress = existing.length === 0;
-    const shouldBeDefault = args.isDefault || isFirstAddress;
-
-    if (shouldBeDefault) {
-      for (const addr of existing) {
-        if (addr.isDefault) {
-          await ctx.db.patch(addr._id, { isDefault: false });
-        }
-      }
-    }
-
-    const addressId = await ctx.db.insert("addresses", {
-      userId,
-      title: args.title,
-      fullName: args.fullName,
-      phone: args.phone,
-      city: args.city,
-      district: args.district,
-      addressLine1: args.addressLine1,
-      addressLine2: args.addressLine2,
-      postalCode: args.postalCode,
-      isDefault: shouldBeDefault,
-    });
-
-    return addressId;
-  },
+  args: addressInputValidator.fields, returns: v.id("addresses"),
+  handler: async (ctx, args) => insertAddress(ctx, await requireUser(ctx), args),
 });
-
 export const updateAddress = mutation({
-  args: {
-    addressId: v.id("addresses"),
-    title: v.string(),
-    fullName: v.string(),
-    phone: v.string(),
-    city: v.string(),
-    district: v.string(),
-    addressLine1: v.string(),
-    addressLine2: v.optional(v.string()),
-    postalCode: v.optional(v.string()),
-    isDefault: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
-
-    const address = await ctx.db.get(args.addressId);
-    if (!address || address.userId !== userId) {
-      throw new Error("Adres bulunamadı veya yetkiniz yok.");
+  args: { addressId: v.id("addresses"), ...addressInputValidator.fields }, returns: v.null(),
+  handler: async (ctx, { addressId, ...input }) => {
+    const address = await ownedAddress(ctx, addressId);
+    if (input.isDefault) await selectDefault(ctx, address.userId, addressId);
+    await ctx.db.patch(addressId, normalizeAddress(input));
+    if (!input.isDefault && address.isDefault) {
+      const remaining = await userAddresses(ctx, address.userId);
+      const replacement = remaining.find((item) => item._id !== addressId) ?? remaining[0];
+      if (replacement) await selectDefault(ctx, address.userId, replacement._id);
     }
-
-    if (args.isDefault && !address.isDefault) {
-      const existing = await ctx.db
-        .query("addresses")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .collect();
-
-      for (const addr of existing) {
-        if (addr._id !== args.addressId && addr.isDefault) {
-          await ctx.db.patch(addr._id, { isDefault: false });
-        }
-      }
-    }
-
-    await ctx.db.patch(args.addressId, {
-      title: args.title,
-      fullName: args.fullName,
-      phone: args.phone,
-      city: args.city,
-      district: args.district,
-      addressLine1: args.addressLine1,
-      addressLine2: args.addressLine2,
-      postalCode: args.postalCode,
-      isDefault: args.isDefault,
-    });
-
     return null;
   },
 });
-
 export const deleteAddress = mutation({
-  args: {
-    addressId: v.id("addresses"),
-  },
+  args: { addressId: v.id("addresses") }, returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
-
-    const address = await ctx.db.get(args.addressId);
-    if (!address || address.userId !== userId) {
-      throw new Error("Adres bulunamadı veya yetkiniz yok.");
-    }
-
-    const wasDefault = address.isDefault;
+    const address = await ownedAddress(ctx, args.addressId);
     await ctx.db.delete(args.addressId);
-
-    // Eğer silinen adres varsayılansa ve başka adres varsa, birini varsayılan yap
-    if (wasDefault) {
-      const remaining = await ctx.db
-        .query("addresses")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .first();
-
-      if (remaining) {
-        await ctx.db.patch(remaining._id, { isDefault: true });
-      }
+    if (address.isDefault) {
+      const remaining = await ctx.db.query("addresses").withIndex("by_userId", (q) => q.eq("userId", address.userId)).first();
+      if (remaining) await selectDefault(ctx, address.userId, remaining._id);
     }
-
     return null;
   },
 });
-
 export const setDefaultAddress = mutation({
-  args: {
-    addressId: v.id("addresses"),
-  },
+  args: { addressId: v.id("addresses") }, returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
-
-    const address = await ctx.db.get(args.addressId);
-    if (!address || address.userId !== userId) {
-      throw new Error("Adres bulunamadı veya yetkiniz yok.");
-    }
-
-    const all = await ctx.db
-      .query("addresses")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-
-    for (const addr of all) {
-      const shouldBe = addr._id === args.addressId;
-      if (addr.isDefault !== shouldBe) {
-        await ctx.db.patch(addr._id, { isDefault: shouldBe });
-      }
-    }
-
+    const address = await ownedAddress(ctx, args.addressId);
+    await selectDefault(ctx, address.userId, address._id);
     return null;
   },
 });

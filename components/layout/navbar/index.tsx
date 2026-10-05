@@ -1,5 +1,5 @@
 import LogoSquare from "@/components/logo-square";
-import { getMenu } from "@/lib/catalog";
+import { getMenu, getStoreSettings } from "@/lib/catalog";
 import { Menu } from "@/lib/catalog/types";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -8,11 +8,8 @@ import Search, { SearchSkeleton } from "./search";
 import { UserNav } from "./user-nav";
 import { CartButton } from "@/components/cart/cart-button";
 
-const rawSiteName = process.env.SITE_NAME || "Commerce";
-const SITE_NAME = rawSiteName.replace(/acme\s*/gi, "").trim() || "Commerce";
-
 export async function Navbar() {
-  const menu = await getMenu();
+  const [menu, settings] = await Promise.all([getMenu(), getStoreSettings()]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200/80 bg-neutral-50/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900/80">
@@ -32,7 +29,7 @@ export async function Navbar() {
           >
             <LogoSquare />
             <span className="text-sm font-semibold tracking-wider uppercase text-black dark:text-white">
-              {SITE_NAME}
+              {settings.storeName}
             </span>
           </Link>
 

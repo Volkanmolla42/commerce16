@@ -1,18 +1,28 @@
 import type { Category, Menu, Page, Product } from "./types";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { fetchQuery } from "convex/nextjs";
+import { cacheTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 
 type ProductFilters = {
+  category?: string;
   query?: string;
   sortKey?: string;
   reverse?: boolean;
 };
 
-function formatProduct(item: any): Product {
+export type StoreSettings = {
+  storeName: string;
+};
+
+export async function getStoreSettings(): Promise<StoreSettings> {
+  "use cache";
+  cacheTag("store-settings");
+  return await fetchQuery(api.settings.getStoreSettings, {});
+}
+
+function formatProduct(item: Doc<"products">): Product {
   const slug = item.slug || "";
-  const images = Array.isArray(item.images)
-    ? item.images.map((img: any) => (typeof img === "string" ? img : img?.url || ""))
-    : [];
 
   return {
     id: item._id,
@@ -21,24 +31,27 @@ function formatProduct(item: any): Product {
     price: item.price || "0.00",
     availableForSale: item.availableForSale ?? true,
     categorySlug: item.categorySlug,
-    images: images.length > 0 ? images : [
+    images: item.images.length > 0 ? item.images : [
       "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80"
     ],
     options: item.options,
-    variants: item.variants,
+    variants: item.variants?.map((variant) => ({
+      ...variant,
+      price: { amount: variant.price, currencyCode: "TRY" },
+    })),
     seo: item.seo,
-    updatedAt: item.updatedAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date(item._creationTime).toISOString(),
   };
 }
 
-// 1. Ürünleri Convex Veritabanından Getir
 export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
   "use cache";
-  const items = await fetchQuery(api.products.list, { limit: 100 });
-  const mapped: Product[] = (items || []).map(formatProduct);
+  cacheTag("products");
+  const items = await fetchQuery(api.products.list, { limit: 100, ...(filters.category ? { categorySlug: filters.category } : {}) });
+  const mapped = items.map(formatProduct);
 
   const query = filters.query?.trim().toLowerCase();
-  let result = mapped.filter(
+  const result = mapped.filter(
     (product) => !query || product.title.toLowerCase().includes(query)
   );
 
@@ -49,23 +62,22 @@ export async function getProducts(filters: ProductFilters = {}): Promise<Product
   return filters.reverse ? result.reverse() : result;
 }
 
-// 2. Tekil Ürünü Convex Veritabanından Getir
 export async function getProduct(slug: string): Promise<Product | undefined> {
   "use cache";
+  cacheTag("products");
   const item = await fetchQuery(api.products.getBySlug, { slug });
   if (!item) return undefined;
   return formatProduct(item);
 }
 
-// 3. Önerilen Ürünleri Convex'ten Getir
 export async function getProductRecommendations(productId: string): Promise<Product[]> {
   const all = await getProducts();
   return all.filter((product) => product.id !== productId).slice(0, 5);
 }
 
-// 4. Kategorileri Convex Veritabanından Getir
 export async function getCategories(): Promise<Category[]> {
   "use cache";
+  cacheTag("categories");
   const items = await fetchQuery(api.categories.list, {});
   const dynamicCategories: Category[] = (items || []).map((c) => ({
     slug: c.slug,
@@ -86,15 +98,15 @@ export async function getCategories(): Promise<Category[]> {
         description: "Tüm ürünler",
       },
       path: "/search",
-      updatedAt: new Date().toISOString(),
+      updatedAt: dynamicCategories.map((category) => category.updatedAt).sort().at(-1) ?? "1970-01-01T00:00:00.000Z",
     },
     ...dynamicCategories,
   ];
 }
 
-// 5. Tekil Kategori Getir
 export async function getCategory(slug: string): Promise<Category | undefined> {
   "use cache";
+  cacheTag("categories");
   const item = await fetchQuery(api.categories.getBySlug, { slug });
   if (!item) return undefined;
   return {
@@ -107,38 +119,14 @@ export async function getCategory(slug: string): Promise<Category | undefined> {
   };
 }
 
-// 6. Kategoriye Ait Ürünleri Getir
 export async function getCategoryProducts({
   category,
   ...filters
 }: ProductFilters & { category: string }): Promise<Product[]> {
-  "use cache";
-  const all = await getProducts(filters);
-  if (!category) return all;
-  return all.filter((product) => product.categorySlug === category);
+  return getProducts({ ...filters, category });
 }
 
-// 7. Sayfaları Convex Veritabanından Getir
-export async function getPages(): Promise<Page[]> {
-  "use cache";
-  const items = await fetchQuery(api.pages.list, {});
-  return (items || []).map((p) => ({
-    id: p._id,
-    title: p.title,
-    slug: p.slug,
-    body: p.body,
-    bodySummary: p.bodySummary,
-    seo: p.seo,
-    createdAt: new Date(p._creationTime).toISOString(),
-    updatedAt: p.updatedAt,
-  }));
-}
-
-// 8. Tekil Sayfa Getir
-export async function getPage(slug: string): Promise<Page | undefined> {
-  "use cache";
-  const item = await fetchQuery(api.pages.getBySlug, { slug });
-  if (!item) return undefined;
+function formatPage(item: Doc<"pages">): Page {
   return {
     id: item._id,
     title: item.title,
@@ -151,7 +139,21 @@ export async function getPage(slug: string): Promise<Page | undefined> {
   };
 }
 
-// 9. Dinamik Menü
+export async function getPages(): Promise<Page[]> {
+  "use cache";
+  cacheTag("cms-pages");
+  const items = await fetchQuery(api.pages.list, {});
+  return items.map(formatPage);
+}
+
+export async function getPage(slug: string): Promise<Page | undefined> {
+  "use cache";
+  cacheTag("cms-pages", `cms-page:${slug}`);
+  const item = await fetchQuery(api.pages.getBySlug, { slug });
+  if (!item) return undefined;
+  return formatPage(item);
+}
+
 export async function getMenu(): Promise<Menu[]> {
   "use cache";
   const categories = await getCategories();

@@ -2,11 +2,6 @@ import { getCategories, getPages, getProducts } from "@/lib/catalog";
 import { baseUrl } from "@/lib/utils";
 import { MetadataRoute } from "next";
 
-type Route = {
-  url: string;
-  lastModified: string;
-};
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   "use cache";
   const routesMap = ["", "/search"].map((route) => ({
@@ -35,15 +30,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   );
 
-  let fetchedRoutes: Route[] = [];
-
-  try {
-    fetchedRoutes = (
-      await Promise.all([categoriesPromise, productsPromise, pagesPromise])
-    ).flat();
-  } catch (error) {
-    throw JSON.stringify(error, null, 2);
-  }
-
-  return [...routesMap, ...fetchedRoutes];
+  const fetchedRoutes = (await Promise.all([categoriesPromise, productsPromise, pagesPromise])).flat();
+  return [...new Map([...routesMap, ...fetchedRoutes].map((route) => [route.url, route])).values()];
 }

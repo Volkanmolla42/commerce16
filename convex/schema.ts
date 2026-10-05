@@ -12,6 +12,14 @@ export default defineSchema({
     availableForSale: v.boolean(),
     categorySlug: v.optional(v.string()),
     images: v.array(v.string()),
+    storageImages: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          fileName: v.string(),
+        })
+      )
+    ),
     options: v.optional(
       v.array(
         v.object({
@@ -102,6 +110,12 @@ export default defineSchema({
     ),
     updatedAt: v.string(),
   }).index("by_slug", ["slug"]),
+
+  storeSettings: defineTable({
+    key: v.literal("store"),
+    storeName: v.string(),
+    updatedAt: v.string(),
+  }).index("by_key", ["key"]),
 
   addresses: defineTable({
     userId: v.id("users"),

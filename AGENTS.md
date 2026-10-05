@@ -1,3 +1,5 @@
+Gereksiz npm run build çalıştırma.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

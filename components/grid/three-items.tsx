@@ -39,7 +39,7 @@ function ThreeItemGridItem({
             position: size === "full" ? "center" : "bottom",
             title: item.title as string,
             amount: item.price,
-            currencyCode: "USD",
+            currencyCode: "TRY",
           }}
         />
       </Link>

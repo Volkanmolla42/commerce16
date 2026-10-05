@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { assertAdminApiSecret } from "./adminAuth";
 
 const initialProducts = [
   {
@@ -15,7 +16,6 @@ const initialProducts = [
       description: "Ağır gramajlı organik pamuk kapüşonlu sweatshirt.",
     },
     categorySlug: "apparel",
-    updatedAt: new Date().toISOString(),
   },
   {
     slug: "minimalist-backpack",
@@ -30,7 +30,6 @@ const initialProducts = [
       description: "Suya dayanıklı 16 inç laptop bölmeli şehir sırt çantası.",
     },
     categorySlug: "accessories",
-    updatedAt: new Date().toISOString(),
   },
   {
     slug: "ceramic-coffee-cup",
@@ -45,7 +44,6 @@ const initialProducts = [
       description: "Geleneksel el yapımı seramik fincan.",
     },
     categorySlug: "accessories",
-    updatedAt: new Date().toISOString(),
   },
 ];
 
@@ -59,7 +57,6 @@ const initialCategories = [
       title: "Giyim Kategorisi",
       description: "Seçkin giyim ürünlerimizi keşfedin.",
     },
-    updatedAt: new Date().toISOString(),
   },
   {
     slug: "accessories",
@@ -70,7 +67,6 @@ const initialCategories = [
       title: "Aksesuar Kategorisi",
       description: "El yapımı günlük aksesuar ürünlerimizi inceleyin.",
     },
-    updatedAt: new Date().toISOString(),
   },
   {
     slug: "footwear",
@@ -81,7 +77,6 @@ const initialCategories = [
       title: "Ayakkabı Kategorisi",
       description: "Premium günlük ayakkabılar.",
     },
-    updatedAt: new Date().toISOString(),
   },
 ];
 
@@ -95,7 +90,6 @@ const initialPages = [
       title: "Hakkımızda | Commerce",
       description: "Modern hassasiyetle üretilmiş yenilikçi tasarım ürünleri.",
     },
-    updatedAt: new Date().toISOString(),
   },
   {
     title: "Kullanım Koşulları",
@@ -106,7 +100,6 @@ const initialPages = [
       title: "Kullanım Koşulları | Commerce",
       description: "Kullanım koşullarımızı ve alışveriş yönergelerimizi okuyun.",
     },
-    updatedAt: new Date().toISOString(),
   },
   {
     title: "Gizlilik Politikası",
@@ -117,42 +110,48 @@ const initialPages = [
       title: "Gizlilik Politikası | Commerce",
       description: "Commerce gizlilik politikası.",
     },
-    updatedAt: new Date().toISOString(),
   },
 ];
 
 export const seedDatabase = mutation({
   args: {
+    adminSecret: v.string(),
     force: v.optional(v.boolean()),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
     if (args.force) {
-      const allP = await ctx.db.query("products").collect();
-      for (const p of allP) await ctx.db.delete(p._id);
-
-      const allCat = await ctx.db.query("categories").collect();
-      for (const cat of allCat) await ctx.db.delete(cat._id);
-
-      const allPg = await ctx.db.query("pages").collect();
-      for (const pg of allPg) await ctx.db.delete(pg._id);
-    } else {
-      const existing = await ctx.db.query("products").first();
-      if (existing) {
-        return "Veritabanında zaten veriler mevcut.";
+      // ponytail: 100 per table; larger datasets use dedicated batched maintenance.
+      const [products, categories, pages] = await Promise.all([
+        ctx.db.query("products").take(101),
+        ctx.db.query("categories").take(101),
+        ctx.db.query("pages").take(101),
+      ]);
+      if ([products, categories, pages].some((rows) => rows.length > 100)) {
+        throw new Error("Örnek veri sıfırlama tablo başına en fazla 100 kayıt destekler. Daha büyük veri için ayrı toplu bakım kullanın.");
       }
+      for (const row of [...products, ...categories, ...pages]) await ctx.db.delete(row._id);
+    } else {
+      const existing = await Promise.all([
+        ctx.db.query("products").first(),
+        ctx.db.query("categories").first(),
+        ctx.db.query("pages").first(),
+      ]);
+      if (existing.some(Boolean)) return "Veritabanında zaten veriler mevcut.";
     }
+    const updatedAt = new Date().toISOString();
 
     for (const prod of initialProducts) {
-      await ctx.db.insert("products", prod);
+      await ctx.db.insert("products", { ...prod, updatedAt });
     }
 
     for (const cat of initialCategories) {
-      await ctx.db.insert("categories", cat);
+      await ctx.db.insert("categories", { ...cat, updatedAt });
     }
 
     for (const pg of initialPages) {
-      await ctx.db.insert("pages", pg);
+      await ctx.db.insert("pages", { ...pg, updatedAt });
     }
 
     return "Tüm ürünler, kategoriler ve sayfalar Convex veritabanına başarıyla yüklendi!";
