@@ -18,7 +18,7 @@ export type Money = {
 export type Page = {
   id: string;
   title: string;
-  handle: string;
+  slug: string;
   body: string;
   bodySummary: string;
   seo?: SEO;
@@ -48,9 +48,9 @@ export type SEO = {
   description: string;
 };
 
-export type Collection = {
+export type Category = {
   path: string;
-  handle: string;
+  slug: string;
   title: string;
   description: string;
   seo: SEO;
@@ -59,20 +59,14 @@ export type Collection = {
 
 export type Product = {
   id: string;
-  handle: string;
-  availableForSale: boolean;
+  slug: string;
   title: string;
-  description: string;
-  descriptionHtml: string;
-  options: ProductOption[];
-  priceRange: {
-    maxVariantPrice: Money;
-    minVariantPrice: Money;
-  };
-  variants: ProductVariant[];
-  featuredImage: Image;
-  images: Image[];
-  seo: SEO;
-  hidden?: boolean;
+  price: string;
+  availableForSale: boolean;
+  categorySlug?: string;
+  images: string[];
+  options?: ProductOption[];
+  variants?: ProductVariant[];
+  seo?: SEO;
   updatedAt: string;
 };

@@ -1,4 +1,10 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import { ReadonlyURLSearchParams } from "next/navigation";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? (process.env.NEXT_PUBLIC_SITE_URL.startsWith("http")

@@ -1,5 +1,5 @@
 import { GridTileImage } from "@/components/grid/tile";
-import { getCollectionProducts } from "@/lib/catalog";
+import { getProducts } from "@/lib/catalog";
 import type { Product } from "@/lib/catalog/types";
 import Link from "next/link";
 
@@ -22,11 +22,11 @@ function ThreeItemGridItem({
     >
       <Link
         className="relative block aspect-square h-full w-full"
-        href={`/product/${item.handle}`}
+        href={`/product/${item.slug}`}
         prefetch={true}
       >
         <GridTileImage
-          src={item.featuredImage.url}
+          src={item.images[0]}
           fill
           sizes={
             size === "full"
@@ -38,8 +38,8 @@ function ThreeItemGridItem({
           label={{
             position: size === "full" ? "center" : "bottom",
             title: item.title as string,
-            amount: item.priceRange.maxVariantPrice.amount,
-            currencyCode: item.priceRange.maxVariantPrice.currencyCode,
+            amount: item.price,
+            currencyCode: "USD",
           }}
         />
       </Link>
@@ -48,20 +48,21 @@ function ThreeItemGridItem({
 }
 
 export async function ThreeItemGrid() {
-  // Collections that start with `hidden-*` are hidden from the search page.
-  const homepageItems = await getCollectionProducts({
-    collection: "hidden-homepage-featured-items",
-  });
+  const products = await getProducts();
 
-  if (!homepageItems[0] || !homepageItems[1] || !homepageItems[2]) return null;
+  if (!products || products.length === 0) return null;
 
-  const [firstProduct, secondProduct, thirdProduct] = homepageItems;
+  const [firstProduct, secondProduct, thirdProduct] = products;
 
   return (
     <section className="mx-auto grid max-w-(--breakpoint-2xl) gap-4 px-4 pb-4 md:grid-cols-6 md:grid-rows-2 lg:max-h-[calc(100vh-200px)]">
       <ThreeItemGridItem size="full" item={firstProduct} priority={true} />
-      <ThreeItemGridItem size="half" item={secondProduct} priority={true} />
-      <ThreeItemGridItem size="half" item={thirdProduct} />
+      {secondProduct && (
+        <ThreeItemGridItem size="half" item={secondProduct} priority={true} />
+      )}
+      {thirdProduct && (
+        <ThreeItemGridItem size="half" item={thirdProduct} />
+      )}
     </section>
   );
 }

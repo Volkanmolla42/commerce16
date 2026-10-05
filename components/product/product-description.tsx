@@ -1,27 +1,30 @@
 import Price from "@/components/price";
-import Prose from "@/components/prose";
 import { Product } from "@/lib/catalog/types";
+import { AddToCart } from "@/components/cart/add-to-cart";
 import { VariantSelector } from "./variant-selector";
 
 export function ProductDescription({ product }: { product: Product }) {
   return (
     <>
       <div className="mb-6 flex flex-col border-b pb-6 dark:border-neutral-700">
-        <h1 className="mb-2 text-5xl font-medium">{product.title}</h1>
-        <div className="mr-auto w-auto rounded-full bg-blue-600 p-2 text-sm text-white">
+        <h1 className="mb-2 text-4xl lg:text-5xl font-bold tracking-tight text-neutral-900 dark:text-white">
+          {product.title}
+        </h1>
+        <div className="mr-auto mt-2 w-auto rounded-full bg-neutral-900 px-3 py-1.5 text-sm font-semibold text-white dark:bg-white dark:text-neutral-900 shadow-xs">
           <Price
-            amount={product.priceRange.maxVariantPrice.amount}
-            currencyCode={product.priceRange.maxVariantPrice.currencyCode}
+            amount={product.price}
+            currencyCode="USD"
           />
         </div>
       </div>
-      <VariantSelector options={product.options} variants={product.variants} />
-      {product.descriptionHtml ? (
-        <Prose
-          className="mb-6 text-sm leading-tight dark:text-white/[60%]"
-          html={product.descriptionHtml}
-        />
-      ) : null}
+
+      {product.options && product.variants && (
+        <VariantSelector options={product.options} variants={product.variants} />
+      )}
+
+      <div className="mt-8">
+        <AddToCart product={product} />
+      </div>
     </>
   );
 }

@@ -37,10 +37,10 @@ export default async function Footer() {
             </div>
           </div>
 
-          {/* 2. Sütun: Koleksiyonlar */}
+          {/* 2. Sütun: Kategoriler */}
           <div>
             <h3 className="mb-4 text-xs font-semibold tracking-wider uppercase text-black dark:text-white">
-              Koleksiyonlar
+              Kategoriler
             </h3>
             <ul className="flex flex-col gap-2.5">
               {menu.map((item: Menu) => (
@@ -63,9 +63,9 @@ export default async function Footer() {
             </h3>
             <ul className="flex flex-col gap-2.5">
               {pages.map((page) => (
-                <li key={page.handle}>
+                <li key={page.slug}>
                   <Link
-                    href={`/${page.handle}`}
+                    href={`/${page.slug}`}
                     className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white"
                   >
                     {page.title}
@@ -81,7 +81,7 @@ export default async function Footer() {
               Bültene Katılın
             </h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Yeni çıkan koleksiyonlar ve özel indirimlerden anında haberdar olun.
+              Yeni ürünler ve özel indirimlerden anında haberdar olun.
             </p>
             <form
               onSubmit={undefined}

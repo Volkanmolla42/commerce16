@@ -1,11 +1,12 @@
 import LogoSquare from "@/components/logo-square";
 import { getMenu } from "@/lib/catalog";
 import { Menu } from "@/lib/catalog/types";
-import { ShoppingBagIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { Suspense } from "react";
 import MobileMenu from "./mobile-menu";
 import Search, { SearchSkeleton } from "./search";
+import { UserNav } from "./user-nav";
+import { CartButton } from "@/components/cart/cart-button";
 
 const rawSiteName = process.env.SITE_NAME || "Commerce";
 const SITE_NAME = rawSiteName.replace(/acme\s*/gi, "").trim() || "Commerce";
@@ -58,18 +59,10 @@ export async function Navbar() {
           </Suspense>
         </div>
 
-        {/* Sağ: Sepet ve Eylemler */}
-        <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            aria-label="Alışveriş Sepeti"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-black dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:text-white"
-          >
-            <ShoppingBagIcon className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-black px-1 text-[10px] font-bold text-white dark:bg-white dark:text-black">
-              0
-            </span>
-          </button>
+        {/* Sağ: Kullanıcı ve Sepet */}
+        <div className="flex items-center justify-end gap-2.5">
+          <UserNav />
+          <CartButton />
         </div>
       </div>
     </header>
