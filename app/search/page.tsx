@@ -4,6 +4,8 @@ import { defaultSort, sorting } from "@/lib/constants";
 import { getProducts } from "@/lib/catalog";
 import { Suspense } from "react";
 
+export const prefetch = "partial";
+
 export const metadata = {
   title: "Arama",
   description: "Mağazadaki ürünleri arayın.",

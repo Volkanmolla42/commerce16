@@ -10,8 +10,11 @@ export default function Search() {
   return (
     <Form
       action="/search"
-      className="w-max-[550px] relative w-full lg:w-80 xl:w-full"
+      className="relative w-full max-w-xs sm:max-w-sm md:max-w-md"
     >
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
+      </div>
       <input
         key={searchParams?.get("q")}
         type="text"
@@ -19,25 +22,23 @@ export default function Search() {
         placeholder="Ürün ara..."
         autoComplete="off"
         defaultValue={searchParams?.get("q") || ""}
-        className="text-md w-full rounded-lg border bg-white px-4 py-2 text-black placeholder:text-neutral-500 md:text-sm dark:border-neutral-800 dark:bg-transparent dark:text-white dark:placeholder:text-neutral-400"
+        className="w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-4 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900"
       />
-      <div className="absolute right-0 top-0 mr-3 flex h-full items-center">
-        <MagnifyingGlassIcon className="h-4" />
-      </div>
     </Form>
   );
 }
 
 export function SearchSkeleton() {
   return (
-    <form className="w-max-[550px] relative w-full lg:w-80 xl:w-full">
+    <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md">
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
+      </div>
       <input
         placeholder="Ürün ara..."
-        className="w-full rounded-lg border bg-white px-4 py-2 text-sm text-black placeholder:text-neutral-500 dark:border-neutral-800 dark:bg-transparent dark:text-white dark:placeholder:text-neutral-400"
+        disabled
+        className="w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-4 text-sm text-black placeholder:text-neutral-500 dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400"
       />
-      <div className="absolute right-0 top-0 mr-3 flex h-full items-center">
-        <MagnifyingGlassIcon className="h-4" />
-      </div>
-    </form>
+    </div>
   );
 }

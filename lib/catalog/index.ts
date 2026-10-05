@@ -4,9 +4,9 @@ import type { Collection, Menu, Page, Product } from "./types";
 export const products: Product[] = [
   {
     id: "prod-hoodie-1",
-    handle: "acme-geometric-hoodie",
+    handle: "geometric-hoodie",
     availableForSale: true,
-    title: "Acme Geometrik Kapüşonlu Sweatshirt",
+    title: "Geometrik Kapüşonlu Sweatshirt",
     description:
       "Rahat ve dökümlü kesime sahip ağır gramajlı organik pamuktan üretilmiştir. İnce geometrik dikiş detayları ve güçlendirilmiş kanguru cep içerir.",
     descriptionHtml:
@@ -81,26 +81,26 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Geometrik Kapüşonlu Sweatshirt",
+      altText: "Geometrik Kapüşonlu Sweatshirt",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Geometrik Kapüşonlu Sweatshirt Ön",
+        altText: "Geometrik Kapüşonlu Sweatshirt Ön",
         width: 1200,
         height: 1200,
       },
       {
         url: "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Geometrik Kapüşonlu Sweatshirt Detay",
+        altText: "Geometrik Kapüşonlu Sweatshirt Detay",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Geometrik Kapüşonlu Sweatshirt",
+      title: "Geometrik Kapüşonlu Sweatshirt",
       description:
         "Modern geometrik stile sahip birinci sınıf organik pamuk kapüşonlu sweatshirt.",
     },
@@ -108,9 +108,9 @@ export const products: Product[] = [
   },
   {
     id: "prod-tee-2",
-    handle: "acme-minimal-tshirt",
+    handle: "minimal-tshirt",
     availableForSale: true,
-    title: "Acme Minimal Tişört",
+    title: "Minimal Tişört",
     description:
       "Ultra ince taranmış pamuktan üretilmiş bisiklet yaka tişört. Nefes alabilir, dayanıklı ve günlük kombinler için idealdir.",
     descriptionHtml:
@@ -165,29 +165,29 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Minimal Tişört",
+      altText: "Minimal Tişört",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Minimal Tişört",
+        altText: "Minimal Tişört",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Minimal Tişört",
+      title: "Minimal Tişört",
       description: "Modern silüete sahip kaliteli penye pamuklu tişört.",
     },
     updatedAt: "2026-10-01T00:00:00Z",
   },
   {
     id: "prod-backpack-3",
-    handle: "acme-leather-backpack",
+    handle: "leather-backpack",
     availableForSale: true,
-    title: "Acme Deri Sırt Çantası",
+    title: "Deri Sırt Çantası",
     description:
       "Suya dayanıklı birinci sınıf deriden üretilmiş, 16 inç dolgulu dizüstü bilgisayar bölmesine ve ergonomik omuz askılarına sahip sırt çantası.",
     descriptionHtml:
@@ -221,20 +221,20 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Deri Sırt Çantası",
+      altText: "Deri Sırt Çantası",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Deri Sırt Çantası",
+        altText: "Deri Sırt Çantası",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Deri Sırt Çantası",
+      title: "Deri Sırt Çantası",
       description:
         "Günlük kullanım ve seyahatler için lüks deri sırt çantası.",
     },
@@ -242,9 +242,9 @@ export const products: Product[] = [
   },
   {
     id: "prod-cap-4",
-    handle: "acme-classic-cap",
+    handle: "classic-cap",
     availableForSale: true,
-    title: "Acme Klasik Şapka",
+    title: "Klasik Şapka",
     description:
       "Ayarlanabilir pirinç tokalı kapamaya sahip altı panelli pamuklu dimi şapka. Önceden kavis verilmiş siperlik ve zarif nakış detayları.",
     descriptionHtml:
@@ -278,29 +278,29 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Klasik Şapka",
+      altText: "Klasik Şapka",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Klasik Şapka",
+        altText: "Klasik Şapka",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Klasik Şapka",
+      title: "Klasik Şapka",
       description: "Zamansız altı panelli pamuk dimi beyzbol şapkası.",
     },
     updatedAt: "2026-10-01T00:00:00Z",
   },
   {
     id: "prod-sneakers-5",
-    handle: "acme-canvas-sneakers",
+    handle: "canvas-sneakers",
     availableForSale: true,
-    title: "Acme Kanvas Spor Ayakkabı",
+    title: "Kanvas Spor Ayakkabı",
     description:
       "Organik kanvas sayaya ve hafızalı köpük iç tabana sahip alçak profilli vulkanize kauçuk spor ayakkabı.",
     descriptionHtml:
@@ -341,29 +341,29 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Kanvas Spor Ayakkabı",
+      altText: "Kanvas Spor Ayakkabı",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Kanvas Spor Ayakkabı",
+        altText: "Kanvas Spor Ayakkabı",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Kanvas Spor Ayakkabı",
+      title: "Kanvas Spor Ayakkabı",
       description: "Alçak profilli minimalist kanvas spor ayakkabı.",
     },
     updatedAt: "2026-10-01T00:00:00Z",
   },
   {
     id: "prod-mug-6",
-    handle: "acme-insulated-mug",
+    handle: "insulated-mug",
     availableForSale: true,
-    title: "Acme Termos Kupa",
+    title: "Termos Kupa",
     description:
       "Çift duvarlı vakum yalıtımlı paslanmaz çelik seyahat kupası. Sıcak içecekleri 12 saat sıcak, soğuk içecekleri 24 saat soğuk tutar.",
     descriptionHtml:
@@ -397,29 +397,29 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Termos Kupa",
+      altText: "Termos Kupa",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Termos Kupa",
+        altText: "Termos Kupa",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Termos Kupa",
+      title: "Termos Kupa",
       description: "Günlük kullanım için tasarlanmış vakum yalıtımlı termos kupa.",
     },
     updatedAt: "2026-10-01T00:00:00Z",
   },
   {
     id: "prod-beanie-7",
-    handle: "acme-wool-beanie",
+    handle: "wool-beanie",
     availableForSale: true,
-    title: "Acme Yün Bere",
+    title: "Yün Bere",
     description:
       "Ultra ince %100 Merinos yününden örülmüş bere. Doğal olarak ısıyı dengeler, koku tutmaz ve kaşındırmaz konfor sunar.",
     descriptionHtml:
@@ -453,29 +453,29 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Yün Bere",
+      altText: "Yün Bere",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Yün Bere",
+        altText: "Yün Bere",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Yün Bere",
+      title: "Yün Bere",
       description: "%100 Merinos yünü fitilli bere.",
     },
     updatedAt: "2026-10-01T00:00:00Z",
   },
   {
     id: "prod-runner-8",
-    handle: "acme-runner-shoes",
+    handle: "runner-shoes",
     availableForSale: true,
-    title: "Acme Performans Koşu Ayakkabısı",
+    title: "Performans Koşu Ayakkabısı",
     description:
       "Yüksek enerji geri dönüşü ve uzun mesafelerde tüy kadar hafif konfor için tasarlanmış özel file koşu ayakkabısı.",
     descriptionHtml:
@@ -516,20 +516,20 @@ export const products: Product[] = [
     ],
     featuredImage: {
       url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
-      altText: "Acme Performans Koşu Ayakkabısı",
+      altText: "Performans Koşu Ayakkabısı",
       width: 1200,
       height: 1200,
     },
     images: [
       {
         url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
-        altText: "Acme Performans Koşu Ayakkabısı",
+        altText: "Performans Koşu Ayakkabısı",
         width: 1200,
         height: 1200,
       },
     ],
     seo: {
-      title: "Acme Performans Koşu Ayakkabısı",
+      title: "Performans Koşu Ayakkabısı",
       description: "Yüksek sıçrama ve enerji dönüşümlü performans koşu ayakkabısı.",
     },
     updatedAt: "2026-10-01T00:00:00Z",
@@ -619,12 +619,12 @@ export const collections: (Collection & { productIds: string[] })[] = [
 export const pages: Page[] = [
   {
     id: "page-about",
-    title: "Acme Hakkında",
+    title: "Hakkımızda",
     handle: "about",
-    body: "<h2>Tasarım Performansla Buluşuyor</h2><p>Acme Commerce yalın bir vizyonla kuruldu: mimari hassasiyet, birinci sınıf malzemeler ve detaylara gösterilen özenle temel parçalar üretmek.</p><p>Next.js 16 ve modern web standartları üzerine inşa edilen mağazamız, anında sayfa yüklemeleri, akıcı geçişler ve zahmetsiz bir alışveriş deneyimi sunmak üzere tasarlanmıştır.</p>",
-    bodySummary: "Acme Commerce'in tasarım felsefesi ve misyonu hakkında bilgi edinin.",
+    body: "<h2>Tasarım Performansla Buluşuyor</h2><p>Commerce yalın bir vizyonla kuruldu: mimari hassasiyet, birinci sınıf malzemeler ve detaylara gösterilen özenle temel parçalar üretmek.</p><p>Next.js 16 ve modern web standartları üzerine inşa edilen mağazamız, anında sayfa yüklemeleri, akıcı geçişler ve zahmetsiz bir alışveriş deneyimi sunmak üzere tasarlanmıştır.</p>",
+    bodySummary: "Commerce'in tasarım felsefesi ve misyonu hakkında bilgi edinin.",
     seo: {
-      title: "Hakkımızda | Acme Commerce",
+      title: "Hakkımızda | Commerce",
       description: "Modern hassasiyetle üretilmiş yenilikçi tasarım ürünleri.",
     },
     createdAt: "2026-10-01T00:00:00Z",
@@ -634,10 +634,10 @@ export const pages: Page[] = [
     id: "page-terms",
     title: "Kullanım Koşulları",
     handle: "terms-conditions",
-    body: "<h2>Kullanım Koşulları ve Şartlar</h2><p>Acme Commerce'e erişerek veya alışveriş yaparak bu Kullanım Koşullarını kabul etmiş olursunuz. Tüm işlemler güvenli bir şekilde işlenir ve endüstri standardı şifreleme protokolleriyle korunur.</p>",
-    bodySummary: "Acme Commerce için standart kullanım koşulları ve şartlar.",
+    body: "<h2>Kullanım Koşulları ve Şartlar</h2><p>Commerce'e erişerek veya alışveriş yaparak bu Kullanım Koşullarını kabul etmiş olursunuz. Tüm işlemler güvenli bir şekilde işlenir ve endüstri standardı şifreleme protokolleriyle korunur.</p>",
+    bodySummary: "Commerce için standart kullanım koşulları ve şartlar.",
     seo: {
-      title: "Kullanım Koşulları | Acme Commerce",
+      title: "Kullanım Koşulları | Commerce",
       description: "Kullanım koşullarımızı ve alışveriş yönergelerimizi okuyun.",
     },
     createdAt: "2026-10-01T00:00:00Z",
@@ -648,11 +648,11 @@ export const pages: Page[] = [
     title: "Gizlilik Politikası",
     handle: "privacy-policy",
     body: "<h2>Gizliliğiniz Bizim İçin Önemli</h2><p>Şeffaf ve gizlilik odaklı bir ticarete inanıyoruz. Kişisel verilerinizi asla satmıyoruz. Ödeme sırasında toplanan bilgiler yalnızca siparişlerinizi hazırlamak ve teslim etmek amacıyla kullanılır.</p>",
-    bodySummary: "Acme Commerce gizlilik politikası ve müşteri verilerinin korunması.",
+    bodySummary: "Commerce gizlilik politikası ve müşteri verilerinin korunması.",
     seo: {
-      title: "Gizlilik Politikası | Acme Commerce",
+      title: "Gizlilik Politikası | Commerce",
       description:
-        "Acme Commerce'in gizliliğinize nasıl saygı duyduğunu ve koruduğunu öğrenin.",
+        "Commerce'in gizliliğinize nasıl saygı duyduğunu ve koruduğunu öğrenin.",
     },
     createdAt: "2026-10-01T00:00:00Z",
     updatedAt: "2026-10-01T00:00:00Z",

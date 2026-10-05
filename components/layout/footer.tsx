@@ -1,78 +1,121 @@
 import Link from "next/link";
-
-import FooterMenu from "@/components/layout/footer-menu";
 import LogoSquare from "@/components/logo-square";
-import { getMenu } from "@/lib/catalog";
-import { Suspense } from "react";
+import { getMenu, getPages } from "@/lib/catalog";
+import { Menu } from "@/lib/catalog/types";
 
-const COMPANY_NAME = process.env.COMPANY_NAME || "Commerce Inc.";
-const SITE_NAME = process.env.SITE_NAME || "Commerce";
+const rawSiteName = process.env.SITE_NAME || "Commerce";
+const SITE_NAME = rawSiteName.replace(/acme\s*/gi, "").trim() || "Commerce";
+
+const rawCompanyName = process.env.COMPANY_NAME || "Commerce Inc.";
+const COMPANY_NAME = rawCompanyName.replace(/acme\s*/gi, "").trim() || "Commerce Inc.";
 
 export default async function Footer() {
-  "use cache";
-  const currentYear = new Date().getFullYear();
-  const copyrightDate = 2023 + (currentYear > 2023 ? `-${currentYear}` : "");
-  const skeleton =
-    "w-full h-6 animate-pulse rounded-sm bg-neutral-200 dark:bg-neutral-700";
-  const menu = await getMenu();
-  const copyrightName = COMPANY_NAME || SITE_NAME || "";
+  "use cache"
+  const copyrightDate = new Date().getFullYear();
+  const [menu, pages] = await Promise.all([getMenu(), getPages()]);
 
   return (
-    <footer className="text-sm text-neutral-500 dark:text-neutral-400">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 border-t border-neutral-200 px-6 py-12 text-sm md:flex-row md:gap-12 md:px-4 min-[1320px]:px-0 dark:border-neutral-700">
-        <div>
-          <Link
-            className="flex items-center gap-2 text-black md:pt-1 dark:text-white"
-            href="/"
-          >
-            <LogoSquare size="sm" />
-            <span className="uppercase">{SITE_NAME}</span>
-          </Link>
-        </div>
-        <Suspense
-          fallback={
-            <div className="flex h-[188px] w-[200px] flex-col gap-2">
-              <div className={skeleton} />
-              <div className={skeleton} />
-              <div className={skeleton} />
-              <div className={skeleton} />
-              <div className={skeleton} />
-              <div className={skeleton} />
+    <footer className="w-full border-t border-neutral-200 bg-neutral-50/50 text-sm text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-400">
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-4 lg:gap-12">
+          {/* 1. Sütun: Marka Tanıtımı */}
+          <div className="flex flex-col gap-4">
+            <Link
+              className="flex items-center gap-2.5 text-black transition hover:opacity-90 dark:text-white"
+              href="/"
+            >
+              <LogoSquare size="sm" />
+              <span className="text-base font-semibold tracking-wider uppercase">
+                {SITE_NAME}
+              </span>
+            </Link>
+            <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+              Modern hassasiyet ve birinci sınıf malzemelerle tasarlanan, yüksek performanslı yeni nesil e-ticaret deneyimi.
+            </p>
+            <div className="pt-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              <span>Güvenli & Hızlı Alışveriş</span>
             </div>
-          }
-        >
-          <FooterMenu menu={menu} />
-        </Suspense>
-        <div className="md:ml-auto">
-          <a
-            className="flex h-8 w-max flex-none items-center justify-center rounded-md border border-neutral-200 bg-white text-xs text-black dark:border-neutral-700 dark:bg-black dark:text-white"
-            aria-label="Vercel'de Yayınla"
-            href="https://vercel.com/templates/next.js/nextjs-commerce"
-          >
-            <span className="px-3">▲</span>
-            <hr className="h-full border-r border-neutral-200 dark:border-neutral-700" />
-            <span className="px-3">Yayınla</span>
-          </a>
+          </div>
+
+          {/* 2. Sütun: Koleksiyonlar */}
+          <div>
+            <h3 className="mb-4 text-xs font-semibold tracking-wider uppercase text-black dark:text-white">
+              Koleksiyonlar
+            </h3>
+            <ul className="flex flex-col gap-2.5">
+              {menu.map((item: Menu) => (
+                <li key={item.title}>
+                  <Link
+                    href={item.path}
+                    className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white"
+                  >
+                    {item.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 3. Sütun: Kurumsal / Bilgi */}
+          <div>
+            <h3 className="mb-4 text-xs font-semibold tracking-wider uppercase text-black dark:text-white">
+              Kurumsal
+            </h3>
+            <ul className="flex flex-col gap-2.5">
+              {pages.map((page) => (
+                <li key={page.handle}>
+                  <Link
+                    href={`/${page.handle}`}
+                    className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white"
+                  >
+                    {page.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 4. Sütun: E-Bülten */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold tracking-wider uppercase text-black dark:text-white">
+              Bültene Katılın
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Yeni çıkan koleksiyonlar ve özel indirimlerden anında haberdar olun.
+            </p>
+            <form
+              onSubmit={undefined}
+              className="mt-1 flex flex-col gap-2"
+              action="#"
+            >
+              <input
+                id="newsletter-email"
+                name="email"
+                type="email"
+                placeholder="E-posta adresiniz..."
+                required
+                className="w-full rounded-md border border-neutral-300 bg-white px-3.5 py-2 text-sm text-black placeholder:text-neutral-400 transition focus:border-neutral-500 focus:outline-hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:placeholder:text-neutral-500 dark:focus:border-neutral-500"
+              />
+              <button
+                type="submit"
+                className="w-full rounded-md bg-black px-4 py-2 text-xs font-medium text-white transition hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+              >
+                Abone Ol
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-      <div className="border-t border-neutral-200 py-6 text-sm dark:border-neutral-700">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-1 px-4 md:flex-row md:gap-0 md:px-4 min-[1320px]:px-0">
-          <p>
-            &copy; {copyrightDate} {copyrightName}
-            {copyrightName.length && !copyrightName.endsWith(".")
-              ? "."
-              : ""}{" "}
-            Tüm hakları saklıdır.
+
+        {/* Alt Çizgi ve Telif */}
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-neutral-200 pt-8 sm:flex-row dark:border-neutral-800">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            &copy; {copyrightDate} {COMPANY_NAME}. Tüm hakları saklıdır.
           </p>
-          <hr className="mx-4 hidden h-4 w-[1px] border-l border-neutral-400 md:inline-block" />
-          <p>
-            <a href="https://github.com/vercel/commerce">Kaynak kodunu görüntüle</a>
-          </p>
-          <p className="md:ml-auto">
-            <a href="https://vercel.com" className="text-black dark:text-white">
-              ▲ Vercel ile geliştirildi
-            </a>
-          </p>
+          <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+            <span>256-Bit SSL Şifreleme</span>
+            <span>&bull;</span>
+            <span>Ücretsiz İade Garantisi</span>
+          </div>
         </div>
       </div>
     </footer>
