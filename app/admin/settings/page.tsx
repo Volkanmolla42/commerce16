@@ -1,28 +1,68 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import Image from "next/image";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import {
+  Button,
+  Card,
+  CardContent,
+  Input,
+  Label,
+} from "@/components/ui";
 import {
   AdminEmpty,
   AdminLoading,
   AdminNotice,
-  AdminPageHeading,
 } from "../_components/admin-primitives";
+import { AdminGate } from "../_components/admin-gate";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import type { StoreSettings } from "@/lib/catalog";
 
-export default function AdminSettingsPage() {
+type SettingsEdits = Partial<Omit<StoreSettings, "isOpen" | "logoUrl" | "logoStorageId">> & {
+  isOpen?: boolean;
+};
+
+function AdminSettingsContent() {
   const { data, error, loading, refresh } =
     useAdminResource<StoreSettings>("settings");
-  const [editedStoreName, setEditedStoreName] = useState<string | null>(null);
+  const [edits, setEdits] = useState<SettingsEdits>({});
+  const [logoEdit, setLogoEdit] = useState<string | null | undefined>(undefined);
+  const [pendingLogo, setPendingLogo] = useState<{ blob: Blob; previewUrl: string } | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const previewUrl = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const storeName = editedStoreName ?? data?.storeName ?? "";
+  useEffect(() => () => {
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+  }, []);
+
+  const logoStorageId = logoEdit !== undefined ? logoEdit : (data?.logoStorageId ?? null);
+
+  const text = (key: keyof Omit<StoreSettings, "isOpen" | "logoUrl" | "logoStorageId">) =>
+    edits[key] ?? data?.[key] ?? "";
+  const isOpen = edits.isOpen ?? data?.isOpen ?? true;
+  const logoPreview = pendingLogo?.previewUrl || data?.logoUrl || "";
+
+  const set = (key: keyof SettingsEdits) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => setEdits((current) => ({ ...current, [key]: event.target.value }));
+
+  const handleLogoSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setActionError("Yalnızca görsel dosyaları yüklenebilir.");
+      return;
+    }
+    setActionError(null);
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    const url = URL.createObjectURL(file);
+    previewUrl.current = url;
+    setPendingLogo({ blob: file, previewUrl: url });
+  };
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,15 +71,51 @@ export default function AdminSettingsPage() {
     setActionError(null);
 
     try {
-      const result = await runAdminAction<StoreSettings>("settings.update", {
-        storeName: storeName.trim(),
+      let nextLogoId = logoStorageId;
+      if (pendingLogo) {
+        setUploadingLogo(true);
+        try {
+          const { uploadUrl } = await runAdminAction<{ uploadUrl: string }>(
+            "product.image-upload-url",
+          );
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": pendingLogo.blob.type || "image/png" },
+            body: pendingLogo.blob,
+          });
+          if (!response.ok) throw new Error("Logo Convex Storage'a yüklenemedi.");
+          const uploaded: unknown = await response.json();
+          if (
+            typeof uploaded !== "object" || uploaded === null ||
+            !("storageId" in uploaded) || typeof uploaded.storageId !== "string"
+          ) {
+            throw new Error("Yüklenen logonun kimliği alınamadı.");
+          }
+          nextLogoId = uploaded.storageId;
+        } finally {
+          setUploadingLogo(false);
+        }
+      }
+      await runAdminAction("settings.update", {
+        storeName: text("storeName").trim(),
+        slogan: text("slogan"),
+        logoStorageId: nextLogoId || "",
+        phone: text("phone"),
+        email: text("email"),
+        address: text("address"),
+        announcement: text("announcement"),
+        seoTitle: text("seoTitle"),
+        seoDescription: text("seoDescription"),
+        isOpen,
       });
-      setEditedStoreName(result.storeName);
-      setMessage("Mağaza adı kaydedildi.");
+      setEdits({});
+      setPendingLogo(null);
+      setLogoEdit(nextLogoId);
+      setMessage("Mağaza ayarları kaydedildi.");
       await refresh();
     } catch (cause) {
       setActionError(
-        cause instanceof Error ? cause.message : "Mağaza adı kaydedilemedi.",
+        cause instanceof Error ? cause.message : "Mağaza ayarları kaydedilemedi.",
       );
     } finally {
       setSaving(false);
@@ -58,11 +134,9 @@ export default function AdminSettingsPage() {
 
   return (
     <>
-      <AdminPageHeading
-        title="Mağaza ayarları"
-        description="Mağaza adını belirle; vitrin başlıklarında ve telif alanında bu ad kullanılır."
-      />
-
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Mağaza ayarları</h1>
+      </div>
       {(message || actionError || error) && (
         <div className="mb-5">
           <AdminNotice kind={actionError || error ? "error" : "success"}>
@@ -71,40 +145,189 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      <Card className="max-w-3xl rounded-lg border-neutral-200 bg-white shadow-none">
-        <CardContent className="p-5 sm:p-7">
-          <form onSubmit={save} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="store-name">Mağaza adı</Label>
-              <Input
-                id="store-name"
-                name="storeName"
-                autoComplete="organization"
-                required
-                minLength={2}
-                maxLength={80}
-                className="rounded-md border-neutral-300 bg-white text-neutral-950 placeholder:text-neutral-400 focus-visible:border-neutral-800 focus-visible:ring-neutral-950/10"
-                value={storeName}
-                onChange={(event) => setEditedStoreName(event.target.value)}
-              />
-              <p className="text-sm leading-6 text-neutral-500">
-                Bu ad vitrin menüsünde, sayfa başlıklarında ve telif satırında
-                görünür.
-              </p>
-            </div>
+      <form onSubmit={save}>
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          <Card className="rounded-lg">
+            <CardContent className="space-y-5 p-5 sm:p-6">
+              <h2 className="text-sm font-semibold text-foreground">Genel</h2>
+              <div className="space-y-2">
+                <Label htmlFor="store-name">Mağaza adı</Label>
+                <Input
+                  id="store-name"
+                  name="storeName"
+                  autoComplete="organization"
+                  required
+                  minLength={2}
+                  maxLength={80}
+                  value={text("storeName")}
+                  onChange={set("storeName")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="store-slogan">Slogan</Label>
+                <Input
+                  id="store-slogan"
+                  name="slogan"
+                  maxLength={140}
+                  value={text("slogan")}
+                  onChange={set("slogan")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="store-logo">Logo</Label>
+                {logoPreview ? (
+                  <div className="flex items-center gap-3">
+                    <Image src={logoPreview} alt="Mağaza logosu" width={64} height={64} unoptimized className="h-16 w-16 rounded-md border border-border bg-muted object-contain" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={saving}
+                      onClick={() => {
+                        setPendingLogo(null);
+                        setLogoEdit(null);
+                      }}
+                    >
+                      Kaldır
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Logo yok, varsayılan kare logo kullanılıyor.</p>
+                )}
+                <input
+                  id="store-logo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={saving || uploadingLogo}
+                  onChange={handleLogoSelection}
+                  className="block min-h-11 w-full rounded-md border border-input bg-background text-sm text-muted-foreground file:mr-3 file:min-h-11 file:border-0 file:bg-muted file:px-4 file:font-medium"
+                />
+                <p className="text-xs text-muted-foreground">Seçilen dosya kaydedince Convex Storage&apos;a yüklenir.</p>
+                {uploadingLogo && <p role="status" className="text-sm text-muted-foreground">Logo yükleniyor…</p>}
+              </div>
+              <label className="flex min-h-11 items-center gap-3 rounded-md border border-border px-3 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  name="isOpen"
+                  checked={isOpen}
+                  onChange={(event) =>
+                    setEdits((current) => ({ ...current, isOpen: event.target.checked }))
+                  }
+                  className="h-4 w-4"
+                />
+                Mağaza açık (kapalıysa vitrin yerine bilgi ekranı gösterilir)
+              </label>
+            </CardContent>
+          </Card>
 
-            <div className="flex justify-end border-t border-neutral-100 pt-4">
-              <Button
-                type="submit"
-                disabled={saving || storeName.trim().length < 2}
-                className="h-11 rounded-md bg-black px-5 text-white hover:bg-neutral-800"
-              >
-                {saving ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="grid gap-4">
+            <Card className="rounded-lg">
+              <CardContent className="space-y-5 p-5 sm:p-6">
+                <h2 className="text-sm font-semibold text-foreground">İletişim</h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="store-phone">Telefon</Label>
+                    <Input
+                      id="store-phone"
+                      name="phone"
+                      autoComplete="tel"
+                      maxLength={40}
+                      value={text("phone")}
+                      onChange={set("phone")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="store-email">E-posta</Label>
+                    <Input
+                      id="store-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      maxLength={120}
+                      value={text("email")}
+                      onChange={set("email")}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="store-address">Adres</Label>
+                  <textarea
+                    id="store-address"
+                    name="address"
+                    rows={2}
+                    maxLength={300}
+                    value={text("address")}
+                    onChange={set("address")}
+                    className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg">
+              <CardContent className="space-y-5 p-5 sm:p-6">
+                <h2 className="text-sm font-semibold text-foreground">Duyuru çubuğu</h2>
+                <div className="space-y-2">
+                  <Label htmlFor="store-announcement">Duyuru metni</Label>
+                  <Input
+                    id="store-announcement"
+                    name="announcement"
+                    maxLength={160}
+                    placeholder="Boş bırakılırsa çubuk gösterilmez"
+                    value={text("announcement")}
+                    onChange={set("announcement")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg">
+              <CardContent className="space-y-5 p-5 sm:p-6">
+                <h2 className="text-sm font-semibold text-foreground">Arama motoru varsayılanları</h2>
+                <div className="space-y-2">
+                  <Label htmlFor="store-seo-title">Varsayılan başlık</Label>
+                  <Input
+                    id="store-seo-title"
+                    name="seoTitle"
+                    maxLength={160}
+                    value={text("seoTitle")}
+                    onChange={set("seoTitle")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="store-seo-description">Varsayılan açıklama</Label>
+                  <textarea
+                    id="store-seo-description"
+                    name="seoDescription"
+                    rows={3}
+                    maxLength={320}
+                    value={text("seoDescription")}
+                    onChange={set("seoDescription")}
+                    className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            type="submit"
+            disabled={saving || uploadingLogo || text("storeName").trim().length < 2}
+            className="h-11 px-5"
+          >
+            {saving ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
+          </Button>
+        </div>
+      </form>
     </>
+  );
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <AdminGate>
+      <AdminSettingsContent />
+    </AdminGate>
   );
 }

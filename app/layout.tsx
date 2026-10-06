@@ -7,14 +7,14 @@ import { baseUrl } from "@/lib/utils";
 import { getStoreSettings } from "@/lib/catalog";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { storeName } = await getStoreSettings();
+  const { storeName, seoTitle, seoDescription } = await getStoreSettings();
   const description =
-    storeName + " - Yüksek kaliteli tasarım ürünleri ve seçkin kategoriler.";
+    seoDescription || storeName + " - Yüksek kaliteli tasarım ürünleri ve seçkin kategoriler.";
 
   return {
     metadataBase: new URL(baseUrl),
     title: {
-      default: storeName,
+      default: seoTitle || storeName,
       template: "%s | " + storeName,
     },
     description,

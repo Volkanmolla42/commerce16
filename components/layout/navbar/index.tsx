@@ -7,6 +7,7 @@ import MobileMenu from "./mobile-menu";
 import Search, { SearchSkeleton } from "./search";
 import { UserNav } from "./user-nav";
 import { CartButton } from "@/components/cart/cart-button";
+import { FavoritesLink } from "@/components/favorites/favorites-link";
 
 export async function Navbar() {
   const [menu, settings] = await Promise.all([getMenu(), getStoreSettings()]);
@@ -27,7 +28,12 @@ export async function Navbar() {
             prefetch={true}
             className="flex items-center gap-2.5 transition hover:opacity-90"
           >
-            <LogoSquare />
+            {settings.logoUrl ? (
+              // ponytail: harici logo için düz img, next/image remote ayarı gerekmez
+              <img src={settings.logoUrl} alt={settings.storeName} className="h-10 w-10 rounded-xl border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
+            ) : (
+              <LogoSquare />
+            )}
             <span className="text-sm font-semibold tracking-wider uppercase text-black dark:text-white">
               {settings.storeName}
             </span>
@@ -58,6 +64,7 @@ export async function Navbar() {
 
         {/* Sağ: Kullanıcı ve Sepet */}
         <div className="flex items-center justify-end gap-2.5">
+          <FavoritesLink />
           <UserNav />
           <CartButton />
         </div>

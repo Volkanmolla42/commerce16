@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowLeftIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
-import { GridTileImage } from "@/components/grid/tile";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -16,9 +15,9 @@ export function Gallery({
   const imageIndex = Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < images.length
     ? requestedIndex : 0;
 
-  const updateImage = (index: string) => {
+  const updateImage = (index: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("image", index);
+    params.set("image", index.toString());
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
@@ -26,11 +25,8 @@ export function Gallery({
   const previousImageIndex =
     imageIndex === 0 ? images.length - 1 : imageIndex - 1;
 
-  const buttonClassName =
-    "h-full px-6 transition-all ease-in-out hover:scale-110 hover:text-black dark:hover:text-white flex items-center justify-center";
-
   return (
-    <form>
+    <div>
       <div className="relative aspect-square h-full max-h-[550px] w-full overflow-hidden">
         {images[imageIndex] && (
           <Image
@@ -44,53 +40,63 @@ export function Gallery({
         )}
 
         {images.length > 1 ? (
-          <div className="absolute bottom-[15%] flex w-full justify-center">
-            <div className="mx-auto flex h-11 items-center rounded-full border border-white bg-neutral-50/80 text-neutral-500 backdrop-blur-sm dark:border-black dark:bg-neutral-900/80">
-              <button
-                formAction={() => updateImage(previousImageIndex.toString())}
-                aria-label="Önceki ürün görseli"
-                className={buttonClassName}
-              >
-                <ArrowLeftIcon className="h-5" />
-              </button>
-              <div className="mx-1 h-6 w-px bg-neutral-500"></div>
-              <button
-                formAction={() => updateImage(nextImageIndex.toString())}
-                aria-label="Sonraki ürün görseli"
-                className={buttonClassName}
-              >
-                <ArrowRightIcon className="h-5" />
-              </button>
-            </div>
-          </div>
+          <>
+            <button
+              type="button"
+              onClick={() => updateImage(previousImageIndex)}
+              aria-label="Önceki ürün görseli"
+              className="absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-800 shadow-lg backdrop-blur-sm transition hover:scale-105 hover:bg-white active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white"
+            >
+              <ArrowLeftIcon className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => updateImage(nextImageIndex)}
+              aria-label="Sonraki ürün görseli"
+              className="absolute right-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-800 shadow-lg backdrop-blur-sm transition hover:scale-105 hover:bg-white active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white"
+            >
+              <ArrowRightIcon className="h-5 w-5" />
+            </button>
+          </>
         ) : null}
       </div>
 
       {images.length > 1 ? (
-        <ul className="my-12 flex items-center flex-wrap justify-center gap-2 overflow-auto py-1 lg:mb-0">
+        <ul
+          aria-label="Diğer ürün görselleri"
+          className="no-scrollbar mx-auto mt-5 flex w-fit max-w-full items-center justify-start gap-3 overflow-x-auto px-1 py-2 lg:justify-center"
+        >
           {images.map((image, index) => {
             const isActive = index === imageIndex;
 
             return (
-              <li key={image.src} className="h-20 w-20">
+              <li key={image.src} className="h-20 w-20 shrink-0">
                 <button
-                  formAction={() => updateImage(index.toString())}
-                  aria-label="Ürün görselini seç"
-                  className="h-full w-full"
+                  type="button"
+                  onClick={() => updateImage(index)}
+                  aria-label={`Ürün görseli ${index + 1} seç`}
+                  aria-pressed={isActive}
+                  className={`group h-full w-full rounded-xl p-0.5 transition hover:scale-[1.03] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:focus-visible:outline-white ${
+                    isActive
+                      ? "ring-2 ring-neutral-900 ring-offset-2 ring-offset-white dark:ring-white dark:ring-offset-black"
+                      : ""
+                  }`}
                 >
-                  <GridTileImage
-                    alt={image.altText}
-                    src={image.src}
-                    width={80}
-                    height={80}
-                    active={isActive}
-                  />
+                  <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-black">
+                    <Image
+                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                      alt={image.altText}
+                      src={image.src}
+                      width={80}
+                      height={80}
+                    />
+                  </span>
                 </button>
               </li>
             );
           })}
         </ul>
       ) : null}
-    </form>
+    </div>
   );
 }

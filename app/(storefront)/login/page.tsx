@@ -5,11 +5,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Tick01Icon } from "hugeicons-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {
+  Button,
+  Input,
+  Label,
+  Card,
+  CardTitle,
+  CardDescription,
+  Badge,
+} from "@/components/ui";
 
 export default function CustomerLoginPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();

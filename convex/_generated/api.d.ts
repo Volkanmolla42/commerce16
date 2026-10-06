@@ -12,6 +12,7 @@ import type * as addresses from "../addresses.js";
 import type * as adminAuth from "../adminAuth.js";
 import type * as auth from "../auth.js";
 import type * as categories from "../categories.js";
+import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
 import type * as orders from "../orders.js";
 import type * as pages from "../pages.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   adminAuth: typeof adminAuth;
   auth: typeof auth;
   categories: typeof categories;
+  favorites: typeof favorites;
   http: typeof http;
   orders: typeof orders;
   pages: typeof pages;

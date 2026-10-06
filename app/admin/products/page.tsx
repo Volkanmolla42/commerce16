@@ -3,18 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import {
+  Button,
+  Input,
+  Label,
+  Card,
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeading } from "../_components/admin-primitives";
+} from "@/components/ui";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminGate } from "../_components/admin-gate";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
 import { formatMoney } from "@/lib/format-money";
@@ -111,7 +112,6 @@ function ProductEditor({
   const [slugTouched, setSlugTouched] = useState(Boolean(product));
   const [price, setPrice] = useState(product?.price || "");
   const [categorySlug, setCategorySlug] = useState(product?.categorySlug || "");
-  const [images, setImages] = useState((product?.images || []).join("\n"));
   const [storageImages, setStorageImages] = useState<StoredImage[]>(product?.storageImages || []);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [processingImages, setProcessingImages] = useState(false);
@@ -226,12 +226,11 @@ function ProductEditor({
       setError("Bir üründe en fazla 100 varyant kombinasyonu olabilir.");
       return;
     }
-    const imageUrls = images.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
-    if (imageUrls.length + storageImages.length + pendingImages.length === 0) {
+    if (storageImages.length + pendingImages.length === 0) {
       setError("En az bir ürün görseli ekle.");
       return;
     }
-    if (imageUrls.length + storageImages.length + pendingImages.length > 20) {
+    if (storageImages.length + pendingImages.length > 20) {
       setError("Bir üründe en fazla 20 görsel olabilir.");
       return;
     }
@@ -246,7 +245,7 @@ function ProductEditor({
       slug: slug.trim(),
       price: price.trim(),
       categorySlug,
-      images: imageUrls,
+      images: [],
       availableForSale,
       options,
       variants: combinations.map((selectedOptions) => {
@@ -288,11 +287,11 @@ function ProductEditor({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto rounded-lg border-neutral-200 bg-white text-neutral-950">
+      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{product ? "Ürünü düzenle" : "Yeni ürün"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={save} className="space-y-5 [&_input]:rounded-md [&_input]:bg-white [&_input]:text-neutral-950">
+        <form onSubmit={save} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="product-title">Ürün adı</Label>
@@ -308,7 +307,7 @@ function ProductEditor({
                 setSlugTouched(true);
                 setSlug(slugify(event.target.value));
               }} />
-              <p className="text-xs text-neutral-500">/product/{slug || "urun-adresi"}</p>
+              <p className="text-xs text-muted-foreground">/product/{slug || "urun-adresi"}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="product-price">Fiyat (₺)</Label>
@@ -316,7 +315,7 @@ function ProductEditor({
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="product-category">Kategori</Label>
-              <select id="product-category" name="categorySlug" value={categorySlug} onChange={(event) => setCategorySlug(event.target.value)} className="h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-base text-neutral-900 outline-none focus-visible:border-neutral-800 focus-visible:ring-2 focus-visible:ring-neutral-950/10">
+              <select id="product-category" name="categorySlug" value={categorySlug} onChange={(event) => setCategorySlug(event.target.value)} className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30">
                 <option value="">Kategorisiz</option>
                 {categories.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
               </select>
@@ -324,17 +323,17 @@ function ProductEditor({
             <section aria-labelledby="product-options-heading" className="space-y-3 sm:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 id="product-options-heading" className="text-sm font-medium text-neutral-800">Varyant seçenekleri</h3>
-                  <p className="mt-1 text-xs text-neutral-500">Örneğin Renk: Siyah, Krem. Kombinasyonlar otomatik oluşturulur.</p>
+                  <h3 id="product-options-heading" className="text-sm font-medium text-foreground">Varyant seçenekleri</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Örneğin Renk: Siyah, Krem. Kombinasyonlar otomatik oluşturulur.</p>
                 </div>
-                <Button type="button" variant="outline" className="min-h-10 shrink-0 rounded-md border-neutral-200 bg-white text-neutral-700 shadow-none hover:bg-neutral-50" disabled={optionDrafts.length >= 3} onClick={() => setOptionDrafts((current) => [...current, { id: createEditorId(), name: "", valuesText: "" }])}>
+                <Button type="button" variant="outline" className="min-h-10 shrink-0" disabled={optionDrafts.length >= 3} onClick={() => setOptionDrafts((current) => [...current, { id: createEditorId(), name: "", valuesText: "" }])}>
                   Seçenek ekle
                 </Button>
               </div>
               {optionDrafts.length === 0 ? (
-                <p className="rounded-md border border-dashed border-neutral-300 px-4 py-3 text-sm text-neutral-500">Bu ürünün varyant seçeneği yok.</p>
+                <p className="rounded-md border border-dashed border-input px-4 py-3 text-sm text-muted-foreground">Bu ürünün varyant seçeneği yok.</p>
               ) : optionDrafts.map((option, index) => (
-                <div key={option.id} className="grid gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-[minmax(120px,.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
+                <div key={option.id} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[minmax(120px,.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
                   <div className="space-y-2">
                     <Label htmlFor={`option-name-${option.id}`}>Seçenek adı</Label>
                     <Input id={`option-name-${option.id}`} value={option.name} maxLength={40} placeholder="Renk" onChange={(event) => setOptionDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} />
@@ -343,28 +342,28 @@ function ProductEditor({
                     <Label htmlFor={`option-values-${option.id}`}>Değerler</Label>
                     <Input id={`option-values-${option.id}`} value={option.valuesText} maxLength={500} placeholder="Siyah, Krem" onChange={(event) => setOptionDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, valuesText: event.target.value } : item))} />
                   </div>
-                  <Button type="button" variant="ghost" className="min-h-10 rounded-lg text-neutral-600 hover:bg-neutral-100" onClick={() => setOptionDrafts((current) => current.filter((item) => item.id !== option.id))}>Kaldır</Button>
+                  <Button type="button" variant="ghost" className="min-h-10" onClick={() => setOptionDrafts((current) => current.filter((item) => item.id !== option.id))}>Kaldır</Button>
                 </div>
               ))}
               {combinations.length > 0 && combinations.length <= 100 && (
-                <div className="overflow-hidden rounded-md border border-neutral-200">
-                  <div className="flex items-center justify-between gap-3 border-b border-neutral-100 bg-neutral-50 px-3 py-2.5">
-                    <p className="text-xs font-semibold text-neutral-700">{combinations.length} varyant</p>
-                    <p className="text-xs text-neutral-500">Fiyat ve satış durumu</p>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-3 py-2.5">
+                    <p className="text-xs font-semibold text-muted-foreground">{combinations.length} varyant</p>
+                    <p className="text-xs text-muted-foreground">Fiyat ve satış durumu</p>
                   </div>
-                  <div className="divide-y divide-neutral-100">
+                  <div className="divide-y divide-border">
                     {combinations.map((selectedOptions) => {
                       const key = selectionKey(selectedOptions);
                       const draft = variantDrafts[key] || { price: price || "0", availableForSale };
                       return (
                         <div key={key} className="grid gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_140px_120px] sm:items-center">
-                          <p className="text-sm font-medium text-neutral-800">{selectedOptions.map((selected) => `${selected.name}: ${selected.value}`).join(" · ")}</p>
+                          <p className="text-sm font-medium text-foreground">{selectedOptions.map((selected) => `${selected.name}: ${selected.value}`).join(" · ")}</p>
                           <div className="space-y-1">
-                            <Label htmlFor={`variant-price-${key}`} className="text-xs text-neutral-500">Fiyat</Label>
+                            <Label htmlFor={`variant-price-${key}`} className="text-xs text-muted-foreground">Fiyat</Label>
                             <Input id={`variant-price-${key}`} type="number" inputMode="decimal" min="0" step="0.01" value={draft.price} onChange={(event) => setVariantDrafts((current) => ({ ...current, [key]: { ...draft, price: event.target.value } }))} />
                           </div>
-                          <label className="flex min-h-10 items-center gap-2 text-sm text-neutral-700">
-                            <input type="checkbox" checked={draft.availableForSale} onChange={(event) => setVariantDrafts((current) => ({ ...current, [key]: { ...draft, availableForSale: event.target.checked } }))} className="h-4 w-4 accent-black" />
+                          <label className="flex min-h-10 items-center gap-2 text-sm text-muted-foreground">
+                            <input type="checkbox" checked={draft.availableForSale} onChange={(event) => setVariantDrafts((current) => ({ ...current, [key]: { ...draft, availableForSale: event.target.checked } }))} className="h-4 w-4" />
                             Satışta
                           </label>
                         </div>
@@ -384,35 +383,32 @@ function ProductEditor({
                 multiple
                 disabled={saving || processingImages}
                 onChange={(event) => void handleImageSelection(event)}
-                className="block min-h-11 w-full rounded-md border border-neutral-300 bg-white text-sm text-neutral-700 file:mr-3 file:min-h-11 file:border-0 file:bg-neutral-100 file:px-4 file:font-medium"
+                className="block min-h-11 w-full rounded-md border border-input bg-background text-sm text-muted-foreground file:mr-3 file:min-h-11 file:border-0 file:bg-muted file:px-4 file:font-medium"
               />
-              <p className="text-xs text-neutral-500">Yüklenen görseller WebP’ye çevrilir ve Convex Storage’a kaydedilir. En fazla 20 görsel.</p>
-              {processingImages && <p role="status" className="text-sm text-neutral-600">Görseller WebP’ye çevriliyor…</p>}
+              <p className="text-xs text-muted-foreground">Yüklenen görseller WebP’ye çevrilir ve Convex Storage’a kaydedilir. En fazla 20 görsel.</p>
+              {processingImages && <p role="status" className="text-sm text-muted-foreground">Görseller WebP’ye çevriliyor…</p>}
               {(storageImages.length > 0 || pendingImages.length > 0) && (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {storageImages.map((image) => (
-                    <div key={image.storageId} className="overflow-hidden rounded-md border border-neutral-200">
-                      {image.url ? <Image src={image.url} alt={title} width={320} height={240} unoptimized className="h-28 w-full object-cover" /> : <div className="h-28 bg-neutral-100" />}
+                    <div key={image.storageId} className="overflow-hidden rounded-md border border-border">
+                      {image.url ? <Image src={image.url} alt={title} width={320} height={240} unoptimized className="h-28 w-full object-cover" /> : <div className="h-28 bg-muted" />}
                       <div className="flex items-center justify-between gap-2 p-2">
-                        <p className="truncate text-xs text-neutral-600">{image.fileName}</p>
-                        <Button type="button" size="sm" variant="ghost" disabled={saving} className="min-h-8 shrink-0 px-2 text-neutral-600" onClick={() => setStorageImages((current) => current.filter((item) => item.storageId !== image.storageId))}>Kaldır</Button>
+                        <p className="truncate text-xs text-muted-foreground">{image.fileName}</p>
+                        <Button type="button" size="sm" variant="ghost" disabled={saving} className="min-h-8 shrink-0 px-2" onClick={() => setStorageImages((current) => current.filter((item) => item.storageId !== image.storageId))}>Kaldır</Button>
                       </div>
                     </div>
                   ))}
                   {pendingImages.map((image) => (
-                    <div key={image.id} className="overflow-hidden rounded-md border border-neutral-200">
+                    <div key={image.id} className="overflow-hidden rounded-md border border-border">
                       <Image src={image.previewUrl} alt={title} width={320} height={240} unoptimized className="h-28 w-full object-cover" />
                       <div className="flex items-center justify-between gap-2 p-2">
-                        <p className="truncate text-xs text-neutral-600">{productImageFileName(title || slug || "urun", storageImages.length + pendingImages.indexOf(image))}</p>
-                        <Button type="button" size="sm" variant="ghost" disabled={saving} className="min-h-8 shrink-0 px-2 text-neutral-600" onClick={() => removePendingImage(image)}>Kaldır</Button>
+                        <p className="truncate text-xs text-muted-foreground">{productImageFileName(title || slug || "urun", storageImages.length + pendingImages.indexOf(image))}</p>
+                        <Button type="button" size="sm" variant="ghost" disabled={saving} className="min-h-8 shrink-0 px-2" onClick={() => removePendingImage(image)}>Kaldır</Button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-              <Label htmlFor="product-images-urls">Harici görsel URL’leri</Label>
-              <textarea id="product-images-urls" name="images" value={images} onChange={(event) => setImages(event.target.value)} rows={2} aria-describedby="product-images-urls-help" className="min-h-20 w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 outline-none focus-visible:border-neutral-800 focus-visible:ring-2 focus-visible:ring-neutral-950/10" />
-              <p id="product-images-urls-help" className="text-xs text-neutral-500">Mevcut harici görsel adresleri burada korunabilir; her satıra bir adres yaz.</p>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="product-seo-title">Arama sonucu başlığı</Label>
@@ -420,20 +416,20 @@ function ProductEditor({
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="product-seo-description">Arama sonucu açıklaması</Label>
-              <textarea id="product-seo-description" name="seoDescription" rows={3} maxLength={320} value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} className="min-h-24 w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 outline-none focus-visible:border-neutral-800 focus-visible:ring-2 focus-visible:ring-neutral-950/10" />
+              <textarea id="product-seo-description" name="seoDescription" rows={3} maxLength={320} value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30" />
             </div>
           </div>
 
-          <label className="flex min-h-11 items-center gap-3 rounded-md border border-neutral-200 px-3 text-sm font-medium text-neutral-800">
-            <input type="checkbox" name="availableForSale" checked={availableForSale} onChange={(event) => setAvailableForSale(event.target.checked)} className="h-4 w-4 accent-black" />
+          <label className="flex min-h-11 items-center gap-3 rounded-md border border-border px-3 text-sm font-medium text-foreground">
+            <input type="checkbox" name="availableForSale" checked={availableForSale} onChange={(event) => setAvailableForSale(event.target.checked)} className="h-4 w-4" />
             Satışta göster
           </label>
 
           {error && <AdminNotice kind="error">{error}</AdminNotice>}
 
-          <DialogFooter className="gap-2 border-t border-neutral-100 pt-4 sm:justify-between">
-            <Button type="button" variant="ghost" className="rounded-md" onClick={onClose}>Vazgeç</Button>
-            <Button type="submit" disabled={saving || processingImages} className="rounded-md bg-black text-white hover:bg-neutral-800">{saving ? (pendingImages.length ? "Görseller yükleniyor…" : "Kaydediliyor…") : "Değişiklikleri kaydet"}</Button>
+          <DialogFooter className="gap-2 border-t border-border pt-4 sm:justify-between">
+            <Button type="button" variant="ghost" onClick={onClose}>Vazgeç</Button>
+            <Button type="submit" disabled={saving || processingImages}>{saving ? (pendingImages.length ? "Görseller yükleniyor…" : "Kaydediliyor…") : "Değişiklikleri kaydet"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -441,7 +437,7 @@ function ProductEditor({
   );
 }
 
-export default function AdminProductsPage() {
+function AdminProductsContent() {
   const { data: products, error, loading, refresh } = useAdminResource<Product[]>("products");
   const { data: categories } = useAdminResource<Category[]>("categories");
   const [query, setQuery] = useState("");
@@ -456,11 +452,6 @@ export default function AdminProductsPage() {
       !term || `${product.title} ${product.slug}`.toLocaleLowerCase("tr-TR").includes(term),
     );
   }, [products, query]);
-
-  const openCreate = () => {
-    setEditorProduct(null);
-    setEditorOpen(true);
-  };
 
   const openEdit = (product: Product) => {
     setEditorProduct(product);
@@ -488,51 +479,45 @@ export default function AdminProductsPage() {
 
   return (
     <>
-      <AdminPageHeading
-        title="Ürünler"
-        description="Ürün bilgilerini, fiyatları, görselleri ve satış durumunu yönet."
-        action={<Button onClick={openCreate} className="h-11 rounded-md bg-black px-4 text-white hover:bg-neutral-800">Yeni ürün ekle</Button>}
-      />
-
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Ürünler</h1>
+        <Button onClick={() => { setEditorProduct(null); setEditorOpen(true); }}>Yeni ürün ekle</Button>
+      </div>
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
-      <Card className="overflow-hidden rounded-lg border-neutral-200 bg-white shadow-none">
-        <div className="flex flex-col gap-3 border-b border-neutral-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <h2 className="font-semibold text-neutral-950">Ürün kataloğu</h2>
-            <p className="mt-1 text-xs text-neutral-500">{products?.length ?? 0} kayıt</p>
-          </div>
+      <Card className="overflow-hidden rounded-lg">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-end sm:px-5">
           <div className="flex gap-2">
-            <Input aria-label="Ürün ara" name="product-search" type="search" placeholder="Ürün veya adres ara" value={query} onChange={(event) => setQuery(event.target.value)} className="h-10 w-full min-w-0 rounded-md bg-white text-neutral-950 placeholder:text-neutral-400 focus-visible:border-neutral-800 focus-visible:ring-neutral-950/10 sm:w-64" />
-            <Button variant="outline" className="h-10 shrink-0 rounded-md border-neutral-200 bg-white text-neutral-700 shadow-none hover:bg-neutral-50" onClick={() => void refresh()}>Yenile</Button>
+            <Input aria-label="Ürün ara" name="product-search" type="search" placeholder="Ürün veya adres ara" value={query} onChange={(event) => setQuery(event.target.value)} className="w-full min-w-0 sm:w-64" />
+            <Button variant="outline" className="h-10 shrink-0" onClick={() => void refresh()}>Yenile</Button>
           </div>
         </div>
 
         {loading ? <div className="p-5"><AdminLoading label="Ürünler" /></div> : filteredProducts.length === 0 ? (
           <div className="p-5"><AdminEmpty title={query ? "Eşleşen ürün yok" : "Henüz ürün yok"} description={query ? "Arama sözcüğünü değiştirip yeniden dene." : "İlk ürünü ekleyerek kataloğu oluşturmaya başlayabilirsin."} /></div>
         ) : (
-          <div className="divide-y divide-neutral-100">
+          <div className="divide-y divide-border">
             {filteredProducts.map((product) => {
               const category = categories?.find((item) => item.slug === product.categorySlug);
               return (
                 <article key={product._id} className="flex flex-col gap-4 px-4 py-4 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1fr)_145px_120px_130px_auto] lg:items-center">
                   <div className="flex min-w-0 items-center gap-3">
                     {(product.images[0] || product.storageImages?.[0]?.url) ? (
-                      <Image src={product.images[0] || product.storageImages?.[0]?.url || ""} alt="" width={56} height={56} unoptimized className="h-14 w-14 shrink-0 rounded-md border border-neutral-200 bg-neutral-100 object-cover" />
+                      <Image src={product.images[0] || product.storageImages?.[0]?.url || ""} alt="" width={56} height={56} unoptimized className="h-14 w-14 shrink-0 rounded-md border border-border bg-muted object-cover" />
                     ) : (
-                      <div aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-md border border-neutral-200 bg-neutral-100 text-sm font-semibold text-neutral-400">Ü</div>
+                      <div aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-md border border-border bg-muted text-sm font-semibold text-muted-foreground">Ü</div>
                     )}
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-neutral-950">{product.title}</h3>
-                      <p className="mt-1 truncate font-mono text-xs text-neutral-500">/product/{product.slug}</p>
+                      <h3 className="truncate text-sm font-semibold text-foreground">{product.title}</h3>
+                      <p className="mt-1 truncate font-mono text-xs text-muted-foreground">/product/{product.slug}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-neutral-600"><span className="mr-2 text-xs text-neutral-400 lg:hidden">Kategori</span>{category?.title || "Kategorisiz"}</p>
-                  <p className="text-sm font-semibold tabular-nums text-neutral-950"><span className="mr-2 text-xs font-normal text-neutral-400 lg:hidden">Fiyat</span>{formatMoney(product.price)}</p>
-                  <p className="text-xs font-semibold"><span className={`mr-2 inline-block h-2 w-2 rounded-full ${product.availableForSale ? "bg-neutral-950" : "bg-neutral-300"}`} />{product.availableForSale ? "Satışta" : "Pasif"}</p>
+                  <p className="text-sm text-muted-foreground"><span className="mr-2 text-xs text-muted-foreground lg:hidden">Kategori</span>{category?.title || "Kategorisiz"}</p>
+                  <p className="text-sm font-semibold tabular-nums text-foreground"><span className="mr-2 text-xs font-normal text-muted-foreground lg:hidden">Fiyat</span>{formatMoney(product.price)}</p>
+                  <p className="text-xs font-semibold"><span className={`mr-2 inline-block h-2 w-2 rounded-full ${product.availableForSale ? "bg-primary" : "bg-muted-foreground"}`} />{product.availableForSale ? "Satışta" : "Pasif"}</p>
                   <div className="flex gap-2 lg:justify-end">
-                    <Button size="sm" variant="outline" className="min-h-10 rounded-md border-neutral-200 bg-white text-neutral-700 shadow-none hover:bg-neutral-50" onClick={() => openEdit(product)}>Düzenle</Button>
-                    <Button size="sm" variant="ghost" className="min-h-10 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950" onClick={() => void handleDelete(product)}>Sil</Button>
+                    <Button size="sm" variant="outline" className="min-h-10" onClick={() => openEdit(product)}>Düzenle</Button>
+                    <Button size="sm" variant="ghost" className="min-h-10" onClick={() => void handleDelete(product)}>Sil</Button>
                   </div>
                 </article>
               );
@@ -551,5 +536,13 @@ export default function AdminProductsPage() {
         />
       )}
     </>
+  );
+}
+
+export default function AdminProductsPage() {
+  return (
+    <AdminGate>
+      <AdminProductsContent />
+    </AdminGate>
   );
 }

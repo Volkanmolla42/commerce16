@@ -11,7 +11,8 @@ import {
   ShoppingBagIcon,
   Squares2X2Icon,
 } from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui/button";
+import { ArrowUpRight01Icon } from "hugeicons-react";
+import { Button } from "@/components/ui";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
@@ -34,7 +35,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [loggingOut, setLoggingOut] = useState(false);
   const storeSettings = useQuery(api.settings.getStoreSettings, {});
   const storeName = storeSettings?.storeName || "Mağaza";
-  const currentPage = navigation.find((item) => isActive(pathname, item.href));
+  const logoUrl = storeSettings?.logoUrl || "";
 
   const logout = async () => {
     setLoggingOut(true);
@@ -60,10 +61,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={compact
-              ? `flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium ${active ? "bg-neutral-100 text-neutral-950" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"}`
-              : `flex min-h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors ${active ? "bg-neutral-100 text-neutral-950" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"}`}
+              ? `flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`
+              : `flex min-h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
           >
-            <Icon aria-hidden="true" className="size-4 shrink-0 text-neutral-500" />
+            <Icon aria-hidden="true" className="size-4 shrink-0" />
             {item.label}
           </Link>
         );
@@ -72,42 +73,49 @@ export function AdminShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-[100dvh] bg-neutral-50 text-neutral-950">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-neutral-200 bg-white px-3 py-5 lg:flex">
-        <Link href="/admin" className="mb-8 flex items-center gap-3 px-2">
-          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-black text-sm font-semibold text-white">C</span>
-          <span>
-            <span className="block max-w-40 truncate text-sm font-semibold text-neutral-950">{storeName}</span>
-            <span className="mt-0.5 block text-xs text-neutral-500">Yönetim paneli</span>
+    <div className="min-h-[100dvh] bg-background text-foreground">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <Link href="/admin" aria-label="Yönetim paneli ana sayfası" className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+            {logoUrl ? <img src={logoUrl} alt={storeName} className="size-8 object-contain" /> : "C"}
+          </Link>
+          <span className="min-w-0">
+            <Link href="/" target="_blank" className="flex max-w-52 items-center gap-1 text-sm font-semibold text-foreground hover:underline">
+              <span className="truncate">{storeName}</span>
+              <ArrowUpRight01Icon className="size-3.5 shrink-0" aria-hidden="true" />
+            </Link>
+            <span className="mt-0.5 block text-xs text-muted-foreground">Yönetim paneli</span>
           </span>
-        </Link>
+        </div>
         {nav()}
+        <div className="mt-auto border-t border-border pt-4">
+          <Button disabled={loggingOut} onClick={() => void logout()} variant="ghost" size="sm" className="w-full justify-start">
+            {loggingOut ? "Çıkılıyor…" : "Çıkış"}
+          </Button>
+        </div>
       </aside>
 
-      <div className="lg:pl-60">
-        <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white">
-          <div className="flex min-h-14 items-center justify-between gap-3 px-4 sm:px-7">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-8 shrink-0 place-items-center rounded-md bg-black text-sm font-semibold text-white lg:hidden">C</span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{currentPage?.label || "Yönetim"}</p>
-                <p className="hidden text-xs text-neutral-500 sm:block">{storeName}</p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button asChild variant="outline" size="sm" className="hidden rounded-md border-neutral-200 bg-white shadow-none hover:bg-neutral-50 sm:inline-flex">
-                <Link href="/" target="_blank"><span>Mağazayı aç</span></Link>
-              </Button>
-              <Button disabled={loggingOut} onClick={() => void logout()} variant="ghost" size="sm" className="rounded-md text-neutral-600 shadow-none hover:bg-neutral-100 hover:text-neutral-950">
-                {loggingOut ? "Çıkılıyor…" : "Çıkış"}
-              </Button>
-            </div>
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-30 border-b border-border bg-card lg:hidden">
+          <div className="flex min-h-14 items-center gap-3 px-4">
+            <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+              {logoUrl ? <img src={logoUrl} alt={storeName} className="size-8 object-contain" /> : "C"}
+            </span>
+            <Link href="/" target="_blank" className="flex min-w-0 items-center gap-1 text-sm font-medium hover:underline">
+              <span className="truncate">{storeName}</span>
+              <ArrowUpRight01Icon className="size-3.5 shrink-0" aria-hidden="true" />
+            </Link>
           </div>
-          <div className="border-t border-neutral-100 lg:hidden">{nav(true)}</div>
+          <div className="border-t border-border">{nav(true)}</div>
+          <div className="border-t border-border px-3 py-3">
+            <Button disabled={loggingOut} onClick={() => void logout()} variant="ghost" size="sm" className="w-full">
+              {loggingOut ? "Çıkılıyor…" : "Çıkış"}
+            </Button>
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-7 sm:py-8">
-          {logoutError && <p role="alert" className="mb-4 text-sm text-rose-700">{logoutError}</p>}
+          {logoutError && <p role="alert" className="mb-4 text-sm text-destructive">{logoutError}</p>}
           {children}
         </main>
       </div>

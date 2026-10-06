@@ -13,6 +13,16 @@ type ProductFilters = {
 
 export type StoreSettings = {
   storeName: string;
+  slogan: string;
+  logoUrl: string;
+  logoStorageId: string | null;
+  phone: string;
+  email: string;
+  address: string;
+  announcement: string;
+  seoTitle: string;
+  seoDescription: string;
+  isOpen: boolean;
 };
 
 export async function getStoreSettings(): Promise<StoreSettings> {

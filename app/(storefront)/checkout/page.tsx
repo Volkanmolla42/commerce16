@@ -1,9 +1,10 @@
 "use client";
 
 import { useCart } from "@/components/cart/cart-context";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useConvexAuth } from "@convex-dev/auth/react";
@@ -13,17 +14,27 @@ import {
   LockIcon,
   ShoppingBag01Icon,
 } from "hugeicons-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import {
+  Button,
+  Input,
+  Label,
+  Card,
+  CardHeader,
+  CardTitle,
+  Separator,
+  Badge,
+} from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
+import { clearQuickBuyItem, useQuickBuyDraft } from "@/components/cart/quick-buy-store";
 
-export default function CheckoutPage() {
-  const { items, clearCart, totalCount, totalAmount } = useCart();
+function CheckoutContent() {
+  const { items: cartItems, clearCart } = useCart();
+  const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
+  const quickBuy = useQuickBuyDraft();
+  const items = isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems;
+  const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = items.reduce((sum, item) => sum + Math.round(Number(item.product.price) * 100) * item.quantity, 0) / 100;
   const { isAuthenticated } = useConvexAuth();
 
   const profile = useQuery(api.users.getMyProfile);
@@ -98,7 +109,8 @@ export default function CheckoutPage() {
         email: customerEmail.trim(),
       };
 
-      clearCart();
+      if (isQuickBuy) clearQuickBuyItem();
+      else clearCart();
       setCompletedOrder(orderData);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
@@ -163,20 +175,30 @@ export default function CheckoutPage() {
     );
   }
 
-  // If cart is empty
+  if (isQuickBuy && !quickBuy.ready) {
+    return (
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Hızlı satın alma bilgisi yükleniyor...</p>
+      </div>
+    );
+  }
+
+  // If there is no item to check out
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center">
         <h2 className="text-2xl font-bold text-foreground">
-          Sipariş Verilecek Ürün Bulunamadı
+          {isQuickBuy ? "Hızlı Satın Alma Bilgisi Bulunamadı" : "Sipariş Verilecek Ürün Bulunamadı"}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sipariş verebilmek için sepetinizde en az bir ürün olmalıdır.
+          {isQuickBuy
+            ? "Ürünü yeniden seçip hızlı satın alma düğmesine basın."
+            : "Sipariş verebilmek için sepetinizde en az bir ürün olmalıdır."}
         </p>
         <div className="mt-6">
           <Button asChild size="lg" className="rounded-full shadow-md font-semibold">
-            <Link href="/cart">
-              <span>Sepete Dön</span>
+            <Link href={isQuickBuy ? "/search" : "/cart"}>
+              <span>{isQuickBuy ? "Alışverişe Dön" : "Sepete Dön"}</span>
             </Link>
           </Button>
         </div>
@@ -546,5 +568,17 @@ export default function CheckoutPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Sipariş sayfası açılıyor...</p>
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   );
 }

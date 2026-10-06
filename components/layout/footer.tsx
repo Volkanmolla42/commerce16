@@ -24,14 +24,26 @@ export default async function Footer() {
               className="flex items-center gap-2.5 text-black transition hover:opacity-90 dark:text-white"
               href="/"
             >
-              <LogoSquare size="sm" />
+              {settings.logoUrl ? (
+                // ponytail: harici logo için düz img, next/image remote ayarı gerekmez
+                <img src={settings.logoUrl} alt={settings.storeName} className="h-[30px] w-[30px] rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
+              ) : (
+                <LogoSquare size="sm" />
+              )}
               <span className="text-base font-semibold tracking-wider uppercase">
                 {settings.storeName}
               </span>
             </Link>
             <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-              Modern hassasiyet ve birinci sınıf malzemelerle tasarlanan, yüksek performanslı yeni nesil e-ticaret deneyimi.
+              {settings.slogan || "Modern hassasiyet ve birinci sınıf malzemelerle tasarlanan, yüksek performanslı yeni nesil e-ticaret deneyimi."}
             </p>
+            {[settings.phone, settings.email, settings.address].some(Boolean) && (
+              <div className="flex flex-col gap-1 text-sm text-neutral-500 dark:text-neutral-400">
+                {settings.phone && <span>{settings.phone}</span>}
+                {settings.email && <span>{settings.email}</span>}
+                {settings.address && <span>{settings.address}</span>}
+              </div>
+            )}
             <div className="pt-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
               <span>Güvenli & Hızlı Alışveriş</span>
             </div>

@@ -2,14 +2,21 @@
 
 import { useState } from "react";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeading } from "../_components/admin-primitives";
+import {
+  Button,
+  Input,
+  Label,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
+import { AdminGate } from "../_components/admin-gate";
 
 type Category = Doc<"categories">;
 
@@ -59,9 +66,9 @@ function CategoryEditor({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto rounded-lg border-neutral-200 bg-white text-neutral-950">
+      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{category ? "Kategoriyi düzenle" : "Yeni kategori"}</DialogTitle></DialogHeader>
-        <form onSubmit={save} className="space-y-5 [&_input]:rounded-md [&_input]:bg-white [&_input]:text-neutral-950">
+        <form onSubmit={save} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="category-title">Kategori adı</Label>
@@ -93,7 +100,7 @@ function CategoryEditor({
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="category-description">Açıklama</Label>
-              <textarea id="category-description" name="description" required maxLength={500} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-28 w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 outline-none focus-visible:border-neutral-800 focus-visible:ring-2 focus-visible:ring-neutral-950/10" />
+              <textarea id="category-description" name="description" required maxLength={500} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring" />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="category-seo-title">Arama sonucu başlığı</Label>
@@ -101,13 +108,13 @@ function CategoryEditor({
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="category-seo-description">Arama sonucu açıklaması</Label>
-              <textarea id="category-seo-description" name="seoDescription" maxLength={320} rows={3} required value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} className="min-h-24 w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 outline-none focus-visible:border-neutral-800 focus-visible:ring-2 focus-visible:ring-neutral-950/10" />
+              <textarea id="category-seo-description" name="seoDescription" maxLength={320} rows={3} required value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring" />
             </div>
           </div>
           {error && <AdminNotice kind="error">{error}</AdminNotice>}
-          <DialogFooter className="gap-2 border-t border-neutral-100 pt-4 sm:justify-between">
-            <Button type="button" variant="ghost" className="rounded-md" onClick={onClose}>Vazgeç</Button>
-            <Button type="submit" disabled={saving} className="rounded-md bg-black text-white hover:bg-neutral-800">{saving ? "Kaydediliyor…" : "Değişiklikleri kaydet"}</Button>
+          <DialogFooter className="gap-2 border-t border-border pt-4 sm:justify-between">
+            <Button type="button" variant="ghost" onClick={onClose}>Vazgeç</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Kaydediliyor…" : "Değişiklikleri kaydet"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -115,7 +122,7 @@ function CategoryEditor({
   );
 }
 
-export default function AdminCategoriesPage() {
+function AdminCategoriesContent() {
   const { data: categories, error, loading, refresh } = useAdminResource<Category[]>("categories");
   const [editorCategory, setEditorCategory] = useState<Category | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -135,35 +142,32 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const openCreate = () => {
-    setEditorCategory(null);
-    setEditorOpen(true);
-  };
-
   return (
     <>
-      <AdminPageHeading title="Kategoriler" description="Mağaza menüsünde görünen kategorileri ve arama sonucu bilgilerini düzenle." action={<Button onClick={openCreate} className="h-11 rounded-md bg-black px-4 text-white hover:bg-neutral-800">Kategori ekle</Button>} />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Kategoriler</h1>
+        <Button onClick={() => { setEditorCategory(null); setEditorOpen(true); }}>Kategori ekle</Button>
+      </div>
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
-      <Card className="overflow-hidden rounded-lg border-neutral-200 bg-white shadow-none">
-        <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-4 sm:px-5">
-          <div><h2 className="font-semibold text-neutral-950">Mağaza kategorileri</h2><p className="mt-1 text-xs text-neutral-500">{categories?.length ?? 0} kayıt</p></div>
-          <Button variant="outline" className="rounded-md border-neutral-200 bg-white text-neutral-700 shadow-none hover:bg-neutral-50" onClick={() => void refresh()}>Yenile</Button>
+      <Card className="overflow-hidden rounded-lg">
+        <div className="flex items-center justify-end gap-3 border-b border-border px-4 py-4 sm:px-5">
+          <Button variant="outline" onClick={() => void refresh()}>Yenile</Button>
         </div>
         {loading ? <div className="p-5"><AdminLoading label="Kategoriler" /></div> : !categories?.length ? (
           <div className="p-5"><AdminEmpty title="Henüz kategori yok" description="Kategoriler ürün kataloğunu düzenler ve mağaza menüsünde görünür." /></div>
         ) : (
-          <div className="divide-y divide-neutral-100">
+          <div className="divide-y divide-border">
             {categories.map((category) => (
               <article key={category._id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-neutral-950">{category.title}</h3>
-                  <p className="mt-1 truncate font-mono text-xs text-neutral-500">{category.path} · {category.slug}</p>
-                  <p className="mt-2 line-clamp-2 text-sm text-neutral-600">{category.description}</p>
+                  <h3 className="font-semibold text-foreground">{category.title}</h3>
+                  <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{category.path} · {category.slug}</p>
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{category.description}</p>
                 </div>
                 <div className="flex shrink-0 gap-2 sm:pl-5">
-                  <Button variant="outline" className="min-h-10 rounded-md border-neutral-200 bg-white text-neutral-700 shadow-none hover:bg-neutral-50" onClick={() => { setEditorCategory(category); setEditorOpen(true); }}>Düzenle</Button>
-                  <Button variant="ghost" className="min-h-10 rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950" onClick={() => void handleDelete(category)}>Sil</Button>
+                  <Button variant="outline" className="min-h-10" onClick={() => { setEditorCategory(category); setEditorOpen(true); }}>Düzenle</Button>
+                  <Button variant="ghost" className="min-h-10" onClick={() => void handleDelete(category)}>Sil</Button>
                 </div>
               </article>
             ))}
@@ -173,5 +177,13 @@ export default function AdminCategoriesPage() {
 
       {editorOpen && <CategoryEditor key={editorCategory?._id || "new-category"} category={editorCategory} onClose={() => setEditorOpen(false)} onSaved={(nextMessage) => { setMessage(nextMessage); setActionError(null); void refresh(); }} />}
     </>
+  );
+}
+
+export default function AdminCategoriesPage() {
+  return (
+    <AdminGate>
+      <AdminCategoriesContent />
+    </AdminGate>
   );
 }

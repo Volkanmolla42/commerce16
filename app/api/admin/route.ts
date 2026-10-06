@@ -102,14 +102,26 @@ export async function POST(request: NextRequest) {
         if (storeName.length < 2 || storeName.length > 80) {
           throw new Error("Mağaza adı 2 ile 80 karakter arasında olmalı.");
         }
-        const result = await client.mutation(api.settings.updateStoreName, {
+        const text = (value: unknown) =>
+          typeof value === "string" ? value : "";
+        const logoStorageId = text(input.logoStorageId);
+        const result = await client.mutation(api.settings.updateStoreSettings, {
           adminSecret,
           storeName,
+          slogan: text(input.slogan),
+          logoStorageId: (logoStorageId || null) as Id<"_storage"> | null,
+          phone: text(input.phone),
+          email: text(input.email),
+          address: text(input.address),
+          announcement: text(input.announcement),
+          seoTitle: text(input.seoTitle),
+          seoDescription: text(input.seoDescription),
+          isOpen: input.isOpen !== false,
         });
         revalidateTag("store-settings", { expire: 0 });
         revalidatePath("/", "layout");
         revalidatePath("/opengraph-image");
-        return NextResponse.json({ success: true, storeName: result.storeName });
+        return NextResponse.json({ success: true, ...result });
       }
       case "product.image-upload-url": {
         const uploadUrl = await client.mutation(api.products.generateImageUploadUrl, {

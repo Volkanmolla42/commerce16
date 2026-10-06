@@ -9,7 +9,13 @@ export function UserNav() {
 
   if (isLoading) {
     return (
-      <div className="h-9 w-9 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-800" />
+      <div
+        aria-hidden
+        className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 animate-pulse dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <div className="h-4 w-4 rounded-full bg-neutral-200 dark:bg-neutral-800" />
+        <div className="hidden sm:block h-3 w-14 rounded bg-neutral-200 dark:bg-neutral-800" />
+      </div>
     );
   }
 

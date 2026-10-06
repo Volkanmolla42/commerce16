@@ -107,6 +107,24 @@ export const getBySlug = query({
   },
 });
 
+export const getBySlugs = query({
+  args: { slugs: v.array(v.string()) },
+  returns: v.array(productValidator),
+  handler: async (ctx, { slugs }) => {
+    if (slugs.length > 100) throw new Error("En fazla 100 ürün aynı anda görüntülenebilir.");
+
+    const products = [];
+    for (const slug of new Set(slugs)) {
+      const product = await ctx.db
+        .query("products")
+        .withIndex("by_slug", (q) => q.eq("slug", slug))
+        .first();
+      if (product) products.push(await withPublicImageUrls(ctx, product));
+    }
+    return products;
+  },
+});
+
 export const create = mutation({
   args: {
     adminSecret: v.string(),

@@ -2,6 +2,7 @@ import { GridTileImage } from "@/components/grid/tile";
 import Footer from "@/components/layout/footer";
 import { Gallery } from "@/components/product/gallery";
 import { ProductDescription } from "@/components/product/product-description";
+import { FavoriteButton } from "@/components/favorites/favorite-button";
 import {
   getProduct,
   getProductRecommendations,
@@ -161,23 +162,29 @@ async function RelatedProducts({ id }: { id: string }) {
             key={product.slug}
             className="aspect-square w-full flex-none min-[475px]:w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5"
           >
-            <Link
-              className="relative h-full w-full"
-              href={`/product/${product.slug}`}
-              prefetch={true}
-            >
-              <GridTileImage
-                alt={product.title}
-                label={{
-                  title: product.title,
-                  amount: product.price,
-                  currencyCode: "TRY",
-                }}
-                src={product.images[0]}
-                fill
-                sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, (min-width: 475px) 50vw, 100vw"
+            <div className="relative h-full w-full">
+              <Link
+                className="relative block h-full w-full"
+                href={`/product/${product.slug}`}
+                prefetch={true}
+              >
+                <GridTileImage
+                  alt={product.title}
+                  label={{
+                    title: product.title,
+                    amount: product.price,
+                    currencyCode: "TRY",
+                  }}
+                  src={product.images[0]}
+                  fill
+                  sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, (min-width: 475px) 50vw, 100vw"
+                />
+              </Link>
+              <FavoriteButton
+                product={product}
+                className="absolute right-3 top-3 z-10 h-11 w-11"
               />
-            </Link>
+            </div>
           </li>
         ))}
       </ul>

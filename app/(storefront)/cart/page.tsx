@@ -14,10 +14,15 @@ import {
   DeliveryTruck01Icon,
   Refresh01Icon,
 } from "hugeicons-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Separator,
+  Badge,
+} from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 
 export default function CartPage() {

@@ -5,9 +5,17 @@ import type { Product, ProductVariant } from "@/lib/catalog/types";
 import { useEffect, useRef, useState } from "react";
 import { ShoppingBag01Icon, Tick01Icon, ArrowRight01Icon } from "hugeicons-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui";
 
-export function AddToCart({ product, variant }: { product: Product; variant?: ProductVariant }) {
+export function AddToCart({
+  product,
+  variant,
+  buttonVariant = "default",
+}: {
+  product: Product;
+  variant?: ProductVariant;
+  buttonVariant?: "default" | "outline";
+}) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -28,6 +36,7 @@ export function AddToCart({ product, variant }: { product: Product; variant?: Pr
       <Button
         type="button"
         size="lg"
+        variant={buttonVariant}
         onClick={handleAdd}
         disabled={!isAvailable}
         aria-label="Sepete Ekle"

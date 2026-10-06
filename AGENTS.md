@@ -1,4 +1,5 @@
 Gereksiz npm run build çalıştırma.
+Birinci görev bitmeden diğerine geçme: aynı anda birden fazla görev verilirse sırayla bitir, bir görev tamamen bitmeden (kod + doğrulama) sonrakine başlama.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

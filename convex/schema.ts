@@ -114,6 +114,15 @@ export default defineSchema({
   storeSettings: defineTable({
     key: v.literal("store"),
     storeName: v.string(),
+    slogan: v.optional(v.string()),
+    logoStorageId: v.optional(v.union(v.id("_storage"), v.null())),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    address: v.optional(v.string()),
+    announcement: v.optional(v.string()),
+    seoTitle: v.optional(v.string()),
+    seoDescription: v.optional(v.string()),
+    isOpen: v.optional(v.boolean()),
     updatedAt: v.string(),
   }).index("by_key", ["key"]),
 
@@ -129,4 +138,11 @@ export default defineSchema({
     postalCode: v.optional(v.string()),
     isDefault: v.boolean(),
   }).index("by_userId", ["userId"]),
+
+  favorites: defineTable({
+    userId: v.id("users"),
+    productSlug: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_slug", ["userId", "productSlug"]),
 });

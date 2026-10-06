@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"next,convex\" -c \"bgBlue.bold,bgGreen.bold\" \"next dev\" \"convex dev\"",
+    "dev": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"next,convex\" -c \"bgpPurple.bold,black.bold\" \"next dev\" \"convex dev\"",
     "dev:next": "next dev",
     "dev:convex": "convex dev",
     "build": "next build",
