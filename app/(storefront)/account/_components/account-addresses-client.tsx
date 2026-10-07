@@ -14,6 +14,13 @@ import {
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
 import {
+  getDistrictById,
+  getDistrictByName,
+  getProvinceById,
+  getProvinceByName,
+  TURKEY_PROVINCES,
+} from "@/lib/turkey-provinces";
+import {
   Button,
   Card,
   Badge,
@@ -26,7 +33,9 @@ import {
   DialogFooter,
 } from "@/components/ui";
 
-export function AccountAddressesSkeleton() {
+const DEFAULT_PROVINCE = getProvinceByName("İstanbul")!;
+
+function AccountAddressesSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-hidden>
       {[0, 1].map((i) => (
@@ -102,8 +111,10 @@ export default function AccountAddressesPage() {
     title: "Ev",
     fullName: "",
     phone: "",
-    city: "İstanbul",
+    city: DEFAULT_PROVINCE.name,
+    provinceId: DEFAULT_PROVINCE.id,
     district: "",
+    districtId: "",
     addressLine1: "",
     addressLine2: "",
     postalCode: "",
@@ -116,8 +127,10 @@ export default function AccountAddressesPage() {
       title: "Ev",
       fullName: profile?.name || "",
       phone: profile?.phone || "",
-      city: "İstanbul",
+      city: DEFAULT_PROVINCE.name,
+      provinceId: DEFAULT_PROVINCE.id,
       district: "",
+      districtId: "",
       addressLine1: "",
       addressLine2: "",
       postalCode: "",
@@ -129,12 +142,16 @@ export default function AccountAddressesPage() {
 
   const openEditModal = (addr: NonNullable<typeof addresses>[number]) => {
     setEditingAddressId(addr._id);
+    const province = getProvinceById(addr.provinceId) ?? getProvinceByName(addr.city);
+    const district = getDistrictById(province?.id, addr.districtId) ?? getDistrictByName(province?.id, addr.district);
     setForm({
       title: addr.title,
       fullName: addr.fullName,
       phone: addr.phone,
-      city: addr.city,
-      district: addr.district,
+      city: province?.name ?? addr.city,
+      provinceId: province?.id ?? "",
+      district: district?.name ?? addr.district,
+      districtId: district?.id ?? "",
       addressLine1: addr.addressLine1,
       addressLine2: addr.addressLine2 || "",
       postalCode: addr.postalCode || "",
@@ -153,7 +170,9 @@ export default function AccountAddressesPage() {
       !form.fullName.trim() ||
       !form.phone.trim() ||
       !form.city.trim() ||
+      !form.provinceId ||
       !form.district.trim() ||
+      !form.districtId ||
       !form.addressLine1.trim()
     ) {
       setErrorMessage("Lütfen zorunlu alanları doldurun.");
@@ -170,6 +189,8 @@ export default function AccountAddressesPage() {
           phone: form.phone.trim(),
           city: form.city.trim(),
           district: form.district.trim(),
+          provinceId: form.provinceId,
+          districtId: form.districtId,
           addressLine1: form.addressLine1.trim(),
           addressLine2: form.addressLine2.trim() || undefined,
           postalCode: form.postalCode.trim() || undefined,
@@ -182,6 +203,8 @@ export default function AccountAddressesPage() {
           phone: form.phone.trim(),
           city: form.city.trim(),
           district: form.district.trim(),
+          provinceId: form.provinceId,
+          districtId: form.districtId,
           addressLine1: form.addressLine1.trim(),
           addressLine2: form.addressLine2.trim() || undefined,
           postalCode: form.postalCode.trim() || undefined,
@@ -212,6 +235,8 @@ export default function AccountAddressesPage() {
       alert("Varsayılan adres güncellenirken bir hata oluştu.");
     }
   };
+
+  const districtOptions = getProvinceById(form.provinceId)?.districts ?? [];
 
   if (!authLoading && !isAuthenticated) {
     return <AccountLoginCard />;
@@ -380,26 +405,53 @@ export default function AccountAddressesPage() {
                 <Label htmlFor="addr-city" className="text-xs uppercase tracking-wider text-muted-foreground">
                   İl *
                 </Label>
-                <Input
+                <select
                   id="addr-city"
                   required
-                  value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })}
-                  placeholder="İstanbul"
-                />
+                  value={form.provinceId}
+                  onChange={(e) => {
+                    const province = getProvinceById(e.target.value);
+                    setForm({
+                      ...form,
+                      provinceId: e.target.value,
+                      city: province?.name ?? "",
+                      districtId: "",
+                      district: "",
+                    });
+                  }}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                >
+                  <option value="" disabled>İl seçin</option>
+                  {TURKEY_PROVINCES.map((province) => (
+                    <option key={province.id} value={province.id}>{province.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="addr-district" className="text-xs uppercase tracking-wider text-muted-foreground">
                   İlçe *
                 </Label>
-                <Input
+                <select
                   id="addr-district"
                   required
-                  value={form.district}
-                  onChange={(e) => setForm({ ...form, district: e.target.value })}
-                  placeholder="Kadıköy"
-                />
+                  value={form.districtId}
+                  disabled={!form.provinceId}
+                  onChange={(e) => {
+                    const district = getDistrictById(form.provinceId, e.target.value);
+                    setForm({
+                      ...form,
+                      districtId: e.target.value,
+                      district: district?.name ?? "",
+                    });
+                  }}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="" disabled>İlçe seçin</option>
+                  {[...districtOptions].sort((a, b) => a.name.localeCompare(b.name, "tr-TR")).map((district) => (
+                    <option key={district.id} value={district.id}>{district.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="sm:col-span-2 space-y-2">

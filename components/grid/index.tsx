@@ -4,18 +4,22 @@ function Grid(props: React.ComponentProps<"ul">) {
   return (
     <ul
       {...props}
-      className={clsx("grid grid-flow-row gap-4", props.className)}
+      className={clsx("grid gap-4", props.className)}
     >
       {props.children}
     </ul>
   );
 }
 
-function GridItem(props: React.ComponentProps<"li">) {
+function GridItem({
+  square = true,
+  className,
+  ...props
+}: React.ComponentProps<"li"> & { square?: boolean }) {
   return (
     <li
       {...props}
-      className={clsx("aspect-square transition-opacity", props.className)}
+      className={clsx(square && "aspect-square", "transition-opacity", className)}
     >
       {props.children}
     </li>

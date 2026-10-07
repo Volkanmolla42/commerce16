@@ -64,7 +64,7 @@ function OrderDetailsPrintButton() {
   );
 }
 
-export function AccountOrderDetailsSkeleton() {
+function AccountOrderDetailsSkeleton() {
   const stepLabels = [
     "Sipariş Alındı",
     orderStatusLabels.paid,

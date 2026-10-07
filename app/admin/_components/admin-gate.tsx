@@ -57,68 +57,70 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (authenticated === null) {
-    return (
-      <div className="grid min-h-[100dvh] place-items-center bg-background">
-        <div className="size-7 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+  const gateOpen = authenticated !== true;
+
+  return (
+    <>
+      <div aria-hidden={gateOpen} inert={gateOpen}>
+        {children}
       </div>
-    );
-  }
 
-  if (!authenticated) {
-    return (
-      <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10 text-foreground">
-        <Card className="w-full max-w-sm overflow-hidden">
-          <CardContent className="p-6 sm:p-8">
-            <div className="mb-7 flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-md bg-primary text-primary-foreground">
-                <LockIcon className="size-4" />
+      {authenticated === null ? (
+        <div className="fixed inset-0 z-50 grid min-h-[100dvh] place-items-center bg-background">
+          <div className="size-7 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+        </div>
+      ) : !authenticated ? (
+        <main className="fixed inset-0 z-50 grid min-h-[100dvh] place-items-center bg-background px-4 py-10 text-foreground">
+          <Card className="w-full max-w-sm overflow-hidden">
+            <CardContent className="p-6 sm:p-8">
+              <div className="mb-7 flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-md bg-primary text-primary-foreground">
+                  <LockIcon className="size-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{storeSettings?.storeName || "Mağaza"}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Yönetim paneli</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">{storeSettings?.storeName || "Mağaza"}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Yönetim paneli</p>
-              </div>
-            </div>
 
-            <h1 className="text-xl font-semibold tracking-tight">Yönetici PIN&apos;i</h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Mağaza yönetimine devam etmek için 6 haneli PIN&apos;ini gir.
-            </p>
+              <h1 className="text-xl font-semibold tracking-tight">Yönetici PIN&apos;i</h1>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Mağaza yönetimine devam etmek için 6 haneli PIN&apos;ini gir.
+              </p>
 
-            <form className="mt-6" onSubmit={verifyPin}>
-              <label htmlFor="admin-pin" className="mb-2 block text-sm font-medium">
-                6 haneli PIN
-              </label>
-              <input
-                id="admin-pin"
-                name="pin"
-                type="password"
-                autoComplete="current-password"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                minLength={6}
-                maxLength={6}
-                required
-                value={pin}
-                onChange={(event) => {
-                  setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
-                  setError(null);
-                }}
-                disabled={submitting}
-                className="h-11 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none disabled:opacity-60"
-              />
+              <form className="mt-6" onSubmit={verifyPin}>
+                <label htmlFor="admin-pin" className="mb-2 block text-sm font-medium">
+                  6 haneli PIN
+                </label>
+                <input
+                  id="admin-pin"
+                  name="pin"
+                  type="password"
+                  autoComplete="current-password"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  minLength={6}
+                  maxLength={6}
+                  required
+                  value={pin}
+                  onChange={(event) => {
+                    setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
+                    setError(null);
+                  }}
+                  disabled={submitting}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none disabled:opacity-60"
+                />
 
-              {error && <p role="alert" aria-live="polite" className="mt-4 text-sm font-medium text-destructive">{error}</p>}
+                {error && <p role="alert" aria-live="polite" className="mt-4 text-sm font-medium text-destructive">{error}</p>}
 
-              <Button type="submit" disabled={submitting || pin.length !== 6} className="mt-5 h-11 w-full">
-                {submitting ? "Doğrulanıyor…" : "Yönetim paneline gir"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
-
-  return children;
+                <Button type="submit" disabled={submitting || pin.length !== 6} className="mt-5 h-11 w-full">
+                  {submitting ? "Doğrulanıyor…" : "Yönetim paneline gir"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </main>
+      ) : null}
+    </>
+  );
 }

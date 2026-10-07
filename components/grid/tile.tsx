@@ -14,6 +14,7 @@ export function GridTileImage({
   label?: {
     title: string;
     amount: string;
+    maxAmount?: string;
     currencyCode: string;
     position?: "bottom" | "center";
   };
@@ -43,6 +44,7 @@ export function GridTileImage({
         <Label
           title={label.title}
           amount={label.amount}
+          maxAmount={label.maxAmount}
           currencyCode={label.currencyCode}
           position={label.position}
         />

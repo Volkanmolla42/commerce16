@@ -8,7 +8,6 @@ import {
   UserIcon,
   Location01Icon,
 } from "hugeicons-react";
-import { Sk } from "./skeleton";
 
 const NAV_ITEMS = [
   { label: "Favorilerim", href: "/favorites", icon: HeartIcon },
@@ -43,21 +42,5 @@ export function AccountNav() {
         );
       })}
     </nav>
-  );
-}
-
-export function AccountNavSkeleton() {
-  return (
-    <div className="flex flex-row gap-1 lg:flex-col">
-      {NAV_ITEMS.map(({ href }) => (
-        <div
-          key={href}
-          className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-        >
-          <Sk className="h-4 w-4" />
-          <Sk className="h-4 w-16" />
-        </div>
-      ))}
-    </div>
   );
 }

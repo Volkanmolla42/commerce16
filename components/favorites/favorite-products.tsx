@@ -8,6 +8,8 @@ import { GridTileImage } from "@/components/grid/tile";
 import { FavoriteButton } from "./favorite-button";
 import { useFavorites } from "./favorites-context";
 import Link from "next/link";
+import { Button, Card } from "@/components/ui";
+import { FavoritesSkeleton } from "./favorites-skeleton";
 
 const EMPTY_PRODUCT_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80";
@@ -20,25 +22,19 @@ export function FavoriteProducts() {
   );
 
   if (!isReady || (favoriteSlugs.length > 0 && products === undefined)) {
-    return (
-      <div aria-busy="true" className="mx-auto grid max-w-(--breakpoint-2xl) grid-cols-2 gap-4 px-4 py-8 sm:grid-cols-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="aspect-square animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
-        ))}
-      </div>
-    );
+    return <FavoritesSkeleton />;
   }
 
   const favoriteProducts = products ?? [];
 
   return (
-    <section className="mx-auto max-w-(--breakpoint-2xl) px-4 py-8 sm:py-12">
-      <header className="mb-6 flex items-end justify-between gap-4">
+    <section className="space-y-6">
+      <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm font-medium text-muted-foreground">
             {favoriteProducts.length} ürün kaydedildi
           </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-neutral-950 dark:text-white">
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">
             Favorilerim
           </h1>
         </div>
@@ -69,21 +65,22 @@ export function FavoriteProducts() {
           ))}
         </Grid>
       ) : (
-        <div className="mx-auto flex max-w-lg flex-col items-center rounded-3xl border border-neutral-200 bg-white px-6 py-12 text-center dark:border-neutral-800 dark:bg-neutral-950">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+        <Card className="mx-auto flex max-w-lg flex-col items-center rounded-3xl p-8 text-center shadow-xs sm:p-12">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <HeartIcon aria-hidden="true" className="h-7 w-7" />
           </span>
           <h2 className="mt-4 text-lg font-semibold">Henüz favori ürününüz yok</h2>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             Beğendiğiniz ürünleri kalp simgesine dokunarak burada saklayabilirsiniz.
           </p>
-          <Link
-            href="/search"
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-neutral-900 px-5 text-sm font-semibold text-white transition hover:bg-neutral-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 dark:focus-visible:outline-white"
+          <Button
+            asChild
+            size="lg"
+            className="mt-6 rounded-2xl font-semibold shadow-md"
           >
-            Ürünleri keşfet
-          </Link>
-        </div>
+            <Link href="/search">Ürünlere göz at</Link>
+          </Button>
+        </Card>
       )}
     </section>
   );

@@ -1,32 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
 import {
   Cog6ToothIcon,
+  ChartBarIcon,
   CubeIcon,
-  DocumentTextIcon,
   FolderIcon,
   ShoppingBagIcon,
   Squares2X2Icon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 import { ArrowUpRight01Icon } from "hugeicons-react";
 import { Button } from "@/components/ui";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { adminPath } from "@/lib/admin/routes";
 
 const navigation = [
-  { label: "Genel Bakış", href: "/admin", icon: Squares2X2Icon },
-  { label: "Ürünler", href: "/admin/products", icon: CubeIcon },
-  { label: "Kategoriler", href: "/admin/categories", icon: FolderIcon },
-  { label: "Siparişler", href: "/admin/orders", icon: ShoppingBagIcon },
-  { label: "Sayfalar", href: "/admin/pages", icon: DocumentTextIcon },
-  { label: "Mağaza ayarları", href: "/admin/settings", icon: Cog6ToothIcon },
+  { label: "Genel Bakış", href: adminPath(), icon: Squares2X2Icon },
+  { label: "Ürünler", href: adminPath("products"), icon: CubeIcon },
+  { label: "Kategoriler", href: adminPath("categories"), icon: FolderIcon },
+  { label: "Kuponlar", href: adminPath("coupons"), icon: TagIcon },
+  { label: "Siparişler", href: adminPath("orders"), icon: ShoppingBagIcon },
+  { label: "Analitik", href: adminPath("analytics"), icon: ChartBarIcon },
+  { label: "Mağaza ayarları", href: adminPath("settings"), icon: Cog6ToothIcon },
 ];
 
 function isActive(pathname: string, href: string) {
-  return href === "/admin" ? pathname === href : pathname.startsWith(href);
+  return href === adminPath() ? pathname === href : pathname.startsWith(href);
 }
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -43,7 +47,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/admin-auth", { method: "DELETE" });
       if (!response.ok) throw new Error("Çıkış yapılamadı. Tekrar dene.");
-      window.location.replace("/admin");
+      window.location.replace(adminPath());
     } catch {
       setLogoutError("Çıkış yapılamadı. Tekrar dene.");
       setLoggingOut(false);
@@ -76,8 +80,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     <div className="min-h-[100dvh] bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
         <div className="mb-8 flex items-center gap-3 px-2">
-          <Link href="/admin" aria-label="Yönetim paneli ana sayfası" className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-            {logoUrl ? <img src={logoUrl} alt={storeName} className="size-8 object-contain" /> : "C"}
+          <Link href={adminPath()} aria-label="Yönetim paneli ana sayfası" className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+            {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : "C"}
           </Link>
           <span className="min-w-0">
             <Link href="/" target="_blank" className="flex max-w-52 items-center gap-1 text-sm font-semibold text-foreground hover:underline">
@@ -99,7 +103,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-30 border-b border-border bg-card lg:hidden">
           <div className="flex min-h-14 items-center gap-3 px-4">
             <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-              {logoUrl ? <img src={logoUrl} alt={storeName} className="size-8 object-contain" /> : "C"}
+              {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : "C"}
             </span>
             <Link href="/" target="_blank" className="flex min-w-0 items-center gap-1 text-sm font-medium hover:underline">
               <span className="truncate">{storeName}</span>

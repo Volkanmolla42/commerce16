@@ -47,7 +47,7 @@ export function FavoriteButton({
         type="button"
         aria-label={`Favori: ${product.title}`}
         aria-pressed={optimisticSelected}
-        disabled={!isReady || isPending}
+        disabled={isPending}
         onClick={handleClick}
         className={cn(
           "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white/95 text-neutral-700 shadow-md backdrop-blur-sm transition hover:scale-105 hover:text-rose-600 active:scale-95 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-neutral-200 dark:hover:text-rose-400 dark:focus-visible:outline-white",

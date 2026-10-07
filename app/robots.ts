@@ -1,15 +1,16 @@
 import { baseUrl } from "@/lib/utils";
+import { ADMIN_BASE_PATH } from "@/lib/admin/routes";
+import type { MetadataRoute } from "next";
 
-export default function robots() {
+export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: "*",
         allow: ["/"],
-        disallow: ["/admin", "/admin/*", "/api/*"],
+        disallow: ["/admin", "/admin/*", ADMIN_BASE_PATH, `${ADMIN_BASE_PATH}/*`, "/api/*"],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
-    host: baseUrl,
+    sitemap: new URL("/sitemap.xml", baseUrl).toString(),
   };
 }

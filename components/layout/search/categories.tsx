@@ -1,4 +1,3 @@
-import clsx from "clsx";
 import { Suspense } from "react";
 import { getCategories } from "@/lib/catalog";
 import FilterList from "./filter";
@@ -8,25 +7,15 @@ async function CategoryList() {
   return <FilterList list={categories} title="Kategoriler" />;
 }
 
-const skeleton = "mb-3 h-4 w-5/6 animate-pulse rounded-sm";
-const activeAndTitles = "bg-neutral-800 dark:bg-neutral-300";
-const items = "bg-neutral-400 dark:bg-neutral-700";
-
 export default function Categories() {
   return (
     <Suspense
       fallback={
-        <div className="col-span-2 hidden h-[400px] w-full flex-none py-4 lg:block">
-          <div className={clsx(skeleton, activeAndTitles)} />
-          <div className={clsx(skeleton, activeAndTitles)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
-          <div className={clsx(skeleton, items)} />
+        <div aria-hidden="true" className="flex gap-2 overflow-hidden py-1">
+          <div className="h-10 w-20 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div className="h-10 w-24 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div className="h-10 w-24 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div className="h-10 w-24 shrink-0 animate-pulse rounded-full bg-muted" />
         </div>
       }
     >

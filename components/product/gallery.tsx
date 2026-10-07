@@ -32,10 +32,11 @@ export function Gallery({
           <Image
             className="h-full w-full object-contain"
             fill
-            sizes="(min-width: 1024px) 66vw, 100vw"
+            sizes="(min-width: 1536px) 960px, (min-width: 1024px) 60vw, calc(100vw - 6rem)"
             alt={images[imageIndex]?.altText as string}
             src={images[imageIndex]?.src as string}
-            priority={true}
+            loading="eager"
+            fetchPriority="high"
           />
         )}
 

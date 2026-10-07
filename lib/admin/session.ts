@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE_NAME = "commerce_admin_session";
+export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 function adminPin() {
   return process.env.ADMIN_PIN || "";
@@ -28,15 +29,30 @@ function constantTimeEqual(left: string, right: string) {
   );
 }
 
-export function getAdminSessionToken() {
+function signAdminSession(expiresAt: number) {
+  return createHmac("sha256", adminApiSecret())
+    .update(`commerce-admin-session:v1:${adminPin()}:${expiresAt}`)
+    .digest("hex");
+}
+
+export function getAdminSessionToken(now = Date.now()) {
   if (!isAdminAuthConfigured()) {
     throw new Error(
       "6 haneli ADMIN_PIN, ADMIN_API_SECRET ve NEXT_PUBLIC_CONVEX_URL ayarlanmalı.",
     );
   }
-  return createHmac("sha256", adminApiSecret())
-    .update(`commerce-admin-session:${adminPin()}`)
-    .digest("hex");
+  const expiresAt = now + ADMIN_SESSION_MAX_AGE_SECONDS * 1000;
+  return `v1.${expiresAt}.${signAdminSession(expiresAt)}`;
+}
+
+function isValidAdminSessionToken(value: string, now = Date.now()) {
+  const [version, expiresAtValue, signature, ...extra] = value.split(".");
+  const expiresAt = Number(expiresAtValue);
+  if (version !== "v1" || extra.length > 0 || !/^\d{13}$/.test(expiresAtValue ?? "") ||
+    !Number.isSafeInteger(expiresAt) || expiresAt <= now ||
+    expiresAt > now + ADMIN_SESSION_MAX_AGE_SECONDS * 1000 + 60_000 ||
+    !/^[a-f0-9]{64}$/.test(signature ?? "")) return false;
+  return constantTimeEqual(signature, signAdminSession(expiresAt));
 }
 
 export function isValidAdminPin(value: unknown) {
@@ -52,9 +68,7 @@ export async function hasAdminSession() {
   if (!isAdminAuthConfigured()) return false;
   const cookieStore = await cookies();
   const session = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
-  return Boolean(
-    session && constantTimeEqual(session, getAdminSessionToken())
-  );
+  return Boolean(session && isValidAdminSessionToken(session));
 }
 
 export function isSameOriginRequest(request: Request) {

@@ -1,27 +1,31 @@
-import { Carousel } from "@/components/carousel";
-import { ThreeItemGrid } from "@/components/grid/three-items";
+import { CategoryShortcuts, HomeProductShelf } from "@/components/home/home-sections";
 import Footer from "@/components/layout/footer";
 import { baseUrl } from "@/lib/utils";
-import { getStoreSettings } from "@/lib/catalog";
+import { getCategories, getRecommendationCatalog, getStoreSettings } from "@/lib/catalog";
+import { PersonalizedRecommendationShelf } from "@/components/product/recommendation-shelves";
 import type { Metadata } from "next";
 
 export const prefetch = "partial";
 
-const homeDescription =
-  "Yüksek kaliteli tasarım ürünleri ve seçkin kategoriler. Hızlı teslimat ve güvenli ödeme.";
-
 export async function generateMetadata(): Promise<Metadata> {
-  const { storeName } = await getStoreSettings();
-  const title = storeName + " | Resmi Online Mağaza";
+  const { storeName, slogan } = await getStoreSettings();
+  const title = `${storeName} | Resmi Online Mağaza`;
+  const description = slogan.trim() || `${storeName} ürünlerini ve koleksiyonlarını keşfedin.`;
 
   return {
-    title,
-    description: homeDescription,
+    title: { absolute: title },
+    description,
     openGraph: {
       type: "website",
       title,
-      description: homeDescription,
+      description,
+      siteName: storeName,
       url: baseUrl,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
     },
     alternates: {
       canonical: baseUrl,
@@ -30,17 +34,23 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const { storeName } = await getStoreSettings();
+  const [{ storeName, logoUrl }, products, categories] = await Promise.all([
+    getStoreSettings(),
+    getRecommendationCatalog(),
+    getCategories(),
+  ]);
+  const availableProducts = products.filter((product) => product.availableForSale);
+  const organizationLogo = new URL(logoUrl || "/favicon.ico", baseUrl).toString();
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: storeName,
-    url: baseUrl,
+    url: new URL("/", baseUrl).toString(),
     potentialAction: {
       "@type": "SearchAction",
       target: {
         "@type": "EntryPoint",
-        urlTemplate: `${baseUrl}/search?q={search_term_string}`,
+      urlTemplate: `${new URL("/search", baseUrl).toString()}?q={search_term_string}`,
       },
       "query-input": "required name=search_term_string",
     },
@@ -50,8 +60,8 @@ export default async function HomePage() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: storeName,
-    url: baseUrl,
-    logo: `${baseUrl}/favicon.ico`,
+    url: new URL("/", baseUrl).toString(),
+    logo: organizationLogo,
   };
 
   return (
@@ -59,17 +69,20 @@ export default async function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(websiteJsonLd),
+          __html: JSON.stringify(websiteJsonLd).replace(/</g, "\\u003c"),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(organizationJsonLd),
+          __html: JSON.stringify(organizationJsonLd).replace(/</g, "\\u003c"),
         }}
       />
-      <ThreeItemGrid />
-      <Carousel />
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4">
+        <CategoryShortcuts categories={categories} />
+        <HomeProductShelf title="Öne çıkan ürünler" products={availableProducts.slice(0, 10)} />
+        <PersonalizedRecommendationShelf products={products} />
+      </div>
       <Footer />
     </>
   );

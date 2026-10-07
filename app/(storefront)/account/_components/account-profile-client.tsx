@@ -64,61 +64,6 @@ function Field({
   );
 }
 
-function PersonalFormSkeleton() {
-  return (
-    <div className="space-y-4" aria-hidden>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div key={i} className="space-y-2">
-            <Sk className="h-3 w-20" />
-            <Sk className="h-10 rounded-xl" />
-          </div>
-        ))}
-      </div>
-      <div className="space-y-2">
-        <Sk className="h-3 w-24" />
-        <Sk className="h-10 rounded-xl" />
-        <Sk className="h-3 w-56" />
-      </div>
-      <Sk className="h-10 w-48 rounded-2xl" />
-    </div>
-  );
-}
-
-function PasswordFormSkeleton() {
-  return (
-    <div className="space-y-4" aria-hidden>
-      <Sk className="h-3 w-48" />
-      {[0, 1].map((i) => (
-        <div key={i} className="space-y-2">
-          <Sk className="h-3 w-24" />
-          <Sk className="h-10 rounded-xl" />
-        </div>
-      ))}
-      <Sk className="h-10 w-36 rounded-2xl" />
-    </div>
-  );
-}
-
-export function AccountProfileSkeleton() {
-  return (
-    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-      <Card className="rounded-3xl border-border bg-card shadow-xs">
-        <ProfileCardHeader icon={UserIcon} title="Kişisel Bilgiler" />
-        <CardContent className="p-6">
-          <PersonalFormSkeleton />
-        </CardContent>
-      </Card>
-      <Card className="rounded-3xl border-border bg-card shadow-xs">
-        <ProfileCardHeader icon={LockIcon} title="Şifre Değiştir" />
-        <CardContent className="p-6">
-          <PasswordFormSkeleton />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 export default function AccountProfilePage() {
   const profile = useQuery(api.users.getMyProfile);
   const updateProfile = useMutation(api.users.updateProfile);
@@ -143,7 +88,7 @@ export default function AccountProfilePage() {
         name: fullName.trim(),
         phone: phoneNumber.trim(),
       });
-      setStatusMessage("Profil bilgileriniz başarıyla güncellendi.");
+      setStatusMessage("Profil güncellendi.");
     } catch {
       setStatusMessage("Bilgiler güncellenirken bir hata oluştu.");
     } finally {
@@ -281,7 +226,7 @@ export default function AccountProfilePage() {
           <div>
             <p className="text-sm font-bold text-foreground">Oturumu Kapat</p>
             <p className="text-xs text-muted-foreground">
-              Hesabınızdan güvenli bir şekilde çıkış yapın.
+              Hesabınızdan çıkış yapın.
             </p>
           </div>
           <Button

@@ -2,8 +2,10 @@ import LogoSquare from "@/components/logo-square";
 import { getMenu, getStoreSettings } from "@/lib/catalog";
 import { Menu } from "@/lib/catalog/types";
 import Link from "next/link";
+import Image from "next/image";
 import { Suspense } from "react";
 import MobileMenu from "./mobile-menu";
+import { AllCategoriesMenu } from "./all-categories-menu";
 import Search, { SearchSkeleton } from "./search";
 import { UserNav } from "./user-nav";
 import { CartButton } from "@/components/cart/cart-button";
@@ -29,8 +31,7 @@ export async function Navbar() {
             className="flex items-center gap-2.5 transition hover:opacity-90"
           >
             {settings.logoUrl ? (
-              // ponytail: harici logo için düz img, next/image remote ayarı gerekmez
-              <img src={settings.logoUrl} alt={settings.storeName} className="h-10 w-10 rounded-xl border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
+              <Image src={settings.logoUrl} alt={settings.storeName} width={40} height={40} unoptimized className="h-10 w-10 rounded-xl border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
             ) : (
               <LogoSquare />
             )}
@@ -41,7 +42,8 @@ export async function Navbar() {
 
           {menu.length ? (
             <nav className="hidden md:flex md:items-center md:gap-6">
-              {menu.map((item: Menu) => (
+              <AllCategoriesMenu categories={menu.filter((item) => item.path !== "/search")} />
+              {menu.filter((item) => item.path !== "/search").map((item: Menu) => (
                 <Link
                   key={item.title}
                   href={item.path}
@@ -64,8 +66,8 @@ export async function Navbar() {
 
         {/* Sağ: Kullanıcı ve Sepet */}
         <div className="flex items-center justify-end gap-2.5">
-          <FavoritesLink />
           <UserNav />
+          <FavoritesLink />
           <CartButton />
         </div>
       </div>

@@ -24,20 +24,22 @@ async function adminRequest<T>(url: string, options: RequestInit, fallback: stri
   return payload as T;
 }
 
-export function useAdminResource<T>(resource: string): ResourceState<T> {
+export function useAdminResource<T>(resource: string, params: Record<string, string> = {}): ResourceState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const request = useRef<AbortController | null>(null);
   const mounted = useRef(false);
+  const paramsKey = JSON.stringify(params);
 
   const load = useCallback(() => {
     if (!mounted.current) return Promise.resolve();
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
+    const search = new URLSearchParams({ resource, ...JSON.parse(paramsKey) as Record<string, string> });
     return adminRequest<T>(
-        `/api/admin?resource=${encodeURIComponent(resource)}`,
+        `/api/admin?${search.toString()}`,
         { cache: "no-store", signal: controller.signal },
         "Veriler yüklenemedi.",
       ).then((payload) => {
@@ -52,7 +54,7 @@ export function useAdminResource<T>(resource: string): ResourceState<T> {
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
-  }, [resource]);
+  }, [paramsKey, resource]);
 
   useEffect(() => {
     mounted.current = true;

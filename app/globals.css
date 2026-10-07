@@ -3,18 +3,7 @@
 @plugin "@tailwindcss/container-queries";
 @plugin "@tailwindcss/typography";
 
-@keyframes carousel {
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
 @theme {
-  --animate-carousel: carousel 40s linear infinite;
-
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

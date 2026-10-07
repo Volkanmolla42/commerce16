@@ -1,16 +1,17 @@
 import Link from "next/link";
+import Image from "next/image";
 import LogoSquare from "@/components/logo-square";
-import { getMenu, getPages, getStoreSettings } from "@/lib/catalog";
+import { getMenu, getStoreSettings } from "@/lib/catalog";
 import { Menu } from "@/lib/catalog/types";
 import { cacheTag } from "next/cache";
+import { CookiePreferencesButton } from "@/components/privacy/cookie-consent-manager";
 
 export default async function Footer() {
   "use cache";
   cacheTag("store-settings");
   const copyrightDate = new Date().getFullYear();
-  const [menu, pages, settings] = await Promise.all([
+  const [menu, settings] = await Promise.all([
     getMenu(),
-    getPages(),
     getStoreSettings(),
   ]);
 
@@ -25,8 +26,7 @@ export default async function Footer() {
               href="/"
             >
               {settings.logoUrl ? (
-                // ponytail: harici logo için düz img, next/image remote ayarı gerekmez
-                <img src={settings.logoUrl} alt={settings.storeName} className="h-[30px] w-[30px] rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
+                <Image src={settings.logoUrl} alt={settings.storeName} width={30} height={30} unoptimized className="h-[30px] w-[30px] rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
               ) : (
                 <LogoSquare size="sm" />
               )}
@@ -34,9 +34,11 @@ export default async function Footer() {
                 {settings.storeName}
               </span>
             </Link>
-            <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-              {settings.slogan || "Modern hassasiyet ve birinci sınıf malzemelerle tasarlanan, yüksek performanslı yeni nesil e-ticaret deneyimi."}
-            </p>
+            {settings.slogan && (
+              <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                {settings.slogan}
+              </p>
+            )}
             {[settings.phone, settings.email, settings.address].some(Boolean) && (
               <div className="flex flex-col gap-1 text-sm text-neutral-500 dark:text-neutral-400">
                 {settings.phone && <span>{settings.phone}</span>}
@@ -44,9 +46,6 @@ export default async function Footer() {
                 {settings.address && <span>{settings.address}</span>}
               </div>
             )}
-            <div className="pt-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              <span>Güvenli & Hızlı Alışveriş</span>
-            </div>
           </div>
 
           {/* 2. Sütun: Kategoriler */}
@@ -74,16 +73,11 @@ export default async function Footer() {
               Kurumsal
             </h3>
             <ul className="flex flex-col gap-2.5">
-              {pages.map((page) => (
-                <li key={page.slug}>
-                  <Link
-                    href={`/${page.slug}`}
-                    className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white"
-                  >
-                    {page.title}
-                  </Link>
-                </li>
-              ))}
+              <li><Link href="/about" className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white">Hakkımızda</Link></li>
+              <li><Link href="/terms-conditions" className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white">Kullanım Koşulları</Link></li>
+              <li><Link href="/privacy-policy" className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white">Gizlilik Politikası</Link></li>
+              <li><Link href="/distance-sales-agreement" className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white">Mesafeli Satış Sözleşmesi</Link></li>
+              <li><Link href="/pre-information-form" className="transition hover:text-black hover:underline underline-offset-4 dark:hover:text-white">Ön Bilgilendirme Formu</Link></li>
             </ul>
           </div>
 
@@ -94,11 +88,7 @@ export default async function Footer() {
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
               &copy; {copyrightDate} {settings.storeName}. Tüm hakları saklıdır.
           </p>
-          <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
-            <span>256-Bit SSL Şifreleme</span>
-            <span>&bull;</span>
-            <span>Ücretsiz İade Garantisi</span>
-          </div>
+          <CookiePreferencesButton />
         </div>
       </div>
     </footer>

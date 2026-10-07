@@ -1,35 +1,28 @@
-import { getCategories, getPages, getProducts } from "@/lib/catalog";
+import { getCategories, getSitemapProducts } from "@/lib/catalog";
 import { baseUrl } from "@/lib/utils";
-import { MetadataRoute } from "next";
+import type { MetadataRoute } from "next";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   "use cache";
-  const routesMap = ["", "/search"].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date().toISOString(),
-  }));
+  const routesMap = [{ url: new URL("/", baseUrl).toString() }];
 
   const categoriesPromise = getCategories().then((categories) =>
-    categories.map((category) => ({
-      url: `${baseUrl}${category.path}`,
+    categories.filter((category) => category.path !== "/search").map((category) => ({
+      url: new URL(category.path, baseUrl).toString(),
       lastModified: category.updatedAt,
     })),
   );
 
-  const productsPromise = getProducts({}).then((products) =>
+  const productsPromise = getSitemapProducts().then((products) =>
     products.map((product) => ({
-      url: `${baseUrl}/product/${product.slug}`,
+      url: new URL(`/product/${product.slug}`, baseUrl).toString(),
       lastModified: product.updatedAt,
     })),
   );
 
-  const pagesPromise = getPages().then((pages) =>
-    pages.map((page) => ({
-      url: `${baseUrl}/${page.slug}`,
-      lastModified: page.updatedAt,
-    })),
-  );
+  const staticPageRoutes = ["about", "terms-conditions", "privacy-policy"]
+    .map((slug) => ({ url: new URL(`/${slug}`, baseUrl).toString() }));
 
-  const fetchedRoutes = (await Promise.all([categoriesPromise, productsPromise, pagesPromise])).flat();
-  return [...new Map([...routesMap, ...fetchedRoutes].map((route) => [route.url, route])).values()];
+  const fetchedRoutes = (await Promise.all([categoriesPromise, productsPromise])).flat();
+  return [...new Map([...routesMap, ...fetchedRoutes, ...staticPageRoutes].map((route) => [route.url, route])).values()];
 }

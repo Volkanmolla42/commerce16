@@ -66,10 +66,10 @@ export default function CustomerLoginPage() {
             <Tick01Icon className="h-7 w-7" />
           </div>
           <CardTitle className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Hesabınıza Giriş Yapıldı
+            Oturum açık
           </CardTitle>
           <CardDescription className="mt-2 text-sm text-muted-foreground">
-            Convex Auth ile güvenli bir şekilde oturum açtınız.
+            Hesabınızı görüntüleyebilir veya oturumu kapatabilirsiniz.
           </CardDescription>
 
           <div className="mt-6 flex flex-col gap-3">
@@ -85,7 +85,7 @@ export default function CustomerLoginPage() {
               onClick={() => signOut()}
               className="text-xs text-muted-foreground hover:text-foreground pt-1"
             >
-              Farklı Bir Hesapla Giriş Yap (Çıkış)
+              Oturumu kapat
             </Button>
           </div>
         </Card>
@@ -106,7 +106,7 @@ export default function CustomerLoginPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {step === "signIn"
               ? "Siparişlerinizi ve sepetinizi yönetmek için giriş yapın."
-              : "Convex Auth ile güvenli müşteri hesabı oluşturun."}
+              : "Müşteri hesabı oluşturun."}
           </p>
         </div>
 

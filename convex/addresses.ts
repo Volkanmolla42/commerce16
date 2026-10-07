@@ -3,6 +3,7 @@ import { v, type Infer } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { getDistrictById, getDistrictByName, getProvinceById, getProvinceByName } from "../lib/turkey-provinces";
 
 const addressValidator = schema.doc("addresses");
 const addressInputValidator = addressValidator.omit("_id", "_creationTime", "userId");
@@ -27,11 +28,17 @@ async function userAddresses(ctx: QueryCtx | MutationCtx, userId: Id<"users">) {
 }
 
 function normalizeAddress(input: AddressInput): AddressInput {
+  const province = getProvinceById(input.provinceId) ?? getProvinceByName(input.city);
+  const district = province && (
+    getDistrictById(province.id, input.districtId) ?? getDistrictByName(province.id, input.district)
+  );
+  if (!province || !district) throw new Error("Türkiye il ve ilçe listesinden geçerli bir adres seçin.");
   return {
     ...input,
     title: input.title.trim() || "Ev",
-    fullName: input.fullName.trim(), phone: input.phone.trim(), city: input.city.trim(),
-    district: input.district.trim(), addressLine1: input.addressLine1.trim(),
+    fullName: input.fullName.trim(), phone: input.phone.trim(), city: province.name,
+    district: district.name, provinceId: province.id, districtId: district.id,
+    addressLine1: input.addressLine1.trim(),
     addressLine2: input.addressLine2?.trim(), postalCode: input.postalCode?.trim(),
   };
 }

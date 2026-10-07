@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { UserIcon } from "hugeicons-react";
 import { Sk } from "./skeleton";
 
-export function SidebarProfileSkeleton() {
+function SidebarProfileSkeleton() {
   return (
     <div className="flex items-center gap-3 border-b border-border pb-4">
       <Sk className="h-11 w-11 shrink-0 rounded-full" />

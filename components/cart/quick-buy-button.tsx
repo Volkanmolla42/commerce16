@@ -6,22 +6,24 @@ import { useState } from "react";
 import { ArrowRight01Icon } from "hugeicons-react";
 import { Button } from "@/components/ui";
 import { setQuickBuyItem } from "./quick-buy-store";
+import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 
 export function QuickBuyButton({ product, variant }: { product: Product; variant?: ProductVariant }) {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
-  const needsSelection = Boolean(product.variants?.length && !variant);
-  const isAvailable = product.availableForSale && !needsSelection && (variant?.availableForSale ?? true);
+  const selectedVariant = variant ?? getSelectedVariant(product, new URLSearchParams());
+  const needsSelection = Boolean(product.variants?.length && !selectedVariant);
+  const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
 
   const handleQuickBuy = () => {
     if (!isAvailable || isNavigating) return;
 
     setQuickBuyItem({
-      product: variant
-        ? { ...product, price: variant.price.amount, title: `${product.title} — ${variant.title}` }
+      product: selectedVariant
+        ? { ...product, price: selectedVariant.price?.amount ?? product.price, title: getProductVariantTitle(product.title, selectedVariant) }
         : product,
       quantity: 1,
-      variantId: variant?.id,
+      variantId: selectedVariant?.id,
     });
     setIsNavigating(true);
     router.push("/checkout?mode=quick-buy");

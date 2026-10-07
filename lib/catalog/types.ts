@@ -1,10 +1,11 @@
+import type { CategoryAttributeDefinition, ProductAttribute } from "./attributes";
+
 export type Image = {
   url: string;
   altText: string;
   width: number;
   height: number;
 };
-
 export type Menu = {
   title: string;
   path: string;
@@ -13,17 +14,6 @@ export type Menu = {
 export type Money = {
   amount: string;
   currencyCode: string;
-};
-
-export type Page = {
-  id: string;
-  title: string;
-  slug: string;
-  body: string;
-  bodySummary: string;
-  seo?: SEO;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type ProductOption = {
@@ -36,11 +26,15 @@ export type ProductVariant = {
   id: string;
   title: string;
   availableForSale: boolean;
+  sku?: string;
+  barcode?: string;
+  stockQuantity?: number | null;
   selectedOptions: {
     name: string;
     value: string;
   }[];
-  price: Money;
+  /** When omitted, the variant uses the product's base price. */
+  price?: Money;
 };
 
 export type SEO = {
@@ -55,6 +49,8 @@ export type Category = {
   description: string;
   seo: SEO;
   updatedAt: string;
+  imageUrl?: string | null;
+  attributes?: CategoryAttributeDefinition[];
 };
 
 export type Product = {
@@ -62,11 +58,17 @@ export type Product = {
   slug: string;
   title: string;
   price: string;
+  sku?: string;
   availableForSale: boolean;
+  stockQuantity?: number | null;
+  brand?: string;
+  material?: string;
+  attributes?: ProductAttribute[];
+  /** Average from verified customer reviews, never a manually assigned catalog value. */
+  rating?: number;
   categorySlug?: string;
   images: string[];
   options?: ProductOption[];
   variants?: ProductVariant[];
-  seo?: SEO;
   updatedAt: string;
 };

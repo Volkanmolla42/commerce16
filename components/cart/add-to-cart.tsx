@@ -6,26 +6,40 @@ import { useEffect, useRef, useState } from "react";
 import { ShoppingBag01Icon, Tick01Icon, ArrowRight01Icon } from "hugeicons-react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 
 export function AddToCart({
   product,
   variant,
   buttonVariant = "default",
+  replaceCartItem,
 }: {
   product: Product;
   variant?: ProductVariant;
   buttonVariant?: "default" | "outline";
+  replaceCartItem?: { productId: string; variantId?: string; quantity: number };
 }) {
-  const { addItem } = useCart();
+  const { addItem, replaceItem } = useCart();
   const [added, setAdded] = useState(false);
+  const [replaced, setReplaced] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  const needsSelection = Boolean(product.variants?.length && !variant);
-  const isAvailable = product.availableForSale && !needsSelection && (variant?.availableForSale ?? true);
+  const selectedVariant = variant ?? getSelectedVariant(product, new URLSearchParams());
+  const needsSelection = Boolean(product.variants?.length && !selectedVariant);
+  const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
 
   const handleAdd = () => {
     if (!isAvailable) return;
-    addItem(variant ? { ...product, price: variant.price.amount, title: `${product.title} — ${variant.title}` } : product, 1, variant?.id);
+    const selectedProduct = selectedVariant
+      ? { ...product, price: selectedVariant.price?.amount ?? product.price, title: getProductVariantTitle(product.title, selectedVariant) }
+      : product;
+    if (replaceCartItem) {
+      replaceItem(replaceCartItem.productId, replaceCartItem.variantId, selectedProduct, replaceCartItem.quantity, selectedVariant?.id);
+      setReplaced(true);
+    } else {
+      addItem(selectedProduct, 1, selectedVariant?.id);
+      setReplaced(false);
+    }
     setAdded(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setAdded(false), 3000);
@@ -45,7 +59,7 @@ export function AddToCart({
         {added ? (
           <>
             <Tick01Icon className="h-5 w-5 text-emerald-400" />
-            <span>Sepete Eklendi</span>
+            <span>{replaced ? "Sepet güncellendi" : "Sepete Eklendi"}</span>
           </>
         ) : needsSelection ? (
           <span>Seçenekleri seç</span>

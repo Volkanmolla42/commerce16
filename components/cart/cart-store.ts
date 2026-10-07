@@ -1,4 +1,5 @@
 import type { Product } from "../../lib/catalog/types";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 
 export type CartItem = { product: Product; quantity: number; variantId?: string };
 export const CART_STORAGE_KEY = "commerce_cart_v1";
@@ -8,7 +9,7 @@ function readItems(): CartItem[] {
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
     if (!Array.isArray(stored)) return [];
-    return stored.filter((item): item is CartItem => {
+    const items = stored.filter((item): item is CartItem => {
       const product = item?.product;
       return product && typeof product.id === "string" && typeof product.slug === "string" &&
         typeof product.title === "string" && typeof product.price === "string" &&
@@ -18,6 +19,9 @@ function readItems(): CartItem[] {
         Number.isSafeInteger(item.quantity) && item.quantity > 0 && item.quantity <= 999 &&
         (item.variantId === undefined || typeof item.variantId === "string");
     });
+    return items.map((item) => item.variantId || item.product.variants?.length !== 1
+      ? item
+      : { ...item, variantId: item.product.variants[0].id });
   } catch {
     return [];
   }
@@ -74,6 +78,21 @@ export function createCartStore() {
           ? current.map((item) => matches(item, product.id, variantId)
             ? { product, variantId, quantity: Math.min(999, item.quantity + quantity) } : item)
           : [...current, { product, quantity: Math.min(999, quantity), variantId }];
+      });
+      void trackAnalyticsEvent("add_to_cart");
+    },
+    replaceItem(sourceProductId: string, sourceVariantId: string | undefined, product: Product, quantity: number, variantId?: string) {
+      if (!product.availableForSale || !Number.isSafeInteger(quantity) || quantity <= 0) return;
+      change((current) => {
+        if (!current.some((item) => matches(item, sourceProductId, sourceVariantId))) return current;
+        const withoutSource = current.filter((item) => !matches(item, sourceProductId, sourceVariantId));
+        const existingIndex = withoutSource.findIndex((item) => matches(item, product.id, variantId));
+        if (existingIndex >= 0) {
+          return withoutSource.map((item, index) => index === existingIndex
+            ? { ...item, quantity: Math.min(999, item.quantity + quantity) }
+            : item);
+        }
+        return [...withoutSource, { product, quantity: Math.min(999, quantity), variantId }];
       });
     },
     removeItem(productId: string, variantId?: string) {

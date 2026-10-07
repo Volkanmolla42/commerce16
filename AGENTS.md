@@ -1,6 +1,10 @@
 Gereksiz npm run build çalıştırma.
 Birinci görev bitmeden diğerine geçme: aynı anda birden fazla görev verilirse sırayla bitir, bir görev tamamen bitmeden (kod + doğrulama) sonrakine başlama.
 
+## Projenin amacı
+
+Bu repo, müşteriler için e-ticaret sitelerini hızlıca uyarlayıp teslim etmeye yarayan bir boilerplate'tir. Yeni özellikleri tek bir mağazaya veya markaya özel varsayımlarla değil, farklı müşteri projelerinde yeniden kullanılabilir ve yapılandırılabilir olacak şekilde geliştir. Müşteriye özgü marka, katalog ve iş kurallarını mümkün olduğunca koda sabitlemek yerine ayar/veri katmanında tut. Mevcut mağaza verisini boilerplate'in evrensel kuralı kabul etme.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

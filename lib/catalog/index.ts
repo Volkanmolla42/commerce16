@@ -1,8 +1,10 @@
-import type { Category, Menu, Page, Product } from "./types";
+import type { Category, Menu, Product } from "./types";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { fetchQuery } from "convex/nextjs";
 import { cacheTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
+import { getProductSearchFields, rankSearchItems } from "./smart-search";
+import { getSimilarProducts } from "./recommendations";
 
 type ProductFilters = {
   category?: string;
@@ -20,8 +22,10 @@ export type StoreSettings = {
   email: string;
   address: string;
   announcement: string;
-  seoTitle: string;
-  seoDescription: string;
+  shippingCutoffMinutes: number | null;
+  shippingDays: number[];
+  shippingFeeKurus: number;
+  freeShippingThresholdKurus: number | null;
   isOpen: boolean;
 };
 
@@ -39,17 +43,21 @@ function formatProduct(item: Doc<"products">): Product {
     slug,
     title: item.title,
     price: item.price || "0.00",
+    sku: item.sku,
     availableForSale: item.availableForSale ?? true,
+    stockQuantity: item.stockQuantity ?? null,
+    brand: item.brand,
+    material: item.material,
+    attributes: item.attributes,
     categorySlug: item.categorySlug,
     images: item.images.length > 0 ? item.images : [
       "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80"
     ],
     options: item.options,
-    variants: item.variants?.map((variant) => ({
+    variants: item.variants?.map(({ price, ...variant }) => ({
       ...variant,
-      price: { amount: variant.price, currencyCode: "TRY" },
+      ...(price ? { price: { amount: price, currencyCode: "TRY" } } : {}),
     })),
-    seo: item.seo,
     updatedAt: item.updatedAt || new Date(item._creationTime).toISOString(),
   };
 }
@@ -57,19 +65,41 @@ function formatProduct(item: Doc<"products">): Product {
 export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
   "use cache";
   cacheTag("products");
+  // ponytail: keep fuzzy matching inside the existing 100-product window; add indexed search if that limit grows.
   const items = await fetchQuery(api.products.list, { limit: 100, ...(filters.category ? { categorySlug: filters.category } : {}) });
   const mapped = items.map(formatProduct);
 
-  const query = filters.query?.trim().toLowerCase();
-  const result = mapped.filter(
-    (product) => !query || product.title.toLowerCase().includes(query)
-  );
+  const query = filters.query?.trim();
+  const result = query
+    ? rankSearchItems(mapped, query, getProductSearchFields)
+    : mapped;
 
   if (filters.sortKey === "PRICE") {
     result.sort((a, b) => Number(a.price) - Number(b.price));
   }
 
   return filters.reverse ? result.reverse() : result;
+}
+
+export async function getSitemapProducts() {
+  "use cache";
+  cacheTag("products");
+  const products: { slug: string; updatedAt: string }[] = [];
+  let cursor: string | null = null;
+  let isDone = false;
+
+  while (!isDone) {
+    const result: {
+      page: { slug: string; updatedAt: string }[];
+      continueCursor: string;
+      isDone: boolean;
+    } = await fetchQuery(api.products.listForSitemap, { cursor });
+    products.push(...result.page);
+    cursor = result.continueCursor;
+    isDone = result.isDone;
+  }
+
+  return products;
 }
 
 export async function getProduct(slug: string): Promise<Product | undefined> {
@@ -80,9 +110,26 @@ export async function getProduct(slug: string): Promise<Product | undefined> {
   return formatProduct(item);
 }
 
-export async function getProductRecommendations(productId: string): Promise<Product[]> {
+export async function getProductRecommendations(product: Product): Promise<Product[]> {
   const all = await getProducts();
-  return all.filter((product) => product.id !== productId).slice(0, 5);
+  return getSimilarProducts(product, all);
+}
+
+export async function getRecommendationCatalog(limit = 100): Promise<Product[]> {
+  const products = await getProducts();
+  return products.slice(0, limit).map((product) => ({
+    id: product.id,
+    slug: product.slug,
+    title: product.title,
+    price: product.price,
+    availableForSale: product.availableForSale,
+    brand: product.brand,
+    material: product.material,
+    attributes: product.attributes,
+    categorySlug: product.categorySlug,
+    images: product.images.slice(0, 1),
+    updatedAt: product.updatedAt,
+  }));
 }
 
 export async function getCategories(): Promise<Category[]> {
@@ -94,8 +141,10 @@ export async function getCategories(): Promise<Category[]> {
     title: c.title,
     description: c.description,
     path: c.path,
-    seo: c.seo,
+    seo: { title: c.title, description: c.description || `${c.title} ürünleri` },
     updatedAt: c.updatedAt,
+    imageUrl: c.imageUrl,
+    attributes: c.attributes,
   }));
 
   return [
@@ -124,8 +173,9 @@ export async function getCategory(slug: string): Promise<Category | undefined> {
     title: item.title,
     description: item.description,
     path: item.path,
-    seo: item.seo,
+    seo: { title: item.title, description: item.description || `${item.title} ürünleri` },
     updatedAt: item.updatedAt,
+    attributes: item.attributes,
   };
 }
 
@@ -134,34 +184,6 @@ export async function getCategoryProducts({
   ...filters
 }: ProductFilters & { category: string }): Promise<Product[]> {
   return getProducts({ ...filters, category });
-}
-
-function formatPage(item: Doc<"pages">): Page {
-  return {
-    id: item._id,
-    title: item.title,
-    slug: item.slug,
-    body: item.body,
-    bodySummary: item.bodySummary,
-    seo: item.seo,
-    createdAt: new Date(item._creationTime).toISOString(),
-    updatedAt: item.updatedAt,
-  };
-}
-
-export async function getPages(): Promise<Page[]> {
-  "use cache";
-  cacheTag("cms-pages");
-  const items = await fetchQuery(api.pages.list, {});
-  return items.map(formatPage);
-}
-
-export async function getPage(slug: string): Promise<Page | undefined> {
-  "use cache";
-  cacheTag("cms-pages", `cms-page:${slug}`);
-  const item = await fetchQuery(api.pages.getBySlug, { slug });
-  if (!item) return undefined;
-  return formatPage(item);
 }
 
 export async function getMenu(): Promise<Menu[]> {

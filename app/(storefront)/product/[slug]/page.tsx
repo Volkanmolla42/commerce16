@@ -4,56 +4,84 @@ import { Gallery } from "@/components/product/gallery";
 import { ProductDescription } from "@/components/product/product-description";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import {
+  BoughtTogetherShelf,
+  ProductViewTracker,
+} from "@/components/product/recommendation-shelves";
+import { ProductReviews } from "@/components/product/product-reviews";
+import {
   getProduct,
   getProductRecommendations,
+  getRecommendationCatalog,
 } from "@/lib/catalog";
-import type { Metadata } from "next";
+import type { Metadata, ResolvingMetadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { baseUrl } from "@/lib/utils";
+
+function getProductUrl(slug: string) {
+  return new URL(`/product/${slug}`, baseUrl).toString();
+}
+
+function getAbsoluteHttpImageUrls(images: string[]) {
+  return images.flatMap((image) => {
+    try {
+      const url = new URL(image, baseUrl);
+      return url.protocol === "https:" || url.protocol === "http:" ? [url.toString()] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function getProductDescription(product: NonNullable<Awaited<ReturnType<typeof getProduct>>>) {
+  return `${product.title} ürününü ${product.price} TL fiyatıyla inceleyin.`;
+}
 
 export async function generateMetadata(props: {
   params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
+}, parent: ResolvingMetadata): Promise<Metadata> {
   const params = await props.params;
   const product = await getProduct(params.slug);
 
   if (!product) return notFound();
 
-  const url = product.images?.[0];
-  const indexable = true;
+  const parentMetadata = await parent;
+  const title = product.title;
+  const description = getProductDescription(product);
+  const productUrl = getProductUrl(product.slug);
+  const imageUrls = getAbsoluteHttpImageUrls(product.images);
 
   return {
-    title: product.seo?.title || product.title,
-    description: product.seo?.description || `${product.title} - En iyi fiyatla satın alın.`,
+    title,
+    description,
     robots: {
-      index: indexable,
-      follow: indexable,
+      index: true,
+      follow: true,
       googleBot: {
-        index: indexable,
-        follow: indexable,
+        index: true,
+        follow: true,
       },
     },
-    openGraph: url
-      ? {
-          images: [
-            {
-              url,
-              width: 1200,
-              height: 1200,
-              alt: product.title,
-            },
-          ],
-        }
-      : null,
+    openGraph: {
+      ...(parentMetadata.openGraph ?? {}),
+      type: "website",
+      title,
+      description,
+      url: productUrl,
+      ...(imageUrls.length > 0
+        ? { images: imageUrls.map((url) => ({ url, alt: product.title })) }
+        : {}),
+    },
     twitter: {
+      ...(parentMetadata.twitter ?? {}),
       card: "summary_large_image",
-      title: product.seo?.title || product.title,
-      description: product.seo?.description || `${product.title} - En iyi fiyatla satın alın.`,
-      images: url ? [url] : undefined,
+      title,
+      description,
+      ...(imageUrls.length > 0 ? { images: imageUrls } : {}),
     },
     alternates: {
-      canonical: `/product/${product.slug}`,
+      canonical: productUrl,
     },
   };
 }
@@ -68,16 +96,24 @@ async function ProductContent({
 
   if (!product) return notFound();
 
+  const productImageUrls = getAbsoluteHttpImageUrls(product.images);
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
+    "@id": `${getProductUrl(product.slug)}#product`,
     name: product.title,
-    image: product.images?.[0],
+    description: getProductDescription(product),
+    ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
+    ...(product.material ? { material: product.material } : {}),
+    url: getProductUrl(product.slug),
+    ...(productImageUrls.length > 0 ? { image: productImageUrls } : {}),
     offers: {
       "@type": "Offer",
+      url: getProductUrl(product.slug),
       availability: product.availableForSale
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
       priceCurrency: "TRY",
       price: product.price,
     },
@@ -91,6 +127,7 @@ async function ProductContent({
           __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c"),
         }}
       />
+      <ProductViewTracker slug={product.slug} />
       <div className="mx-auto max-w-(--breakpoint-2xl) px-4">
         <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-8 md:p-12 lg:flex-row lg:gap-8 dark:border-neutral-800 dark:bg-black">
           <div className="h-full w-full basis-full lg:basis-4/6">
@@ -114,9 +151,32 @@ async function ProductContent({
             </Suspense>
           </div>
         </div>
-        <RelatedProducts id={product.id} />
+        <ProductReviews productId={product.id} productTitle={product.title} />
+        <Suspense fallback={null}>
+          <ProductMerchandising product={product} />
+        </Suspense>
       </div>
       <Footer />
+    </>
+  );
+}
+
+async function ProductMerchandising({ product }: {
+  product: NonNullable<Awaited<ReturnType<typeof getProduct>>>;
+}) {
+  const [relatedProducts, recommendationCatalog] = await Promise.all([
+    getProductRecommendations(product),
+    getRecommendationCatalog(),
+  ]);
+
+  return (
+    <>
+      <RelatedProducts products={relatedProducts} />
+      <BoughtTogetherShelf
+        products={recommendationCatalog}
+        sourceProducts={[product]}
+        sourceProductIds={[product.id]}
+      />
     </>
   );
 }
@@ -148,9 +208,8 @@ export default function ProductPage(props: {
   );
 }
 
-async function RelatedProducts({ id }: { id: string }) {
-  const relatedProducts = await getProductRecommendations(id);
-
+function RelatedProducts({ products }: { products: Awaited<ReturnType<typeof getProductRecommendations>> }) {
+  const relatedProducts = products;
   if (!relatedProducts.length) return null;
 
   return (
@@ -166,7 +225,6 @@ async function RelatedProducts({ id }: { id: string }) {
               <Link
                 className="relative block h-full w-full"
                 href={`/product/${product.slug}`}
-                prefetch={true}
               >
                 <GridTileImage
                   alt={product.title}

@@ -1,14 +1,15 @@
-import Grid from "@/components/grid";
-import ProductGridItems from "@/components/layout/product-grid-items";
+import { FacetedProductGrid } from "@/components/layout/faceted-product-grid";
 import { defaultSort, sorting } from "@/lib/constants";
 import { getProducts } from "@/lib/catalog";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 
 export const prefetch = "partial";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Arama",
   description: "Mağazadaki ürünleri arayın.",
+  robots: { index: false, follow: true },
 };
 
 async function SearchContent(props: {
@@ -22,30 +23,7 @@ async function SearchContent(props: {
 
   const products = await getProducts({ sortKey, reverse, query: searchValue });
 
-  return (
-    <>
-      {searchValue ? (
-        <p className="mb-4">
-          {products.length === 0 ? (
-            <>
-              <span className="font-bold">&quot;{searchValue}&quot;</span> ile
-              eşleşen ürün bulunamadı.
-            </>
-          ) : (
-            <>
-              <span className="font-bold">&quot;{searchValue}&quot;</span> için{" "}
-              {products.length} sonuç gösteriliyor
-            </>
-          )}
-        </p>
-      ) : null}
-      {products.length > 0 ? (
-        <Grid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <ProductGridItems products={products} />
-        </Grid>
-      ) : null}
-    </>
-  );
+  return <FacetedProductGrid products={products} query={searchValue} />;
 }
 
 export default function SearchPage(props: {

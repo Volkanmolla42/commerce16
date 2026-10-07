@@ -1,11 +1,12 @@
 "use client";
 
 import { useCart } from "@/components/cart/cart-context";
-import { Suspense, useState } from "react";
+import { useCheckoutRiskContext } from "@/components/checkout/risk-context";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import {
@@ -26,43 +27,122 @@ import {
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
-import { clearQuickBuyItem, useQuickBuyDraft } from "@/components/cart/quick-buy-store";
+import { useQuickBuyDraft } from "@/components/cart/quick-buy-store";
+import { getCartRecoverySessionKey } from "@/components/cart/recovery-store";
+import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
+import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
+import { getProductUnitPrice } from "@/lib/catalog/variants";
 
 function CheckoutContent() {
-  const { items: cartItems, clearCart } = useCart();
+  const { items: cartItems } = useCart();
+  const riskContext = useCheckoutRiskContext();
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
   const quickBuy = useQuickBuyDraft();
-  const items = isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems;
+  const items = useMemo(
+    () => isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems,
+    [cartItems, isQuickBuy, quickBuy.item],
+  );
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalAmount = items.reduce((sum, item) => sum + Math.round(Number(item.product.price) * 100) * item.quantity, 0) / 100;
+  const subtotalKurus = items.reduce((sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity, 0);
+  const totalAmount = subtotalKurus / 100;
   const { isAuthenticated } = useConvexAuth();
 
   const profile = useQuery(api.users.getMyProfile);
   const addresses = useQuery(api.addresses.getMyAddresses);
+  const paymentAvailability = useQuery(api.checkoutPayments.getAvailability, {});
+  const recoveryAvailability = useQuery(api.abandonedCartRecovery.getAvailability, {});
+  const legalDocuments = useQuery(api.legalDocuments.getCheckoutDocuments, {});
+  const [couponCheckTime, setCouponCheckTime] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => setCouponCheckTime(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCouponCode, setAppliedCouponCode] = useState("");
+  const couponPreview = useQuery(
+    api.coupons.preview,
+    appliedCouponCode ? { code: appliedCouponCode, subtotalKurus, now: couponCheckTime } : "skip",
+  );
+  const couponDiscountKurus = couponPreview?.valid ? couponPreview.discountKurus : 0;
+  const payableKurus = Math.max(0, subtotalKurus - couponDiscountKurus);
+  const shippingQuote = useQuery(api.settings.getCheckoutShippingQuote, { subtotalKurus: payableKurus });
+  const shippingCostKurus = shippingQuote?.shippingCostKurus;
+  const orderTotalKurus = payableKurus + (shippingCostKurus ?? 0);
+  const payableAmount = orderTotalKurus / 100;
   const createOrder = useMutation(api.orders.createOrder);
+  const captureRecovery = useMutation(api.abandonedCartRecovery.capture);
+  const linkRecoveryOrder = useMutation(api.abandonedCartRecovery.linkOrder);
+  const createCheckout = useAction(api.checkoutPayments.createCheckout);
 
   // Form State
   const [draft, setDraft] = useState<CheckoutDraft>({});
   const [addressTitle, setAddressTitle] = useState("Ev");
   const [saveAddressToBook, setSaveAddressToBook] = useState(true);
   const [addressSelection, setAddressSelection] = useState<string | null>(null);
-  const { selectedAddressId, customerName, customerEmail, phone, city, district, addressLine } =
+  const { selectedAddressId, customerName, customerEmail, phone, city, district, addressLine, provinceId, districtId } =
     getCheckoutDetails({ profile, addresses, selection: addressSelection, draft });
+  const districtOptions = getProvinceById(provinceId)?.districts ?? [];
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [completedOrder, setCompletedOrder] = useState<{
-    id: string;
-    total: string;
-    email: string;
-  } | null>(null);
+  const [identityNumber, setIdentityNumber] = useState("");
+  const [invoiceRecipientType, setInvoiceRecipientType] = useState<"individual" | "business">("individual");
+  const [businessTitle, setBusinessTitle] = useState("");
+  const [taxNumber, setTaxNumber] = useState("");
+  const [taxOffice, setTaxOffice] = useState("");
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [preInformationAccepted, setPreInformationAccepted] = useState(false);
+  const [emailReminderConsent, setEmailReminderConsent] = useState(false);
+  const [whatsappReminderConsent, setWhatsappReminderConsent] = useState(false);
+
+  useEffect(() => {
+    if (items.length > 0) void trackAnalyticsEvent("begin_checkout");
+  }, [items.length]);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    let sessionKey: string | null;
+    try {
+      sessionKey = getCartRecoverySessionKey(emailReminderConsent || whatsappReminderConsent);
+    } catch {
+      return;
+    }
+    if (!sessionKey) return;
+    const timeout = window.setTimeout(() => {
+      void captureRecovery({
+        sessionKey,
+        ...(emailReminderConsent ? { email: customerEmail } : {}),
+        ...(whatsappReminderConsent ? { phone } : {}),
+        emailConsent: emailReminderConsent,
+        whatsappConsent: whatsappReminderConsent,
+        items: emailReminderConsent || whatsappReminderConsent
+          ? items.map((item) => ({
+              productId: item.product.id,
+              ...(item.variantId ? { variantId: item.variantId } : {}),
+              quantity: item.quantity,
+            }))
+          : [],
+      }).catch(() => undefined);
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [captureRecovery, customerEmail, emailReminderConsent, items, phone, whatsappReminderConsent]);
 
   const handleAddressSelect = (addressId: string) => {
     setAddressSelection(addressId);
-    setDraft((current) => ({
-      customerEmail: current.customerEmail,
-      ...(addressId === "custom" ? { customerName, phone, city: "", district: "", addressLine: "" } : {}),
-    }));
+    if (addressId === "custom") {
+      setDraft((current) => ({
+        customerName,
+        customerEmail: current.customerEmail,
+        phone,
+        city: "",
+        district: "",
+        addressLine: "",
+        provinceId: "",
+        districtId: "",
+      }));
+    } else {
+      setDraft((current) => ({ customerEmail: current.customerEmail }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,6 +150,43 @@ function CheckoutContent() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setErrorMessage(null);
+
+    if (!legalDocuments?.distanceSalesAgreement?.ready || !legalDocuments.preInformationForm?.ready) {
+      setErrorMessage("Ödeme açılamıyor: yasal belgeler kodda tamamlanmalı.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!agreementAccepted || !preInformationAccepted) {
+      setErrorMessage("Siparişten önce iki yasal belgeyi de okuyup onaylamalısınız.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!paymentAvailability?.ready) {
+      setErrorMessage("Güvenli ödeme altyapısı henüz yapılandırılmamış.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!provinceId || !districtId) {
+      setErrorMessage("Teslimat için geçerli bir il ve ilçe seçin.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (appliedCouponCode && !couponPreview?.valid) {
+      setErrorMessage(couponPreview && !couponPreview.valid ? couponPreview.message : "Kupon doğrulanıyor. Biraz bekleyip tekrar deneyin.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (payableKurus <= 0) {
+      setErrorMessage("Kupon indirimi sepet toplamını sıfırlıyor; ücretsiz sipariş bu ödeme akışında kullanılamıyor.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (shippingQuote === undefined) {
+      setErrorMessage("Kargo ücreti hesaplanıyor. Biraz bekleyip tekrar deneyin.");
+      setIsSubmitting(false);
+      return;
+    }
 
     const fullShippingAddress = `${customerName}, Tel: ${phone} - ${addressLine}, ${district}/${city}`;
     const isNewAddress = selectedAddressId === "custom" || !addresses || addresses.length === 0;
@@ -80,100 +197,97 @@ function CheckoutContent() {
           title: addressTitle.trim() || "Ev",
           city: city.trim(),
           district: district.trim(),
+          provinceId,
+          districtId,
           addressLine1: addressLine.trim(),
           isDefault: !addresses || addresses.length === 0,
         }
       : undefined;
 
     try {
+      let recoverySessionKey: string | null = null;
+      try {
+        recoverySessionKey = getCartRecoverySessionKey(emailReminderConsent || whatsappReminderConsent);
+      } catch {
+        recoverySessionKey = null;
+      }
+
+      if (recoverySessionKey && items.length > 0) {
+        await captureRecovery({
+          sessionKey: recoverySessionKey,
+          ...(emailReminderConsent ? { email: customerEmail } : {}),
+          ...(whatsappReminderConsent ? { phone } : {}),
+          emailConsent: emailReminderConsent,
+          whatsappConsent: whatsappReminderConsent,
+          items: emailReminderConsent || whatsappReminderConsent
+            ? items.map((item) => ({
+                productId: item.product.id,
+                ...(item.variantId ? { variantId: item.variantId } : {}),
+                quantity: item.quantity,
+              }))
+            : [],
+        }).catch(() => undefined);
+      }
+
+      const analyticsSessionId = getAnalyticsSessionIdForOrder();
       const orderId = await createOrder({
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim(),
         customerPhone: phone.trim() || undefined,
+        ...(analyticsSessionId ? { analyticsSessionId } : {}),
         shippingAddress: fullShippingAddress,
-        total: totalAmount.toFixed(2),
+        total: payableAmount.toFixed(2),
+        ...(couponPreview?.valid ? { couponCode: couponPreview.code } : {}),
+        provinceId,
+        districtId,
         items: items.map((item) => ({
           productId: item.product.id,
           ...(item.variantId ? { variantId: item.variantId } : {}),
           title: item.product.title,
           quantity: item.quantity,
-          price: item.product.price,
+          price: getProductUnitPrice(item.product, item.variantId),
           image: item.product.images[0],
         })),
+        legalAcceptance: {
+          accepted: true as const,
+          distanceSalesAgreementVersion: legalDocuments.distanceSalesAgreement.version,
+          preInformationFormVersion: legalDocuments.preInformationForm.version,
+        },
+        invoiceRecipient: invoiceRecipientType === "business"
+          ? {
+              type: "business" as const,
+              businessTitle: businessTitle.trim(),
+              taxNumber: taxNumber.trim(),
+              taxOffice: taxOffice.trim(),
+            }
+          : { type: "individual" as const },
+        ...(riskContext ? { riskContext } : {}),
         saveAddress: saveAddressPayload,
       });
 
-      const orderData = {
-        id: orderId,
-        total: totalAmount.toFixed(2),
-        email: customerEmail.trim(),
-      };
+      if (recoverySessionKey && (emailReminderConsent || whatsappReminderConsent)) {
+        await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
+      }
 
-      if (isQuickBuy) clearQuickBuyItem();
-      else clearCart();
-      setCompletedOrder(orderData);
+      const checkout = await createCheckout({
+        orderId,
+        customerEmail: customerEmail.trim(),
+        customerName: customerName.trim(),
+        customerPhone: phone.trim(),
+        shippingAddress: fullShippingAddress,
+        city: city.trim(),
+        provinceId,
+        districtId,
+        identityNumber: identityNumber.trim(),
+        ...(riskContext ? { riskContext } : {}),
+      });
+      window.location.assign(checkout.paymentPageUrl);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Success view
-  if (completedOrder) {
-    return (
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
-        <Card className="mx-auto max-w-lg rounded-3xl p-8 sm:p-12 text-center shadow-xl border-border bg-card">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-            <CheckmarkBadge01Icon className="h-12 w-12" />
-          </div>
-
-          <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
-            Siparişiniz Alındı!
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Teşekkür ederiz. Siparişiniz alındı.
-          </p>
-
-          <Card className="mt-6 bg-muted/40 p-5 text-left text-xs space-y-2 border-border">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Sipariş Numarası:</span>
-              <span className="font-mono font-bold text-foreground">
-                #{completedOrder.id.slice(-8).toUpperCase()}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Bildirim E-Postası:</span>
-              <span className="font-medium text-foreground">
-                {completedOrder.email}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Sipariş Tutarı:</span>
-              <span className="font-bold text-foreground">
-                {formatMoney(completedOrder.total)}
-              </span>
-            </div>
-          </Card>
-
-          {isAuthenticated ? <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <Button asChild size="lg" className="flex-1 rounded-2xl shadow-md font-semibold">
-              <Link href={`/account/orders/${completedOrder.id}`}>
-                Sipariş Detayını Görüntüle
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="flex-1 rounded-2xl font-semibold border-border">
-              <Link href="/account/orders">Tüm Siparişlerim</Link>
-            </Button>
-          </div> : (
-            <Button asChild size="lg" className="mt-8 rounded-2xl font-semibold">
-              <Link href="/search">Alışverişe Devam Et</Link>
-            </Button>
-          )}
-        </Card>
-      </div>
-    );
-  }
 
   if (isQuickBuy && !quickBuy.ready) {
     return (
@@ -224,7 +338,7 @@ function CheckoutContent() {
 
         <Badge variant="outline" className="gap-1.5 py-1 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/60 font-medium">
           <LockIcon className="h-3.5 w-3.5" />
-          <span>256-Bit SSL Korumalı</span>
+          <span>Ödeme: {paymentAvailability?.provider === "paytr" ? "PayTR" : "iyzico"}</span>
         </Badge>
       </div>
 
@@ -291,7 +405,66 @@ function CheckoutContent() {
                   placeholder="05XX XXX XX XX"
                 />
               </div>
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="checkout-identity-number" className="text-xs uppercase tracking-wider text-muted-foreground">
+                  T.C. Kimlik Numarası
+                </Label>
+                <Input
+                  id="checkout-identity-number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={11}
+                  pattern="[0-9]{11}"
+                  required
+                  value={identityNumber}
+                  onChange={(e) => setIdentityNumber(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                  placeholder="11 haneli numara"
+                  aria-describedby="checkout-identity-help"
+                />
+                <p id="checkout-identity-help" className="text-xs text-muted-foreground">
+                  Ödeme sağlayıcısına iletilir; mağaza sipariş kaydında saklanmaz.
+                </p>
+              </div>
             </div>
+          </Card>
+
+          <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-4">
+            <CardHeader className="p-0">
+              <CardTitle className="text-base font-bold text-foreground">Fatura bilgileri</CardTitle>
+            </CardHeader>
+            <Separator />
+            <fieldset className="space-y-3">
+              <legend className="text-xs text-muted-foreground">Fatura türü</legend>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input type="radio" name="invoice-recipient-type" checked={invoiceRecipientType === "individual"} onChange={() => setInvoiceRecipientType("individual")} className="h-4 w-4 accent-primary" />
+                  Bireysel
+                </label>
+                <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input type="radio" name="invoice-recipient-type" checked={invoiceRecipientType === "business"} onChange={() => setInvoiceRecipientType("business")} className="h-4 w-4 accent-primary" />
+                  Kurumsal
+                </label>
+              </div>
+              {invoiceRecipientType === "business" && (
+                <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="invoice-business-title">Ticaret unvanı</Label>
+                    <Input id="invoice-business-title" autoComplete="organization" required maxLength={160} value={businessTitle} onChange={(event) => setBusinessTitle(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice-tax-number">Vergi kimlik numarası</Label>
+                    <Input id="invoice-tax-number" inputMode="numeric" autoComplete="off" required maxLength={10} pattern="[0-9]{10}" value={taxNumber} onChange={(event) => setTaxNumber(event.target.value.replace(/\D/g, "").slice(0, 10))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice-tax-office">Vergi dairesi</Label>
+                    <Input id="invoice-tax-office" autoComplete="off" required maxLength={100} value={taxOffice} onChange={(event) => setTaxOffice(event.target.value)} />
+                  </div>
+                </div>
+              )}
+              <p className="text-xs leading-5 text-muted-foreground">
+                Kurumsal fatura bilgileri sipariş kaydında ve yapılandırılmışsa fatura entegratörüne iletilir. Bireysel T.C. kimlik numaranız ödeme sağlayıcısına iletilir; mağaza sipariş kaydında saklanmaz. <Link href="/privacy-policy" className="underline underline-offset-4">Gizlilik politikası</Link>
+              </p>
+            </fieldset>
           </Card>
 
           {/* 2. Teslimat Adresi */}
@@ -384,36 +557,57 @@ function CheckoutContent() {
                   <Label htmlFor="checkout-city" className="text-xs uppercase tracking-wider text-muted-foreground">
                     İl (Şehir)
                   </Label>
-                  <Input
+                  <select
                     id="checkout-city"
-                  autoComplete="address-level1"
-                    type="text"
                     required
-                    value={city}
+                    autoComplete="address-level1"
+                    value={provinceId}
                     onChange={(e) => {
+                      const province = getProvinceById(e.target.value);
                       setAddressSelection("custom");
-                      setDraft({ ...draft, city: e.target.value });
+                      setDraft((current) => ({
+                        ...current,
+                        provinceId: province?.id ?? "",
+                        city: province?.name ?? "",
+                        districtId: "",
+                        district: "",
+                      }));
                     }}
-                    placeholder="İstanbul"
-                  />
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  >
+                    <option value="">İl seçin</option>
+                    {TURKEY_PROVINCES.map((province) => (
+                      <option key={province.id} value={province.id}>{province.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="checkout-district" className="text-xs uppercase tracking-wider text-muted-foreground">
                     İlçe
                   </Label>
-                  <Input
+                  <select
                     id="checkout-district"
-                  autoComplete="address-level2"
-                    type="text"
                     required
-                    value={district}
+                    autoComplete="address-level2"
+                    value={districtId}
+                    disabled={!provinceId}
                     onChange={(e) => {
                       setAddressSelection("custom");
-                      setDraft({ ...draft, district: e.target.value });
+                      const selectedDistrict = districtOptions.find((option) => option.id === e.target.value);
+                      setDraft((current) => ({
+                        ...current,
+                        districtId: selectedDistrict?.id ?? "",
+                        district: selectedDistrict?.name ?? "",
+                      }));
                     }}
-                    placeholder="Kadıköy"
-                  />
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">İlçe seçin</option>
+                    {[...districtOptions].sort((a, b) => a.name.localeCompare(b.name, "tr")).map((districtOption) => (
+                      <option key={districtOption.id} value={districtOption.id}>{districtOption.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="sm:col-span-2 space-y-2">
@@ -477,8 +671,64 @@ function CheckoutContent() {
           </Card>
 
           <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
-            <p className="text-xs text-muted-foreground">Siparişiniz ödeme alınmadan oluşturulur.</p>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-foreground">
+                {paymentAvailability?.provider === "paytr" ? "PayTR güvenli iFrame ödeme" : "iyzico ile güvenli ödeme"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {paymentAvailability?.provider === "paytr"
+                  ? "Kart bilgilerinizi mağaza almaz. Ödeme PayTR’nin güvenli formunda tamamlanır."
+                  : "Kart bilgilerinizi mağaza almaz. Hesabınızda etkin olan kayıtlı kart ve hızlı ödeme seçenekleri iyzico ödeme sayfasında görünür."}
+              </p>
+              {riskContext && (
+                <p className="text-xs text-muted-foreground">
+                  Ödeme güvenliği ve fraud kontrolü için doğrulanmış bağlantı IP adresiniz iyzico ile paylaşılır; mağaza bunu sipariş kaydında saklamaz.
+                </p>
+              )}
+              {!paymentAvailability?.ready && (
+                <p className="text-xs font-medium text-destructive">
+                  Ödeme tamamlanamıyor: seçili ödeme sağlayıcısının sunucu ayarları eksik.
+                </p>
+              )}
+            </div>
           </Card>
+
+          {(recoveryAvailability?.email || recoveryAvailability?.whatsapp) && (
+            <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold text-foreground">Sepet hatırlatması (isteğe bağlı)</legend>
+                <p className="text-xs text-muted-foreground">
+                  Ödeme tamamlanmazsa seçtiğiniz her kanaldan bir hatırlatma gönderilir.
+                </p>
+                {recoveryAvailability.email && (
+                  <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
+                    <input
+                      id="cart-reminder-email-consent"
+                      name="cart-reminder-email-consent"
+                      type="checkbox"
+                      checked={emailReminderConsent}
+                      onChange={(event) => setEmailReminderConsent(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span>Sepetimdeki ürünleri tamamlamam için e-posta ile bir hatırlatma gönderilmesine izin veriyorum.</span>
+                  </label>
+                )}
+                {recoveryAvailability.whatsapp && (
+                  <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
+                    <input
+                      id="cart-reminder-whatsapp-consent"
+                      name="cart-reminder-whatsapp-consent"
+                      type="checkbox"
+                      checked={whatsappReminderConsent}
+                      onChange={(event) => setWhatsappReminderConsent(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span>Sepetimdeki ürünleri tamamlamam için WhatsApp ile bir hatırlatma gönderilmesine izin veriyorum.</span>
+                  </label>
+                )}
+              </fieldset>
+            </Card>
+          )}
         </div>
 
         {/* Sağ Kolon: Sipariş Özeti */}
@@ -523,6 +773,46 @@ function CheckoutContent() {
               ))}
             </div>
 
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label htmlFor="checkout-coupon" className="text-xs font-medium text-foreground">İndirim kuponu</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="checkout-coupon"
+                  value={couponInput}
+                  onChange={(event) => setCouponInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      setAppliedCouponCode(couponInput.trim().toLocaleUpperCase("en-US"));
+                    }
+                  }}
+                  maxLength={32}
+                  autoCapitalize="characters"
+                  placeholder="Kupon kodu"
+                  aria-describedby="checkout-coupon-status"
+                  className="min-w-0"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!couponInput.trim()}
+                  onClick={() => setAppliedCouponCode(couponInput.trim().toLocaleUpperCase("en-US"))}
+                >Uygula</Button>
+              </div>
+              <p
+                id="checkout-coupon-status"
+                role="status"
+                aria-live="polite"
+                className={`min-h-4 text-xs ${couponPreview?.valid ? "text-emerald-700 dark:text-emerald-400" : appliedCouponCode ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {couponPreview?.valid
+                  ? `${couponPreview.code} kuponu uygulandı.`
+                  : couponPreview && !couponPreview.valid
+                    ? couponPreview.message
+                    : appliedCouponCode ? "Kupon kontrol ediliyor…" : "Kupon kodunuz varsa burada uygulayın."}
+              </p>
+            </div>
+
             {/* Fiyat Detayı */}
             <Separator />
             <div className="space-y-2.5 text-sm">
@@ -532,12 +822,29 @@ function CheckoutContent() {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Kargo</span>
-                <Badge variant="success">Ücretsiz</Badge>
+                {shippingQuote === undefined ? (
+                  <span>Hesaplanıyor…</span>
+                ) : shippingCostKurus === 0 ? (
+                  <Badge variant="success">Ücretsiz</Badge>
+                ) : (
+                  <span>{formatMoney(shippingQuote.shippingCostKurus / 100)}</span>
+                )}
               </div>
+              {shippingQuote?.freeShippingRemainingKurus != null && shippingQuote.freeShippingRemainingKurus > 0 && shippingQuote.configuredShippingFeeKurus > 0 && (
+                <p className="text-right text-xs text-muted-foreground">
+                  {formatMoney(shippingQuote.freeShippingRemainingKurus / 100)} daha ekleyin, kargo ücretsiz olsun.
+                </p>
+              )}
+              {couponDiscountKurus > 0 && (
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                  <span>Kupon indirimi</span>
+                  <span>−{formatMoney(couponDiscountKurus / 100)}</span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between text-base font-bold text-foreground pt-1">
                 <span>Toplam</span>
-                <span>{formatMoney(totalAmount)}</span>
+                <span>{formatMoney(payableAmount)}</span>
               </div>
             </div>
 
@@ -545,7 +852,7 @@ function CheckoutContent() {
             <Button
               type="submit"
               size="lg"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !paymentAvailability?.ready || shippingQuote === undefined}
               className="mt-6 w-full rounded-2xl shadow-lg font-semibold gap-2 h-14"
             >
               {isSubmitting ? (
@@ -556,14 +863,30 @@ function CheckoutContent() {
               ) : (
                 <>
                   <LockIcon className="h-4 w-4" />
-                  <span>Siparişi Oluştur ({formatMoney(totalAmount)})</span>
+                  <span>Güvenli Ödemeye Geç ({formatMoney(payableAmount)})</span>
                 </>
               )}
             </Button>
 
-            <div className="mt-4 text-center text-xs text-muted-foreground">
-              Siparişi tamamlayarak Kullanım Koşulları ve Gizlilik Politikası&apos;nı kabul etmiş olursunuz.
-            </div>
+            <fieldset className="space-y-3 border-t border-border pt-4">
+              <legend className="sr-only">Sipariş sözleşmeleri</legend>
+              {!legalDocuments?.distanceSalesAgreement?.ready || !legalDocuments.preInformationForm?.ready ? (
+                <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  Ödeme için Mesafeli Satış Sözleşmesi ve Ön Bilgilendirme Formu içerikleri kodda tamamlanmalı.
+                </p>
+              ) : (
+                <>
+                  <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-muted-foreground">
+                    <input type="checkbox" required checked={preInformationAccepted} onChange={(event) => setPreInformationAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+                    <span><Link href={`/${legalDocuments.preInformationForm.slug}`} target="_blank" rel="noreferrer" className="font-medium text-foreground underline underline-offset-4">Ön Bilgilendirme Formu</Link> içeriğini ödeme öncesinde inceledim ve formu aldığımı onaylıyorum.</span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-muted-foreground">
+                    <input type="checkbox" required checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+                    <span><Link href={`/${legalDocuments.distanceSalesAgreement.slug}`} target="_blank" rel="noreferrer" className="font-medium text-foreground underline underline-offset-4">Mesafeli Satış Sözleşmesi</Link> koşullarını okudum ve kabul ediyorum.</span>
+                  </label>
+                </>
+              )}
+            </fieldset>
           </Card>
         </div>
       </form>

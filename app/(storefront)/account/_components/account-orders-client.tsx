@@ -15,7 +15,7 @@ import { OrderStatusBadge } from "./order-status-badge";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
 
-export function AccountOrdersSkeleton() {
+function AccountOrdersSkeleton() {
   return (
     <div className="space-y-4" aria-hidden>
       {[0, 1].map((i) => (
@@ -77,7 +77,7 @@ export default function AccountOrdersPage() {
           Henüz kayıtlı bir siparişiniz yok
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sipariş verdiğinizde tüm detayları ve kargo takibini buradan kolayca yapabilirsiniz.
+          Sipariş ve kargo bilgileri, sipariş oluşturduğunuzda burada görünür.
         </p>
         <Button asChild size="lg" className="mt-6 rounded-2xl font-semibold shadow-md">
           <Link href="/search">

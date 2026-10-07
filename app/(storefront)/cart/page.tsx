@@ -1,5 +1,12 @@
 "use client";
 
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import type { Product } from "@/lib/catalog/types";
+import { setCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { useCart } from "@/components/cart/cart-context";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,9 +17,6 @@ import {
   MinusSignIcon,
   ArrowRight01Icon,
   ArrowLeft01Icon,
-  SecurityCheckIcon,
-  DeliveryTruck01Icon,
-  Refresh01Icon,
 } from "hugeicons-react";
 import {
   Button,
@@ -24,10 +28,106 @@ import {
   Badge,
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
+import { getProductUnitPrice } from "@/lib/catalog/variants";
+import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
 
-export default function CartPage() {
-  const { items, updateQuantity, removeItem, clearCart, totalCount, totalAmount } =
+function CartContent() {
+  const router = useRouter();
+  const restoreToken = useSearchParams().get("recover");
+  const { items, addItem, updateQuantity, removeItem, clearCart, totalCount, totalAmount } =
     useCart();
+  const restoreHandled = useRef(false);
+  const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
+  const [restoreState, setRestoreState] = useState<{
+    token: string;
+    cart: Awaited<ReturnType<typeof restoreCart>>;
+  } | null>(null);
+  const restoredCart = restoreToken
+    ? restoreState?.token === restoreToken ? restoreState.cart : undefined
+    : null;
+  useEffect(() => {
+    let cancelled = false;
+    restoreHandled.current = false;
+    if (!restoreToken) return () => { cancelled = true; };
+    void restoreCart({ token: restoreToken })
+      .then((cart) => { if (!cancelled) setRestoreState({ token: restoreToken, cart }); })
+      .catch(() => { if (!cancelled) setRestoreState({ token: restoreToken, cart: null }); });
+    return () => { cancelled = true; };
+  }, [restoreCart, restoreToken]);
+
+  const restoredProducts = useQuery(
+    api.products.getByIds,
+    restoredCart === undefined
+      ? "skip"
+      : { ids: (restoredCart?.items ?? []).map((item) => item.productId as Id<"products">) },
+  );
+  const restoredProductsById = useMemo(() => {
+    const mapped = new Map<string, Product>();
+    for (const product of restoredProducts ?? []) {
+      mapped.set(product._id, {
+        id: product._id,
+        slug: product.slug,
+        title: product.title,
+        price: product.price || "0.00",
+        availableForSale: product.availableForSale ?? true,
+        stockQuantity: product.stockQuantity ?? null,
+        brand: product.brand,
+        material: product.material,
+        categorySlug: product.categorySlug,
+        images: product.images,
+        options: product.options,
+        variants: product.variants?.map(({ price, ...variant }) => ({
+          ...variant,
+          ...(price ? { price: { amount: price, currencyCode: "TRY" } } : {}),
+        })),
+        updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
+      });
+    }
+    return mapped;
+  }, [restoredProducts]);
+
+  useEffect(() => {
+    if (!restoreToken || restoredCart === undefined || restoredProducts === undefined || restoreHandled.current) return;
+    restoreHandled.current = true;
+
+    if (restoredCart) {
+      try {
+        setCartRecoverySessionKey(restoredCart.sessionKey);
+      } catch {
+        // The cart can still be restored when browser storage is unavailable.
+      }
+    }
+
+    for (const restored of restoredCart?.items ?? []) {
+      const product = restoredProductsById.get(restored.productId);
+      if (!product?.availableForSale) continue;
+      const resolvedVariantId = restored.variantId ?? (product.variants?.length === 1 ? product.variants[0].id : undefined);
+      if (product.variants?.length && !resolvedVariantId) continue;
+      const variant = resolvedVariantId
+        ? product.variants?.find((candidate) => candidate.id === resolvedVariantId)
+        : undefined;
+      if (resolvedVariantId && (!variant || !variant.availableForSale)) continue;
+      const stock = variant?.stockQuantity ?? product.stockQuantity;
+      if (stock != null && stock <= 0) continue;
+
+      const currentQuantity = items.find((item) =>
+        item.product.id === product.id && item.variantId === resolvedVariantId
+      )?.quantity ?? 0;
+      const quantity = Math.max(currentQuantity, Math.min(999, restored.quantity));
+      if (currentQuantity > 0) updateQuantity(product.id, quantity, resolvedVariantId);
+      else addItem(product, quantity, resolvedVariantId);
+    }
+
+    router.replace("/cart");
+  }, [addItem, items, restoredCart, restoredProducts, restoredProductsById, restoreToken, router, updateQuantity]);
+
+  if (restoreToken) {
+    return (
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 text-center text-sm text-muted-foreground" aria-busy="true">
+        Sepetiniz geri yükleniyor...
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -40,12 +140,12 @@ export default function CartPage() {
             Sepetiniz Boş
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Alışveriş sepetinizde henüz herhangi bir ürün bulunmuyor. İlginizi çeken ürünleri ekleyerek başlayın.
+            Sepetinize eklediğiniz ürünler burada görünür.
           </p>
           <div className="mt-8">
             <Button asChild size="lg" className="rounded-full shadow-md font-semibold">
               <Link href="/search" className="gap-2">
-                <span>Ürünleri Keşfet</span>
+                <span>Ürünlere göz at</span>
                 <ArrowRight01Icon className="h-4 w-4" />
               </Link>
             </Button>
@@ -82,8 +182,9 @@ export default function CartPage() {
         <div className="lg:col-span-8">
           <Card className="divide-y divide-border border-border bg-card shadow-sm overflow-hidden rounded-3xl">
             {items.map((item) => {
+              const unitPrice = getProductUnitPrice(item.product, item.variantId);
               const lineTotal = (
-                parseFloat(item.product.price || "0") * item.quantity
+                parseFloat(unitPrice || "0") * item.quantity
               ).toFixed(2);
 
               return (
@@ -124,7 +225,7 @@ export default function CartPage() {
                         </div>
                       )}
                       <div className="mt-1.5 text-sm font-semibold text-foreground">
-                        {formatMoney(item.product.price)}
+                        {formatMoney(unitPrice)}
                       </div>
                     </div>
                   </div>
@@ -233,24 +334,19 @@ export default function CartPage() {
                 </Button>
               </div>
 
-              <div className="pt-4 space-y-3 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2.5">
-                  <SecurityCheckIcon className="h-4 w-4 text-emerald-500 flex-none" />
-                  <span>256-Bit SSL ile Güvenli Ödeme Altyapısı</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <DeliveryTruck01Icon className="h-4 w-4 text-primary flex-none" />
-                  <span>Tüm Siparişlerde Hızlı & Ücretsiz Kargo</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <Refresh01Icon className="h-4 w-4 text-muted-foreground flex-none" />
-                  <span>30 Gün Koşulsuz İade ve Değişim Garantisi</span>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+      <CartRecommendationShelf />
     </div>
+  );
+}
+
+export default function CartPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 text-center text-sm text-muted-foreground" aria-busy="true">Sepetiniz açılıyor...</div>}>
+      <CartContent />
+    </Suspense>
   );
 }
