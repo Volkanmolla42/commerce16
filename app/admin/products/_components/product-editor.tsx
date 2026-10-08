@@ -690,305 +690,305 @@ function ProductEditor({
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
           <section aria-label="Görseller" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-5">
-              <label htmlFor="product-image-upload" className={`flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-950 p-4 text-center transition hover:border-neutral-500 hover:bg-neutral-800/70 ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
-                <span className="grid size-9 place-items-center rounded-full bg-neutral-800 text-neutral-300"><PlusCircleIcon className="size-5" /></span>
-                <strong className="text-xs font-medium text-neutral-200">
-                  {processingImages ? "Görseller hazırlanıyor…" : `Görsel ekle (${storageImages.length + pendingImages.length}/20)`}
-                </strong>
-              </label>
-              <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event)} className="sr-only" />
-              {(storageImages.length > 0 || pendingImages.length > 0) && <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
-                {storageImages.map((image) => <div key={image.storageId} className="group relative overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
-                  {image.url ? <Image src={image.url} alt={title} width={240} height={240} unoptimized className="aspect-square w-full object-cover" /> : <div className="aspect-square" />}
-                  <Button type="button" size="sm" variant="secondary" disabled={saving} className="absolute right-1 top-1 min-h-7 rounded-md bg-neutral-950/90 px-2 text-[10px] text-neutral-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => setStorageImages((current) => current.filter((item) => item.storageId !== image.storageId))}>
-                    <TrashIcon className="mr-1 size-3" />
-                    Kaldır
-                  </Button>
-                </div>)}
-                {pendingImages.map((image) => <div key={image.id} className="group relative overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
-                  <Image src={image.previewUrl} alt={title} width={240} height={240} unoptimized className="aspect-square w-full object-cover" />
-                  <Button type="button" size="sm" variant="secondary" disabled={saving} className="absolute right-1 top-1 min-h-7 rounded-md bg-neutral-950/90 px-2 text-[10px] text-neutral-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
-                    <TrashIcon className="mr-1 size-3" />
-                    Kaldır
-                  </Button>
-                </div>)}
-              </div>}
+            <label htmlFor="product-image-upload" className={`flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-950 p-4 text-center transition hover:border-neutral-500 hover:bg-neutral-800/70 ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
+              <span className="grid size-9 place-items-center rounded-full bg-neutral-800 text-neutral-300"><PlusCircleIcon className="size-5" /></span>
+              <strong className="text-xs font-medium text-neutral-200">
+                {processingImages ? "Görseller hazırlanıyor…" : `Görsel ekle (${storageImages.length + pendingImages.length}/20)`}
+              </strong>
+            </label>
+            <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event)} className="sr-only" />
+            {(storageImages.length > 0 || pendingImages.length > 0) && <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+              {storageImages.map((image) => <div key={image.storageId} className="group relative overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
+                {image.url ? <Image src={image.url} alt={title} width={240} height={240} unoptimized className="aspect-square w-full object-cover" /> : <div className="aspect-square" />}
+                <Button type="button" size="sm" variant="secondary" disabled={saving} className="absolute right-1 top-1 min-h-7 rounded-md bg-neutral-950/90 px-2 text-[10px] text-neutral-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => setStorageImages((current) => current.filter((item) => item.storageId !== image.storageId))}>
+                  <TrashIcon className="mr-1 size-3" />
+                  Kaldır
+                </Button>
+              </div>)}
+              {pendingImages.map((image) => <div key={image.id} className="group relative overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
+                <Image src={image.previewUrl} alt={title} width={240} height={240} unoptimized className="aspect-square w-full object-cover" />
+                <Button type="button" size="sm" variant="secondary" disabled={saving} className="absolute right-1 top-1 min-h-7 rounded-md bg-neutral-950/90 px-2 text-[10px] text-neutral-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
+                  <TrashIcon className="mr-1 size-3" />
+                  Kaldır
+                </Button>
+              </div>)}
+            </div>}
           </section>
           <section aria-label="Ürün detayları" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
-              <div className="space-y-5">
-                <div className="grid gap-4 sm:grid-cols-[1fr_10rem] sm:items-start">
-                  <div className="space-y-2">
-                    <Label htmlFor="product-title" className="text-xs font-medium text-neutral-300">Ürün adı <span className="text-red-400">*</span></Label>
-                    <Input id="product-title" name="title" autoComplete="off" required minLength={2} maxLength={140} placeholder="Ürün adı" value={title} onChange={(event) => {
-                      const nextTitle = event.target.value;
-                      setTitle(nextTitle);
-                      setSlug(slugify(nextTitle));
-                    }} className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-4 text-sm text-neutral-100 placeholder:text-neutral-600 focus-visible:ring-neutral-400" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="product-vat-rate" className="text-xs font-medium text-neutral-300">KDV oranı (%) <span className="text-red-400">*</span></Label>
-                    <Input
-                      id="product-vat-rate"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      required
-                      value={baseVatRate}
-                      onChange={(event) => setBaseVatRate(event.target.value)}
-                      placeholder="Örn. 20"
-                      className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 focus-visible:ring-neutral-400"
-                    />
-                  </div>
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-[1fr_10rem] sm:items-start">
+                <div className="space-y-2">
+                  <Label htmlFor="product-title" className="text-xs font-medium text-neutral-300">Ürün adı <span className="text-red-400">*</span></Label>
+                  <Input id="product-title" name="title" autoComplete="off" required minLength={2} maxLength={140} placeholder="Ürün adı" value={title} onChange={(event) => {
+                    const nextTitle = event.target.value;
+                    setTitle(nextTitle);
+                    setSlug(slugify(nextTitle));
+                  }} className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-4 text-sm text-neutral-100 placeholder:text-neutral-600 focus-visible:ring-neutral-400" />
                 </div>
-
-                <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                  <div className="space-y-2">
-                    <Label htmlFor="product-category" className="text-xs font-medium text-neutral-300">Kategori <span className="text-red-400">*</span></Label>
-                    <select id="product-category" name="categorySlug" required value={categorySlug} onChange={(event) => changeCategory(event.target.value)} className="h-11 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 outline-none focus:ring-2 focus:ring-neutral-400/30">
-                      <option value="" disabled>Kategori seçin</option>
-                      {categories.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
-                    </select>
-                  </div>
-                  <label className="flex h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-950/60 px-4 text-xs font-medium text-neutral-200 hover:border-neutral-700">
-                    <input type="checkbox" checked={isVariantProduct} onChange={toggleVariantProduct} className="size-4 accent-neutral-200" />
-                    <Squares2X2Icon className="size-4 text-neutral-400" />
-                    <span>Varyantlı ürün</span>
-                  </label>
+                <div className="space-y-2">
+                  <Label htmlFor="product-vat-rate" className="text-xs font-medium text-neutral-300">KDV oranı (%) <span className="text-red-400">*</span></Label>
+                  <Input
+                    id="product-vat-rate"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    required
+                    value={baseVatRate}
+                    onChange={(event) => setBaseVatRate(event.target.value)}
+                    placeholder="Örn. 20"
+                    className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 focus-visible:ring-neutral-400"
+                  />
                 </div>
+              </div>
 
-                {categoryAttributes.length > 0 ? (
-                  <section aria-labelledby="product-category-attributes-heading" className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4 sm:p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800/80 pb-3">
-                      <h3 id="product-category-attributes-heading" className="flex items-center gap-1.5 text-sm font-semibold text-neutral-100">
-                        <AdjustmentsHorizontalIcon className="size-4 text-neutral-400" />
-                        Teknik Özellikler
-                      </h3>
-                      <span className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300">
-                        {categoryAttributes.length} özellik
-                      </span>
-                    </div>
+              <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="product-category" className="text-xs font-medium text-neutral-300">Kategori <span className="text-red-400">*</span></Label>
+                  <select id="product-category" name="categorySlug" required value={categorySlug} onChange={(event) => changeCategory(event.target.value)} className="h-11 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 outline-none focus:ring-2 focus:ring-neutral-400/30">
+                    <option value="" disabled>Kategori seçin</option>
+                    {categories.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
+                  </select>
+                </div>
+                <label className="flex h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-950/60 px-4 text-xs font-medium text-neutral-200 hover:border-neutral-700">
+                  <input type="checkbox" checked={isVariantProduct} onChange={toggleVariantProduct} className="size-4 accent-neutral-200" />
+                  <Squares2X2Icon className="size-4 text-neutral-400" />
+                  <span>Varyantlı ürün</span>
+                </label>
+              </div>
 
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      {categoryAttributes.map((attribute: CategoryAttributeDefinition) => {
-                        const inputId = `product-attribute-${attribute.key}`;
-                        const rawValue = attributeValues[attribute.key];
+              {categoryAttributes.length > 0 ? (
+                <section aria-labelledby="product-category-attributes-heading" className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800/80 pb-3">
+                    <h3 id="product-category-attributes-heading" className="flex items-center gap-1.5 text-sm font-semibold text-neutral-100">
+                      <AdjustmentsHorizontalIcon className="size-4 text-neutral-400" />
+                      Teknik Özellikler
+                    </h3>
+                    <span className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300">
+                      {categoryAttributes.length} özellik
+                    </span>
+                  </div>
 
-                        return (
-                          <div key={attribute.key} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label htmlFor={inputId} className="text-xs font-medium text-neutral-200">
-                                {attribute.label}
-                                {attribute.unit ? ` (${attribute.unit})` : ""}
-                                {attribute.required ? <span className="text-red-400"> *</span> : null}
-                              </Label>
-                              <span className="text-[10px] text-neutral-400 bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800">
-                                {attribute.type === "multiselect"
-                                  ? "Çoklu Seçim"
-                                  : attribute.type === "select"
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    {categoryAttributes.map((attribute: CategoryAttributeDefinition) => {
+                      const inputId = `product-attribute-${attribute.key}`;
+                      const rawValue = attributeValues[attribute.key];
+
+                      return (
+                        <div key={attribute.key} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor={inputId} className="text-xs font-medium text-neutral-200">
+                              {attribute.label}
+                              {attribute.unit ? ` (${attribute.unit})` : ""}
+                              {attribute.required ? <span className="text-red-400"> *</span> : null}
+                            </Label>
+                            <span className="text-[10px] text-neutral-400 bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800">
+                              {attribute.type === "multiselect"
+                                ? "Çoklu Seçim"
+                                : attribute.type === "select"
                                   ? "Tekli Seçim"
                                   : attribute.type === "boolean"
-                                  ? "Evet / Hayır"
-                                  : attribute.type === "number"
-                                  ? "Sayı"
-                                  : "Metin"}
-                              </span>
-                            </div>
-
-                            {attribute.type === "multiselect" ? (
-                              <AttributeMultiSelect
-                                attribute={attribute}
-                                value={Array.isArray(rawValue) ? rawValue : []}
-                                onChange={(next) =>
-                                  setAttributeValues((current) => ({
-                                    ...current,
-                                    [attribute.key]: next,
-                                  }))
-                                }
-                              />
-                            ) : attribute.type === "select" ? (
-                              <AttributeSingleSelect
-                                attribute={attribute}
-                                value={typeof rawValue === "string" ? rawValue : ""}
-                                onChange={(next) =>
-                                  setAttributeValues((current) => ({
-                                    ...current,
-                                    [attribute.key]: next,
-                                  }))
-                                }
-                              />
-                            ) : attribute.type === "boolean" ? (
-                              <AttributeBooleanToggle
-                                attribute={attribute}
-                                value={typeof rawValue === "string" ? rawValue : ""}
-                                onChange={(next) =>
-                                  setAttributeValues((current) => ({
-                                    ...current,
-                                    [attribute.key]: next,
-                                  }))
-                                }
-                              />
-                            ) : attribute.type === "number" ? (
-                              <AttributeNumberInput
-                                attribute={attribute}
-                                value={typeof rawValue === "string" ? rawValue : ""}
-                                onChange={(next) =>
-                                  setAttributeValues((current) => ({
-                                    ...current,
-                                    [attribute.key]: next,
-                                  }))
-                                }
-                              />
-                            ) : (
-                              <Input
-                                id={inputId}
-                                type="text"
-                                required={attribute.required}
-                                value={typeof rawValue === "string" ? rawValue : ""}
-                                onChange={(event) =>
-                                  setAttributeValues((current) => ({
-                                    ...current,
-                                    [attribute.key]: event.target.value,
-                                  }))
-                                }
-                                placeholder={attribute.label}
-                                className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100 placeholder:text-neutral-600"
-                              />
-                            )}
+                                    ? "Evet / Hayır"
+                                    : attribute.type === "number"
+                                      ? "Sayı"
+                                      : "Metin"}
+                            </span>
                           </div>
-                        );
-                      })}
+
+                          {attribute.type === "multiselect" ? (
+                            <AttributeMultiSelect
+                              attribute={attribute}
+                              value={Array.isArray(rawValue) ? rawValue : []}
+                              onChange={(next) =>
+                                setAttributeValues((current) => ({
+                                  ...current,
+                                  [attribute.key]: next,
+                                }))
+                              }
+                            />
+                          ) : attribute.type === "select" ? (
+                            <AttributeSingleSelect
+                              attribute={attribute}
+                              value={typeof rawValue === "string" ? rawValue : ""}
+                              onChange={(next) =>
+                                setAttributeValues((current) => ({
+                                  ...current,
+                                  [attribute.key]: next,
+                                }))
+                              }
+                            />
+                          ) : attribute.type === "boolean" ? (
+                            <AttributeBooleanToggle
+                              attribute={attribute}
+                              value={typeof rawValue === "string" ? rawValue : ""}
+                              onChange={(next) =>
+                                setAttributeValues((current) => ({
+                                  ...current,
+                                  [attribute.key]: next,
+                                }))
+                              }
+                            />
+                          ) : attribute.type === "number" ? (
+                            <AttributeNumberInput
+                              attribute={attribute}
+                              value={typeof rawValue === "string" ? rawValue : ""}
+                              onChange={(next) =>
+                                setAttributeValues((current) => ({
+                                  ...current,
+                                  [attribute.key]: next,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <Input
+                              id={inputId}
+                              type="text"
+                              required={attribute.required}
+                              value={typeof rawValue === "string" ? rawValue : ""}
+                              onChange={(event) =>
+                                setAttributeValues((current) => ({
+                                  ...current,
+                                  [attribute.key]: event.target.value,
+                                }))
+                              }
+                              placeholder={attribute.label}
+                              className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100 placeholder:text-neutral-600"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : categorySlug ? (
+                <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950/30 p-4 text-xs text-neutral-400">
+                  Bu kategori için özellik tanımlanmamış.
+                </div>
+              ) : null}
+
+              {isVariantProduct ? (
+                <>
+                  <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h4 className="text-xs font-semibold text-neutral-200">Kombinasyon Seçenekleri</h4>
+                      <Button type="button" variant="outline" className="min-h-9 rounded-lg border-neutral-700 bg-neutral-950 px-3 text-xs text-neutral-200 hover:bg-neutral-800" disabled={variantOptions.length >= 3} onClick={addVariantOption}>
+                        <PlusCircleIcon className="mr-2 size-4" /> Seçenek ekle
+                      </Button>
+                    </div>
+                    {variantOptions.map((option, index) => (
+                      <div key={option.id} className="grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-neutral-400">Seçenek adı</Label>
+                          <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-sm text-neutral-100" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-neutral-400">Değerler</Label>
+                          <VariantOptionValuesInput
+                            values={option.values}
+                            onChange={(nextValues) =>
+                              setVariantOptions((current) =>
+                                current.map((item) => (item.id === option.id ? { ...item, values: nextValues } : item))
+                              )
+                            }
+                          />
+                        </div>
+                        <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} disabled={variantOptions.length <= 1} onClick={() => setVariantOptions((current) => current.filter((item) => item.id !== option.id))}>
+                          <TrashIcon className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-800 pt-3">
+                      <Button type="button" variant="secondary" className="min-h-9 rounded-lg px-3 text-xs" onClick={generateVariantRows}>
+                        <ArrowPathIcon className="mr-1.5 size-3.5" />
+                        Kombinasyonları oluştur
+                      </Button>
                     </div>
                   </section>
-                ) : categorySlug ? (
-                  <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950/30 p-4 text-xs text-neutral-400">
-                    Bu kategori için özellik tanımlanmamış.
-                  </div>
-                ) : null}
 
-                {isVariantProduct ? (
-                    <>
-                      <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h4 className="text-xs font-semibold text-neutral-200">Varyasyon Seçenekleri</h4>
-                          <Button type="button" variant="outline" className="min-h-9 rounded-lg border-neutral-700 bg-neutral-950 px-3 text-xs text-neutral-200 hover:bg-neutral-800" disabled={variantOptions.length >= 3} onClick={addVariantOption}>
-                            <PlusCircleIcon className="mr-2 size-4" /> Seçenek ekle
-                          </Button>
-                        </div>
-                        {variantOptions.map((option, index) => (
-                          <div key={option.id} className="grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
-                            <div className="space-y-1.5">
-                              <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-neutral-400">Seçenek adı</Label>
-                              <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-sm text-neutral-100" />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-neutral-400">Değerler</Label>
-                              <VariantOptionValuesInput
-                                values={option.values}
-                                onChange={(nextValues) =>
-                                  setVariantOptions((current) =>
-                                    current.map((item) => (item.id === option.id ? { ...item, values: nextValues } : item))
-                                  )
-                                }
-                              />
-                            </div>
-                            <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} disabled={variantOptions.length <= 1} onClick={() => setVariantOptions((current) => current.filter((item) => item.id !== option.id))}>
-                              <TrashIcon className="size-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-800 pt-3">
-                          <Button type="button" variant="secondary" className="min-h-9 rounded-lg px-3 text-xs" onClick={generateVariantRows}>
-                            <ArrowPathIcon className="mr-1.5 size-3.5" />
-                            Kombinasyonları oluştur
-                          </Button>
-                        </div>
-                      </section>
-
-                      {variantRows.length > 0 && <>
-                        <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
-                          <table className="w-full min-w-[760px] border-collapse text-left text-xs">
-                            <thead className="bg-neutral-950 text-neutral-400">
-                              <tr>
-                                <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
-                                <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-red-400">*</span></th>
-                                <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
-                                <th scope="col" className="px-3 py-3 font-medium">Adet <span className="text-red-400">*</span></th>
-                                <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-red-400">*</span></th>
-                                <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
-                                <th scope="col" className="px-3 py-3 font-medium"></th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-800">
-                              {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)}>
-                                <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-neutral-200">{variant.selectedOptions.map(({ value }) => value).join(" / ")}</td>
-                                <td className="min-w-36 px-3 py-3"><Input aria-label={`Varyant ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                                <td className="min-w-32 px-3 py-3"><Input aria-label={`Varyant ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                                <td className="w-20 px-2 py-3"><Input aria-label={`Varyant ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                                <td className="w-28 px-2 py-3"><Input aria-label={`Varyant ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                                <td className="px-3 py-3"><input aria-label={`Varyant ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" /></td>
-                                <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Varyant ${index + 1} kombinasyonunu kaldır`} className="min-h-9 px-2 text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
-                              </tr>)}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        <div className="space-y-3 md:hidden">
-                          {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Varyant ${index + 1}`} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200">{selected.name}: {selected.value}</span>)}</div>
-                              <Button type="button" variant="ghost" aria-label={`Varyant ${index + 1} kombinasyonunu kaldır`} className="min-h-8 px-2 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
-                            </div>
-                            <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                            <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-neutral-400">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-neutral-400">Adet <span className="text-red-400">*</span></Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                              <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                            </div>
-                            <label className="flex min-h-11 items-center gap-2 self-end text-xs text-neutral-300"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" />Satışta</label>
-                          </section>)}
-                        </div>
-                      </>}
-                    </>
-                  ) : (
-                    <>
+                  {variantRows.length > 0 && <>
                     <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
-                      <table className="w-full min-w-[640px] border-collapse text-left text-xs">
+                      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
                         <thead className="bg-neutral-950 text-neutral-400">
                           <tr>
-                            <th scope="col" className="px-3 py-3 font-medium">Ürün</th>
+                            <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
                             <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-red-400">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
                             <th scope="col" className="px-3 py-3 font-medium">Adet <span className="text-red-400">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-red-400">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
+                            <th scope="col" className="px-3 py-3 font-medium"></th>
                           </tr>
                         </thead>
-                        <tbody>
-                          <tr>
-                            <td className="min-w-36 px-3 py-3"><div className="flex h-10 items-center rounded-lg border border-neutral-800 bg-neutral-900 px-3 text-xs text-neutral-400">Tek ürün</div></td>
-                            <td className="min-w-36 px-3 py-3"><Input aria-label="Ürün SKU" name="sku" required maxLength={64} value={baseSku} onChange={(event) => setBaseSku(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="min-w-32 px-3 py-3"><Input aria-label="Ürün Barkod" placeholder="Barkod / GTIN" maxLength={64} value={baseBarcode} onChange={(event) => setBaseBarcode(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="w-24 px-2 py-3"><Input aria-label="Ürün stok adedi" name="stockQuantity" required type="number" inputMode="numeric" min="0" step="1" value={baseStockQuantity} onChange={(event) => setBaseStockQuantity(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                            <td className="w-28 px-2 py-3"><Input aria-label="Ürün satış fiyatı" name="price" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs font-semibold text-neutral-100 placeholder:text-neutral-600" /></td>
-                          </tr>
+                        <tbody className="divide-y divide-neutral-800">
+                          {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)}>
+                            <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-neutral-200">{variant.selectedOptions.map(({ value }) => value).join(" / ")}</td>
+                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Varyant ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
+                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Varyant ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
+                            <td className="w-20 px-2 py-3"><Input aria-label={`Varyant ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
+                            <td className="w-28 px-2 py-3"><Input aria-label={`Varyant ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
+                            <td className="px-3 py-3"><input aria-label={`Varyant ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" /></td>
+                            <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Varyant ${index + 1} kombinasyonunu kaldır`} className="min-h-9 px-2 text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
+                          </tr>)}
                         </tbody>
                       </table>
                     </div>
+
                     <div className="space-y-3 md:hidden">
-                      <section aria-label="Tek ürün" className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
-                        <span className="text-xs font-medium text-neutral-400">Tek ürün</span>
-                        <div className="space-y-2"><Label htmlFor="mobile-product-sku" className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id="mobile-product-sku" required maxLength={64} value={baseSku} onChange={(event) => setBaseSku(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                        <div className="space-y-2"><Label htmlFor="mobile-product-barcode" className="text-xs text-neutral-400">Barkod</Label><Input id="mobile-product-barcode" placeholder="Barkod / GTIN" maxLength={64} value={baseBarcode} onChange={(event) => setBaseBarcode(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2"><Label htmlFor="mobile-product-stock" className="text-xs text-neutral-400">Stok adedi <span className="text-red-400">*</span></Label><Input id="mobile-product-stock" required type="number" inputMode="numeric" min="0" step="1" value={baseStockQuantity} onChange={(event) => setBaseStockQuantity(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                          <div className="space-y-2"><Label htmlFor="mobile-product-price" className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id="mobile-product-price" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100 placeholder:text-neutral-600" /></div>
+                      {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Varyant ${index + 1}`} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200">{selected.name}: {selected.value}</span>)}</div>
+                          <Button type="button" variant="ghost" aria-label={`Varyant ${index + 1} kombinasyonunu kaldır`} className="min-h-8 px-2 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
                         </div>
-                      </section>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-neutral-400">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-neutral-400">Adet <span className="text-red-400">*</span></Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
+                          <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
+                        </div>
+                        <label className="flex min-h-11 items-center gap-2 self-end text-xs text-neutral-300"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" />Satışta</label>
+                      </section>)}
                     </div>
-                    </>
-                  )}
-              </div>
+                  </>}
+                </>
+              ) : (
+                <>
+                  <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
+                    <table className="w-full min-w-[640px] border-collapse text-left text-xs">
+                      <thead className="bg-neutral-950 text-neutral-400">
+                        <tr>
+                          <th scope="col" className="px-3 py-3 font-medium">Ürün</th>
+                          <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-red-400">*</span></th>
+                          <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
+                          <th scope="col" className="px-3 py-3 font-medium">Adet <span className="text-red-400">*</span></th>
+                          <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-red-400">*</span></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="min-w-36 px-3 py-3"><div className="flex h-10 items-center rounded-lg border border-neutral-800 bg-neutral-900 px-3 text-xs text-neutral-400">Tek ürün</div></td>
+                          <td className="min-w-36 px-3 py-3"><Input aria-label="Ürün SKU" name="sku" required maxLength={64} value={baseSku} onChange={(event) => setBaseSku(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
+                          <td className="min-w-32 px-3 py-3"><Input aria-label="Ürün Barkod" placeholder="Barkod / GTIN" maxLength={64} value={baseBarcode} onChange={(event) => setBaseBarcode(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
+                          <td className="w-24 px-2 py-3"><Input aria-label="Ürün stok adedi" name="stockQuantity" required type="number" inputMode="numeric" min="0" step="1" value={baseStockQuantity} onChange={(event) => setBaseStockQuantity(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
+                          <td className="w-28 px-2 py-3"><Input aria-label="Ürün satış fiyatı" name="price" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs font-semibold text-neutral-100 placeholder:text-neutral-600" /></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="space-y-3 md:hidden">
+                    <section aria-label="Tek ürün" className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
+                      <span className="text-xs font-medium text-neutral-400">Tek ürün</span>
+                      <div className="space-y-2"><Label htmlFor="mobile-product-sku" className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id="mobile-product-sku" required maxLength={64} value={baseSku} onChange={(event) => setBaseSku(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
+                      <div className="space-y-2"><Label htmlFor="mobile-product-barcode" className="text-xs text-neutral-400">Barkod</Label><Input id="mobile-product-barcode" placeholder="Barkod / GTIN" maxLength={64} value={baseBarcode} onChange={(event) => setBaseBarcode(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2"><Label htmlFor="mobile-product-stock" className="text-xs text-neutral-400">Stok adedi <span className="text-red-400">*</span></Label><Input id="mobile-product-stock" required type="number" inputMode="numeric" min="0" step="1" value={baseStockQuantity} onChange={(event) => setBaseStockQuantity(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
+                        <div className="space-y-2"><Label htmlFor="mobile-product-price" className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id="mobile-product-price" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100 placeholder:text-neutral-600" /></div>
+                      </div>
+                    </section>
+                  </div>
+                </>
+              )}
+            </div>
           </section>
         </div>
 
