@@ -94,12 +94,25 @@ function createEditorId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function normalizeOptionKey(str: string) {
+  return str.trim().toLocaleLowerCase("tr-TR");
+}
+
 function selectionKey(selectedOptions: { name: string; value: string }[]) {
-  return JSON.stringify([...selectedOptions].sort((a, b) => a.name.localeCompare(b.name)));
+  return JSON.stringify(
+    [...selectedOptions]
+      .map((opt) => ({ name: normalizeOptionKey(opt.name), value: opt.value.trim() }))
+      .sort((a, b) => a.name.localeCompare(b.name, "tr-TR"))
+  );
 }
 
 function variantOptionSignature(options: { name: string; values: string[] }[]) {
-  return JSON.stringify(options.map((option) => [option.name.trim(), option.values]));
+  return JSON.stringify(
+    options.map((option) => [
+      normalizeOptionKey(option.name),
+      [...option.values.map((v) => v.trim()).filter(Boolean)],
+    ])
+  );
 }
 
 function getVariantCombinations(options: { name: string; values: string[] }[]) {
@@ -230,17 +243,132 @@ function ProductEditor({
       return;
     }
 
-    const existingRows = new Map(variantRows.map((variant) => [selectionKey(variant.selectedOptions), variant]));
-    setVariantRows(combinations.map((selectedOptions) => existingRows.get(selectionKey(selectedOptions)) ?? ({
-      id: createEditorId(),
-      selectedOptions,
-      sku: generatedVariantSku(slug, selectedOptions),
-      barcode: "",
-      price: price || "",
-      vatRate: baseVatRate,
-      stockQuantity: "0",
-      availableForSale: true,
-    })));
+    const existingExactMap = new Map<string, VariantDraft>();
+    for (const variant of variantRows) {
+      existingExactMap.set(selectionKey(variant.selectedOptions), variant);
+    }
+
+    const usedSkus = new Set<string>();
+    const claimedParentCounts = new Map<VariantDraft, number>();
+
+    const ensureUniqueSku = (candidate: string, fallbackSlug: string, selOptions: { name: string; value: string }[]) => {
+      let cleaned = candidate.trim().replace(/[^A-Za-z0-9._-]/g, "").slice(0, 64);
+      if (!cleaned || !/^[A-Za-z0-9]/.test(cleaned)) {
+        cleaned = generatedVariantSku(fallbackSlug, selOptions);
+      }
+      let finalSku = cleaned;
+      let counter = 2;
+      while (usedSkus.has(finalSku.toLocaleUpperCase("en-US"))) {
+        const suffix = `-${counter}`;
+        const base = cleaned.slice(0, Math.max(1, 64 - suffix.length));
+        finalSku = `${base}${suffix}`;
+        counter += 1;
+      }
+      usedSkus.add(finalSku.toLocaleUpperCase("en-US"));
+      return finalSku;
+    };
+
+    // 1. Aşama: Birebir eşleşen kombinasyonları ve onların mevcut verilerini koru
+    const resolvedRows: (VariantDraft | null)[] = combinations.map((comb) => {
+      const key = selectionKey(comb);
+      const exact = existingExactMap.get(key);
+      if (exact) {
+        const sku = ensureUniqueSku(exact.sku, slug, comb);
+        return {
+          ...exact,
+          selectedOptions: comb,
+          sku,
+        };
+      }
+      return null;
+    });
+
+    // 2. Aşama: Yeni eklenen veya değişen seçenekler için mevcut varyantlardan akıllı miras alma
+    const nextVariantRows = combinations.map((comb, index) => {
+      const existingResolved = resolvedRows[index];
+      if (existingResolved) return existingResolved;
+
+      // En çok ortak seçeneğe sahip mevcut satırı bul
+      let bestMatch: VariantDraft | null = null;
+      let bestScore = 0;
+
+      for (const row of variantRows) {
+        let score = 0;
+        for (const rowOpt of row.selectedOptions) {
+          const matchingCombOpt = comb.find(
+            (c) => normalizeOptionKey(c.name) === normalizeOptionKey(rowOpt.name)
+          );
+          if (matchingCombOpt) {
+            if (matchingCombOpt.value.trim() === rowOpt.value.trim()) {
+              score += 10;
+            }
+          } else {
+            const valueMatch = comb.some((c) => c.value.trim() === rowOpt.value.trim());
+            if (valueMatch) {
+              score += 5;
+            }
+          }
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = row;
+        }
+      }
+
+      if (bestMatch && bestScore > 0) {
+        const claimCount = claimedParentCounts.get(bestMatch) ?? 0;
+        claimedParentCounts.set(bestMatch, claimCount + 1);
+
+        const addedOptions = comb.filter(
+          (c) => !bestMatch!.selectedOptions.some((p) => normalizeOptionKey(p.name) === normalizeOptionKey(c.name))
+        );
+
+        let candidateSku = "";
+        if (bestMatch.sku) {
+          const addedSuffix = addedOptions
+            .map((opt) => slugify(opt.value).toUpperCase().replace(/[^A-Z0-9._-]/g, ""))
+            .filter(Boolean)
+            .join("-");
+
+          if (addedSuffix) {
+            candidateSku = `${bestMatch.sku}-${addedSuffix}`;
+          } else if (claimCount === 0) {
+            candidateSku = bestMatch.sku;
+          } else {
+            candidateSku = `${bestMatch.sku}-${claimCount + 1}`;
+          }
+        } else {
+          candidateSku = generatedVariantSku(slug, comb);
+        }
+
+        const sku = ensureUniqueSku(candidateSku, slug, comb);
+
+        return {
+          id: claimCount === 0 && bestMatch.id ? bestMatch.id : createEditorId(),
+          selectedOptions: comb,
+          sku,
+          barcode: claimCount === 0 ? (bestMatch.barcode ?? "") : "",
+          price: bestMatch.price || price || "",
+          vatRate: bestMatch.vatRate || baseVatRate,
+          stockQuantity: claimCount === 0 ? (bestMatch.stockQuantity || "0") : "0",
+          availableForSale: bestMatch.availableForSale ?? true,
+        };
+      }
+
+      const sku = ensureUniqueSku(generatedVariantSku(slug, comb), slug, comb);
+      return {
+        id: createEditorId(),
+        selectedOptions: comb,
+        sku,
+        barcode: "",
+        price: price || "",
+        vatRate: baseVatRate,
+        stockQuantity: "0",
+        availableForSale: true,
+      };
+    });
+
+    setVariantRows(nextVariantRows);
     setGeneratedOptionSignature(variantOptionSignature(options));
     setError(null);
   };
@@ -421,7 +549,7 @@ function ProductEditor({
       return;
     }
     if (isVariantProduct && variantOptionSignature(activeOptions) !== generatedOptionSignature) {
-      setError("Seçenekleri değiştirdin. Varyant tablosunu yeniden oluştur.");
+      setError("Seçenekleri değiştirdin. Tabloyu güncellemek için 'Kombinasyonları oluştur' butonuna tıkla.");
       return;
     }
     if (isVariantProduct && new Set(activeOptions.map((option) => option.name.toLocaleLowerCase("tr-TR"))).size !== activeOptions.length) {
@@ -443,7 +571,7 @@ function ProductEditor({
     }
     if (isVariantProduct && activeVariantRows.some((variant) =>
       variant.selectedOptions.length !== activeOptions.length ||
-      activeOptions.some((option) => !variant.selectedOptions.some((selected) => selected.name === option.name && option.values.includes(selected.value))),
+      activeOptions.some((option) => !variant.selectedOptions.some((selected) => normalizeOptionKey(selected.name) === normalizeOptionKey(option.name) && option.values.includes(selected.value))),
     )) {
       setError("Varyant tablosunu güncel seçeneklerle yeniden oluştur.");
       return;
