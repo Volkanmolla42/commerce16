@@ -202,7 +202,6 @@ function AdminOrdersContent() {
 
   return (
     <>
-      <AdminPageHeader title="Siparişler" description="Müşteri siparişlerini ve ödeme durumlarını takip edin." />
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
       <Card className="overflow-hidden rounded-lg">
@@ -249,8 +248,11 @@ function AdminOrdersContent() {
 
 export default function AdminOrdersPage() {
   return (
-    <Suspense fallback={<AdminLoading label="Siparişler" />}>
-      <AdminOrdersContent />
-    </Suspense>
+    <>
+      <AdminPageHeader title="Siparişler" description="Müşteri siparişlerini ve ödeme durumlarını takip edin." />
+      <Suspense fallback={<AdminLoading label="Siparişler" variant="table" />}>
+        <AdminOrdersContent />
+      </Suspense>
+    </>
   );
 }

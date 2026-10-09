@@ -126,19 +126,21 @@ function AdminSettingsContent() {
     }
   };
 
-  if (loading) return <AdminLoading label="Mağaza ayarları" variant="settings" />;
+  const pageHeader = <AdminPageHeader title="Mağaza ayarları" description="Mağaza bilgilerini, iletişim seçeneklerini ve duyuru alanını düzenleyin." />;
+
+  if (loading) return <>{pageHeader}<AdminLoading label="Mağaza ayarları" variant="settings-content" /></>;
   if (!data) {
     return (
-      <AdminEmpty
-        title="Mağaza ayarları yüklenemedi"
-        description={error || "Bağlantıyı kontrol edip yeniden deneyebilirsin."}
-      />
+      <>{pageHeader}<AdminEmpty
+          title="Mağaza ayarları yüklenemedi"
+          description={error || "Bağlantıyı kontrol edip yeniden deneyebilirsin."}
+        /></>
     );
   }
 
   return (
     <>
-      <AdminPageHeader title="Mağaza ayarları" description="Mağaza bilgilerini, iletişim seçeneklerini ve duyuru alanını düzenleyin." />
+      {pageHeader}
       {(message || actionError || error) && (
         <div className="mb-5">
           <AdminNotice kind={actionError || error ? "error" : "success"}>

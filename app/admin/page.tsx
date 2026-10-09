@@ -27,14 +27,12 @@ function StatCard({ label, value, note }: { label: string; value: string | numbe
 function AdminOverviewContent() {
   const { data, error, loading } = useAdminResource<AdminOverview>("overview");
 
-  if (loading) return <AdminLoading label="Mağaza özeti" variant="overview" />;
-
   return (
     <>
       <AdminPageHeader title="Genel Bakış" description="Mağazanızın ürün, kategori, sipariş ve ciro özetini takip edin." />
       {error && <div className="mb-5"><AdminNotice kind="error">{error}</AdminNotice></div>}
 
-      {!data ? (
+      {loading && !data ? <AdminLoading label="Mağaza özeti" variant="overview-content" /> : !data ? (
         <AdminEmpty title="Özet yüklenemedi" description="Bağlantıyı kontrol edip yeniden deneyebilirsin." />
       ) : (
         <>

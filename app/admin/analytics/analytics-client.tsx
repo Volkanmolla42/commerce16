@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
 import { AnalyticsDashboard } from "@/lib/analytics/types";
@@ -21,33 +21,43 @@ function Metric({ title, value, note }: { title: string; value: string; note: st
   );
 }
 
-export function AnalyticsContent() {
+export function AnalyticsPage() {
   const [days, setDays] = useState<7 | 30 | 90>(30);
-  const { data, error, loading } = useAdminResource<AnalyticsDashboard>("analytics", { days: String(days) });
-
-  if (loading && !data) return <AdminLoading label="E-ticaret analitiği" variant="analytics" />;
 
   return (
     <>
       <AdminPageHeader
         title="E-ticaret analitiği"
         description="Satın alma hunisi, müşteri değeri ve kampanya performansı."
-        actions={<label className="flex items-center gap-2 text-sm font-medium text-foreground">
-          Dönem
-          <select
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          >
-            <option value={7}>Son 7 gün</option>
-            <option value={30}>Son 30 gün</option>
-            <option value={90}>Son 90 gün</option>
-          </select>
-        </label>}
+        actions={
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            Dönem
+            <select
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+            >
+              <option value={7}>Son 7 gün</option>
+              <option value={30}>Son 30 gün</option>
+              <option value={90}>Son 90 gün</option>
+            </select>
+          </label>
+        }
       />
+      <Suspense fallback={<AdminLoading label="E-ticaret analitiği" variant="analytics-content" />}>
+        <AnalyticsContent days={days} />
+      </Suspense>
+    </>
+  );
+}
 
+function AnalyticsContent({ days }: { days: 7 | 30 | 90 }) {
+  const { data, error, loading } = useAdminResource<AnalyticsDashboard>("analytics", { days: String(days) });
+
+  return (
+    <>
       {error && <div className="mb-4"><AdminNotice kind="error">{error}</AdminNotice></div>}
-      {data ? (
+      {loading && !data ? <AdminLoading label="E-ticaret analitiği" variant="analytics-content" /> : data ? (
         <>
           <section aria-label="Satış ve müşteri ölçümleri" className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-5">
             <Metric title="Tekil ziyaretçi" value={formatNumber(data.summary.uniqueVisitors)} note={`${formatNumber(data.summary.sessions)} izinli oturum`} />

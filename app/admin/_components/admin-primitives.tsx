@@ -52,7 +52,7 @@ export function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
-type AdminLoadingVariant = "page" | "table" | "list" | "form" | "overview" | "analytics" | "settings";
+type AdminLoadingVariant = "page" | "table" | "list" | "form" | "overview" | "analytics" | "settings" | "overview-content" | "analytics-content" | "settings-content" | "form-content";
 
 function SkeletonBlock({ className }: { className: string }) {
   return <div aria-hidden="true" className={`motion-safe:animate-pulse rounded-md bg-muted ${className}`} />;
@@ -151,11 +151,14 @@ export function AdminLoading({
     return <div role="status" aria-label={`${label} yükleniyor`} aria-busy="true"><span className="sr-only">{label} yükleniyor…</span><LoadingListCards /></div>;
   }
 
+  const contentVariant = variant.endsWith("-content");
+  const contentType = contentVariant ? variant.slice(0, -8) : variant;
+
   return (
     <div role="status" aria-label={`${label} yükleniyor`} aria-busy="true" className="space-y-5">
       <span className="sr-only">{label} yükleniyor…</span>
-      <LoadingPageHeader />
-      {variant === "overview" ? (
+      {!contentVariant && <LoadingPageHeader />}
+      {contentType === "overview" ? (
         <>
           <LoadingMetrics />
           <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -163,7 +166,7 @@ export function AdminLoading({
             <LoadingTableRows />
           </div>
         </>
-      ) : variant === "analytics" ? (
+      ) : contentType === "analytics" ? (
         <>
           <LoadingMetrics count={5} />
           <div aria-hidden="true" className="grid gap-4 lg:grid-cols-2">
@@ -171,7 +174,7 @@ export function AdminLoading({
             <SkeletonBlock className="h-64 rounded-lg border border-border" />
           </div>
         </>
-      ) : variant === "form" || variant === "settings" ? (
+      ) : contentType === "form" || contentType === "settings" ? (
         <LoadingFormSections />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card"><LoadingTableRows /></div>

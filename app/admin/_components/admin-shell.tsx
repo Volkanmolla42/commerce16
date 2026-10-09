@@ -41,7 +41,6 @@ type AdminTheme = "light" | "dark";
 function isActive(pathname: string, href: string) {
   return href === adminPath() ? pathname === href : pathname.startsWith(href);
 }
-
 function AdminNavLinks({
   compact = false,
   pathname,
@@ -176,63 +175,6 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
         <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
           {logoutError && <p role="alert" className="mb-4 text-sm text-destructive">{logoutError}</p>}
           {children}
-        </main>
-      </div>
-    </div>
-  );
-}
-
-export function AdminShellFallback() {
-  return (
-    <div className="min-h-[100dvh] bg-neutral-100 text-foreground dark:bg-neutral-900">
-      <aside aria-hidden="true" className="fixed inset-y-0 left-0 hidden w-72 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="size-8 rounded-md bg-muted" />
-          <div className="space-y-2">
-            <div className="h-3 w-24 rounded bg-muted" />
-            <div className="h-2.5 w-20 rounded bg-muted" />
-          </div>
-        </div>
-        <AdminNavLinks pathname="" />
-        <div className="mt-auto border-t border-border pt-4">
-          <div className="h-9 rounded-md bg-muted" />
-        </div>
-      </aside>
-      <div className="lg:pl-72">
-        <div className="border-b border-border bg-card p-4 lg:hidden">
-          <div className="h-8 w-32 rounded bg-muted" />
-        </div>
-        <main aria-label="Yönetim paneli yükleniyor" className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8 sm:py-8">
-          <div aria-hidden="true" className="border-b border-border pb-5">
-            <div className="h-7 w-44 motion-safe:animate-pulse rounded-md bg-muted" />
-            <div className="mt-2 h-4 w-72 max-w-full motion-safe:animate-pulse rounded-md bg-muted" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => (
-              <div aria-hidden="true" key={index} className="rounded-lg border border-border bg-card p-4 sm:p-5">
-                <div className="h-3 w-20 motion-safe:animate-pulse rounded-md bg-muted" />
-                <div className="mt-3 h-7 w-28 motion-safe:animate-pulse rounded-md bg-muted" />
-                <div className="mt-2 h-3 w-24 motion-safe:animate-pulse rounded-md bg-muted" />
-              </div>
-            ))}
-          </div>
-          <div aria-hidden="true" className="overflow-hidden rounded-lg border border-border bg-card">
-            <div className="border-b border-border px-4 py-4 sm:px-5">
-              <div className="h-4 w-36 motion-safe:animate-pulse rounded-md bg-muted" />
-              <div className="mt-2 h-3 w-24 motion-safe:animate-pulse rounded-md bg-muted" />
-            </div>
-            <div className="divide-y divide-border">
-              {Array.from({ length: 4 }, (_, index) => (
-                <div key={index} className="flex min-h-[4.5rem] items-center gap-3 px-4 py-4 sm:px-5">
-                  <div className="size-10 motion-safe:animate-pulse rounded-md bg-muted" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-44 max-w-full motion-safe:animate-pulse rounded-md bg-muted" />
-                    <div className="h-3 w-28 max-w-full motion-safe:animate-pulse rounded-md bg-muted" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </main>
       </div>
     </div>

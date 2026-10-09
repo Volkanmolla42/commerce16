@@ -66,8 +66,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
       </div>
 
       {authenticated === null ? (
-        <div className="fixed inset-0 z-50 grid min-h-[100dvh] place-items-center bg-background">
-          <div className="size-7 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+        <div role="status" className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm">
+          <span aria-hidden="true" className="size-3 animate-spin rounded-full border-2 border-muted border-t-foreground motion-reduce:animate-none" />
+          Yetki doğrulanıyor
         </div>
       ) : !authenticated ? (
         <main className="fixed inset-0 z-50 grid min-h-[100dvh] place-items-center bg-background px-4 py-10 text-foreground">

@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   CheckIcon,
@@ -337,7 +336,7 @@ function CartDetailModal({
 
 export default function AdminCartsPage() {
   const { data: carts, loading, error, refresh } = useAdminResource<AbandonedCart[]>("abandoned-carts");
-  const { data: activeCarts, loading: activeLoading, error: activeError, refresh: refreshActive } = useAdminResource<LiveCart[]>("active-carts");
+  const { data: activeCarts, loading: activeLoading, error: activeError } = useAdminResource<LiveCart[]>("active-carts");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [consentFilter, setConsentFilter] = useState<string>("all");
@@ -392,10 +391,6 @@ export default function AdminCartsPage() {
     });
   }, [activeCarts, carts, statusFilter, consentFilter, search, view]);
 
-  const refreshCarts = async () => {
-    await Promise.all([refresh(), refreshActive()]);
-  };
-
   const liveItemCount = (activeCarts ?? []).reduce((sum, cart) => sum + cart.itemCount, 0);
   const liveCartValue = (activeCarts ?? []).reduce((sum, cart) => sum + (Number.parseFloat(cart.estimatedTotal) || 0), 0);
 
@@ -404,9 +399,6 @@ export default function AdminCartsPage() {
       <AdminPageHeader
         title="Sepetler"
         description="Aktif sepetleri ve terk edilen sepet hatırlatmalarını görüntüleyin."
-        actions={<Button type="button" variant="outline" size="sm" onClick={() => void refreshCarts()} className="gap-2">
-          <ArrowPathIcon className="size-4" /> Yenile
-        </Button>}
       />
 
       {currentError && <AdminNotice kind="error">{currentError}</AdminNotice>}

@@ -663,13 +663,6 @@ function ProductEditor({
 
   return (
     <div className="scheme-dark w-full text-foreground">
-      <AdminPageHeader
-        title={title || (product ? "Ürün detayları" : "Yeni ürün")}
-        description={product
-          ? "Ürün bilgilerini, görsellerini ve varyantlarını düzenleyin."
-          : "Yeni ürünün bilgilerini, görsellerini ve varyantlarını tanımlayın."}
-      />
-
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
           <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
@@ -1020,7 +1013,17 @@ function ProductEditor({
 
 
 export function ProductEditorRoute({ productId }: { productId?: string }) {
-  return <ProductEditorData productId={productId} />;
+  const title = productId ? "Ürün detayları" : "Yeni ürün";
+  const description = productId
+    ? "Ürün bilgilerini, görsellerini ve varyantlarını düzenleyin."
+    : "Yeni ürünün bilgilerini, görsellerini ve varyantlarını tanımlayın.";
+
+  return (
+    <div className="scheme-dark w-full text-foreground">
+      <AdminPageHeader title={title} description={description} />
+      <ProductEditorData productId={productId} />
+    </div>
+  );
 }
 
 function ProductEditorData({ productId }: { productId?: string }) {
@@ -1031,7 +1034,7 @@ function ProductEditorData({ productId }: { productId?: string }) {
   const loading = categoriesLoading || (Boolean(productId) && productsLoading);
   const error = categoriesError || (productId && productsError) || null;
 
-  if (loading) return <AdminLoading label="Ürün formu" variant="form" />;
+  if (loading) return <AdminLoading label="Ürün formu" variant="form-content" />;
   if (error) return <div className="w-full"><AdminNotice kind="error">{error}</AdminNotice></div>;
   if (productId && !product) return <div className="w-full"><AdminNotice kind="error">Ürün bulunamadı.</AdminNotice></div>;
 
