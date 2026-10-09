@@ -1,12 +1,20 @@
 import { ReactNode } from "react";
 import type { Metadata } from "next";
-import { AdminShell } from "./_components/admin-shell";
+import { Suspense } from "react";
+import { AdminShellFallback } from "./_components/admin-shell";
 import { AdminGate } from "./_components/admin-gate";
+import { AdminThemeShell } from "./admin-theme-shell";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <AdminGate><AdminShell>{children}</AdminShell></AdminGate>;
+  return (
+    <AdminGate>
+      <Suspense fallback={<AdminShellFallback />}>
+        <AdminThemeShell>{children}</AdminThemeShell>
+      </Suspense>
+    </AdminGate>
+  );
 }

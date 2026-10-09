@@ -67,14 +67,14 @@ export function VariantOptionValuesInput({
       role="group"
       aria-label="Varyant değerleri"
       onClick={() => inputRef.current?.focus()}
-      className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 transition focus-within:border-neutral-500 focus-within:ring-2 focus-within:ring-neutral-400/30"
+      className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background p-1.5 transition focus-within:border-border focus-within:ring-2 focus-within:ring-ring/30"
     >
       <div role="list" aria-label="Eklenen değerler" className="flex flex-wrap items-center gap-1.5">
         {values.map((val, index) => (
           <span
             key={`${val}-${index}`}
             role="listitem"
-            className="inline-flex items-center gap-1 rounded-md bg-neutral-800 px-2 py-0.5 text-xs font-medium text-neutral-100"
+            className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
           >
             <span>{val}</span>
             <button
@@ -84,7 +84,7 @@ export function VariantOptionValuesInput({
                 e.stopPropagation();
                 removeAt(index);
               }}
-              className="inline-flex size-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+              className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`${val} değerini kaldır`}
             >
               <XMarkIcon className="size-3" />
@@ -111,7 +111,7 @@ export function VariantOptionValuesInput({
             if (draft.trim()) addValues(draft);
           }}
           placeholder={values.length === 0 ? "Örn. 38, 39, 40..." : "Değer ekle..."}
-          className="h-7 w-full bg-transparent px-1 text-xs text-neutral-100 placeholder:text-neutral-500 outline-none"
+          className="h-7 w-full bg-transparent px-1 text-xs text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 

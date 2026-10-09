@@ -662,7 +662,7 @@ function ProductEditor({
   };
 
   return (
-    <main className="scheme-dark mx-auto w-full max-w-7xl px-4 py-5 text-neutral-100 sm:px-6 lg:px-8">
+    <main className="scheme-dark mx-auto w-full max-w-7xl px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <header className="mb-6">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{title || (product ? "Ürün detayları" : "Yeni ürün")}</h1>
@@ -671,21 +671,21 @@ function ProductEditor({
 
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
-          <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-5">
+          <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-neutral-100">Görseller</h2>
-              <label htmlFor="product-image-upload" className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-xs font-medium text-neutral-200 transition-colors hover:border-neutral-500 hover:bg-neutral-800 ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
+              <h2 className="text-sm font-semibold text-foreground">Görseller</h2>
+              <label htmlFor="product-image-upload" className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:bg-muted ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
                 <PlusCircleIcon className="size-4" />
                 <span>{processingImages ? "Hazırlanıyor…" : "Görsel ekle"}</span>
-                <span className="rounded-md bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{images.length + pendingImages.length}/20</span>
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{images.length + pendingImages.length}/20</span>
               </label>
             </div>
             <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event)} className="sr-only" />
             {(images.length > 0 || pendingImages.length > 0) ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {images.map((image) => <div key={image.storageId} className="group overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950">
-                <div className="relative aspect-[4/5] overflow-hidden bg-neutral-900">
+              {images.map((image) => <div key={image.storageId} className="group overflow-hidden rounded-xl border border-border bg-background">
+                <div className="relative aspect-[4/5] overflow-hidden bg-card">
                   {image.url ? <Image src={image.url} alt={title} width={400} height={500} unoptimized className="size-full object-cover" /> : null}
-                  <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-neutral-950/90 text-neutral-100 opacity-100 hover:bg-rose-950 hover:text-rose-200 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => setImages((current) => current.filter((item) => item.storageId !== image.storageId))}>
+                  <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => setImages((current) => current.filter((item) => item.storageId !== image.storageId))}>
                     <TrashIcon className="size-4" />
                   </Button>
                 </div>
@@ -694,7 +694,7 @@ function ProductEditor({
                   setImages((current) => current.map((item) => item.storageId === image.storageId
                     ? { ...item, selectedOptions: selectedOptions.length ? selectedOptions : undefined }
                     : item));
-                }} className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-neutral-800 bg-neutral-900 px-2.5 text-xs text-neutral-200 outline-none focus-visible:border-neutral-600">
+                }} className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none focus-visible:border-border">
                   <option value="[]">Tüm varyantlarda</option>
                   {variantOptions.flatMap((option) => option.values.map((value) => {
                     const scope = [{ name: option.name, value }];
@@ -702,10 +702,10 @@ function ProductEditor({
                   }))}
                 </select>}
               </div>)}
-              {pendingImages.map((image) => <div key={image.id} className="group overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950">
-                <div className="relative aspect-[4/5] overflow-hidden bg-neutral-900">
+              {pendingImages.map((image) => <div key={image.id} className="group overflow-hidden rounded-xl border border-border bg-background">
+                <div className="relative aspect-[4/5] overflow-hidden bg-card">
                   <Image src={image.previewUrl} alt={title} width={400} height={500} unoptimized className="size-full object-cover" />
-                  <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-neutral-950/90 text-neutral-100 opacity-100 hover:bg-rose-950 hover:text-rose-200 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
+                  <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
                     <TrashIcon className="size-4" />
                   </Button>
                 </div>
@@ -714,7 +714,7 @@ function ProductEditor({
                   setPendingImages((current) => current.map((item) => item.id === image.id
                     ? { ...item, selectedOptions: selectedOptions.length ? selectedOptions : undefined }
                     : item));
-                }} className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-neutral-800 bg-neutral-900 px-2.5 text-xs text-neutral-200 outline-none focus-visible:border-neutral-600">
+                }} className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none focus-visible:border-border">
                   <option value="[]">Tüm varyantlarda</option>
                   {variantOptions.flatMap((option) => option.values.map((value) => {
                     const scope = [{ name: option.name, value }];
@@ -722,26 +722,26 @@ function ProductEditor({
                   }))}
                 </select>}
               </div>)}
-            </div> : <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950/50 px-4 py-5 text-center text-xs text-neutral-500">Henüz görsel eklenmedi</div>}
+            </div> : <div className="rounded-xl border border-dashed border-border bg-background/50 px-4 py-5 text-center text-xs text-muted-foreground">Henüz görsel eklenmedi</div>}
           </section>
-          <section aria-label="Ürün Bilgileri" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
+          <section aria-label="Ürün Bilgileri" className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
             <div className="space-y-5">
-              <h2 className="text-sm font-semibold text-neutral-100">Ürün Bilgileri</h2>
+              <h2 className="text-sm font-semibold text-foreground">Ürün Bilgileri</h2>
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="product-title" className="text-xs font-medium text-neutral-300">Ürün adı <span className="text-red-400">*</span></Label>
+                  <Label htmlFor="product-title" className="text-xs font-medium text-muted-foreground">Ürün adı <span className="text-destructive">*</span></Label>
                   <Input id="product-title" name="title" autoComplete="off" required minLength={2} maxLength={140} placeholder="Ürün adı" value={title} onChange={(event) => {
                     const nextTitle = event.target.value;
                     setTitle(nextTitle);
                     setSlug(slugify(nextTitle));
-                  }} className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-4 text-sm text-neutral-100 placeholder:text-neutral-600 focus-visible:ring-neutral-400" />
+                  }} className="h-12 rounded-xl border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-ring" />
                 </div>
               </div>
 
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="product-category" className="text-xs font-medium text-neutral-300">Kategori <span className="text-red-400">*</span></Label>
-                  <select id="product-category" name="categorySlug" required value={categorySlug} onChange={(event) => changeCategory(event.target.value)} className="h-11 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 outline-none focus:ring-2 focus:ring-neutral-400/30">
+                  <Label htmlFor="product-category" className="text-xs font-medium text-muted-foreground">Kategori <span className="text-destructive">*</span></Label>
+                  <select id="product-category" name="categorySlug" required value={categorySlug} onChange={(event) => changeCategory(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30">
                     <option value="" disabled>Kategori seçin</option>
                     {categories.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
                   </select>
@@ -749,13 +749,13 @@ function ProductEditor({
               </div>
 
               {categoryAttributes.length > 0 ? (
-                <section aria-labelledby="product-category-attributes-heading" className="space-y-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4 sm:p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-800/80 pb-3">
-                    <h3 id="product-category-attributes-heading" className="flex items-center gap-1.5 text-sm font-semibold text-neutral-100">
-                      <AdjustmentsHorizontalIcon className="size-4 text-neutral-400" />
+                <section aria-labelledby="product-category-attributes-heading" className="space-y-4 rounded-xl border border-border bg-background/40 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+                    <h3 id="product-category-attributes-heading" className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                      <AdjustmentsHorizontalIcon className="size-4 text-muted-foreground" />
                       Teknik Özellikler
                     </h3>
-                    <span className="rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300">
+                    <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
                       {categoryAttributes.length} özellik
                     </span>
                   </div>
@@ -768,12 +768,12 @@ function ProductEditor({
                       return (
                         <div key={attribute.key} className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label htmlFor={inputId} className="text-xs font-medium text-neutral-200">
+                            <Label htmlFor={inputId} className="text-xs font-medium text-foreground">
                               {attribute.label}
                               {attribute.unit ? ` (${attribute.unit})` : ""}
-                              {attribute.required ? <span className="text-red-400"> *</span> : null}
+                              {attribute.required ? <span className="text-destructive"> *</span> : null}
                             </Label>
-                            <span className="text-[10px] text-neutral-400 bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800">
+                            <span className="text-[10px] text-muted-foreground bg-card px-1.5 py-0.5 rounded border border-border">
                               {attribute.type === "multiselect"
                                 ? "Çoklu Seçim"
                                 : attribute.type === "select"
@@ -843,7 +843,7 @@ function ProductEditor({
                                 }))
                               }
                               placeholder={attribute.label}
-                              className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100 placeholder:text-neutral-600"
+                              className="h-11 rounded-lg border-border bg-card text-sm text-foreground placeholder:text-muted-foreground"
                             />
                           )}
                         </div>
@@ -852,38 +852,38 @@ function ProductEditor({
                   </div>
                 </section>
               ) : categorySlug ? (
-                <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950/30 p-4 text-xs text-neutral-400">
+                <div className="rounded-xl border border-dashed border-border bg-background/30 p-4 text-xs text-muted-foreground">
                   Bu kategori için özellik tanımlanmamış.
                 </div>
               ) : null}
             </div>
           </section>
 
-          <section aria-label="Varyantlar" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
+          <section aria-label="Varyantlar" className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-neutral-100">Varyantlar</h2>
+                <h2 className="text-sm font-semibold text-foreground">Varyantlar</h2>
               </div>
-                  <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
+                  <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-border bg-background/70 p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h4 className="text-xs font-semibold text-neutral-200">Varyant seçenekleri</h4>
-                      <Button type="button" variant="outline" className="min-h-9 rounded-lg border-neutral-700 bg-neutral-950 px-3 text-xs text-neutral-200 hover:bg-neutral-800" disabled={variantOptions.length >= 3} onClick={addVariantOption}>
+                      <h4 className="text-xs font-semibold text-foreground">Varyant seçenekleri</h4>
+                      <Button type="button" variant="outline" className="min-h-9 rounded-lg border-border bg-background px-3 text-xs text-foreground hover:bg-muted" disabled={variantOptions.length >= 3} onClick={addVariantOption}>
                         <PlusCircleIcon className="mr-2 size-4" /> Seçenek ekle
                       </Button>
                     </div>
                     {variantOptions.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-neutral-800 p-4 text-center text-xs text-neutral-400">
+                      <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                         Seçenek eklemeden ürün tek kombinasyon olarak kaydedilir.
                       </div>
                     ) : (
                       variantOptions.map((option, index) => (
                         <div key={option.id} className="grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
                           <div className="space-y-1.5">
-                            <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-neutral-400">Seçenek adı</Label>
-                            <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-sm text-neutral-100" />
+                            <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-muted-foreground">Seçenek adı</Label>
+                            <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-border bg-background text-sm text-foreground" />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-neutral-400">Değerler</Label>
+                            <Label className="text-xs text-muted-foreground">Değerler</Label>
                             <VariantOptionValuesInput
                               values={option.values}
                               onChange={(nextValues) =>
@@ -893,13 +893,13 @@ function ProductEditor({
                               }
                             />
                           </div>
-                          <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} onClick={() => removeVariantOption(option.id)}>
+                          <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} onClick={() => removeVariantOption(option.id)}>
                             <TrashIcon className="size-4" />
                           </Button>
                         </div>
                       ))
                     )}
-                    {variantOptions.length > 0 && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-800 pt-3">
+                    {variantOptions.length > 0 && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-3">
                       <Button type="button" variant="secondary" className="min-h-9 rounded-lg px-3 text-xs" onClick={generateVariantRows}>
                         <ArrowPathIcon className="mr-1.5 size-3.5" />
                         Kombinasyonları oluştur
@@ -907,44 +907,44 @@ function ProductEditor({
                     </div>}
                   </section>
 
-                  <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
+                  <div className="hidden overflow-x-auto rounded-xl border border-border md:block">
                       <table className="w-full min-w-[760px] border-collapse text-left text-xs">
-                        <thead className="bg-neutral-950 text-neutral-400">
+                        <thead className="bg-background text-muted-foreground">
                           <tr>
                             <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
-                            <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-red-400">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-destructive">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-red-400">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-destructive">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Stok</th>
                             <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
                             <th scope="col" className="px-3 py-3 font-medium"></th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-800">
+                        <tbody className="divide-y divide-border">
                           {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)}>
-                            <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-neutral-200">{variant.selectedOptions.map(({ value }) => value).join(" / ") || "Tek ürün"}</td>
-                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                            <td className="w-24 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                            <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" /></td>
-                            <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-9 px-2 text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
+                            <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-foreground">{variant.selectedOptions.map(({ value }) => value).join(" / ") || "Tek ürün"}</td>
+                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
+                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
+                            <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
+                            <td className="w-24 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
+                            <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" /></td>
+                            <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-9 px-2 text-muted-foreground hover:bg-muted hover:text-foreground" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
                           </tr>)}
                         </tbody>
                       </table>
                     </div>
 
                     <div className="space-y-3 md:hidden">
-                      {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Kombinasyon ${index + 1}`} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
+                      {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Kombinasyon ${index + 1}`} className="space-y-3 rounded-xl border border-border bg-background/70 p-3">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.length > 0 ? variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200">{selected.name}: {selected.value}</span>) : <span className="text-xs text-neutral-400">Tek ürün</span>}</div>
-                          <Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-8 px-2 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
+                          <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.length > 0 ? variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-muted px-2 py-1 text-xs text-foreground">{selected.name}: {selected.value}</span>) : <span className="text-xs text-muted-foreground">Tek ürün</span>}</div>
+                          <Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-8 px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
                         </div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-neutral-400">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-neutral-400">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                        <label className="flex min-h-11 items-center gap-2 self-end text-xs text-neutral-300"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" />Satışta</label>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-muted-foreground">SKU <span className="text-destructive">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-border bg-card font-mono text-sm text-foreground" /></div>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-muted-foreground">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-border bg-card font-mono text-sm text-foreground" /></div>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (₺) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-border bg-card text-sm text-foreground" /></div>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-muted-foreground">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-border bg-card text-sm text-foreground" /></div>
+                        <label className="flex min-h-11 items-center gap-2 self-end text-xs text-muted-foreground"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" />Satışta</label>
                       </section>)}
                   </div>
             </div>
@@ -952,32 +952,32 @@ function ProductEditor({
         </div>
 
         {error && <AdminNotice kind="error">{error}</AdminNotice>}
-        <div className="sticky bottom-0 z-20 -mx-4 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:flex-row sm:items-center sm:px-6 lg:-mx-8 lg:px-8">
-          <span className="min-h-5 text-xs text-neutral-400" role="status">
+        <div className="sticky bottom-0 z-20 -mx-4 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:flex-row sm:items-center sm:px-6 lg:-mx-8 lg:px-8">
+          <span className="min-h-5 text-xs text-muted-foreground" role="status">
             {saving ? (pendingImages.length ? "Görseller yükleniyor…" : "Kaydediliyor…") : error ? "Bilgileri kontrol edin" : ""}
           </span>
           <div className="flex flex-wrap items-center justify-end gap-2.5">
             {product ? (
               <>
-                <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/70 px-3 text-xs font-medium text-neutral-200 hover:border-neutral-700">
+                <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card/70 px-3 text-xs font-medium text-foreground hover:border-border">
                   <input
                     type="checkbox"
                     name="availableForSale"
                     checked={availableForSale}
                     onChange={(event) => setAvailableForSale(event.target.checked)}
-                    className="size-4 accent-neutral-200"
+                    className="size-4 accent-foreground"
                   />
-                  <GlobeAltIcon className="size-4 text-neutral-400" />
+                  <GlobeAltIcon className="size-4 text-muted-foreground" />
                   <span>Mağazada yayınla</span>
                 </label>
-                <Button type="button" variant="ghost" onClick={onCancel} className="min-h-10 text-neutral-300">
+                <Button type="button" variant="ghost" onClick={onCancel} className="min-h-10 text-muted-foreground">
                   <XMarkIcon className="mr-1.5 size-4" />
                   Vazgeç
                 </Button>
                 <Button
                   type="submit"
                   disabled={saving || processingImages}
-                  className="min-h-10 rounded-lg bg-neutral-100 px-5 font-semibold text-neutral-950 hover:bg-white"
+                  className="min-h-10 rounded-lg bg-muted px-5 font-semibold text-foreground hover:bg-white"
                 >
                   <CheckIcon className="mr-1.5 size-4" />
                   Değişiklikleri kaydet
@@ -985,7 +985,7 @@ function ProductEditor({
               </>
             ) : (
               <>
-                <Button type="button" variant="ghost" onClick={onCancel} className="min-h-10 text-neutral-300">
+                <Button type="button" variant="ghost" onClick={onCancel} className="min-h-10 text-muted-foreground">
                   <XMarkIcon className="mr-1.5 size-4" />
                   Vazgeç
                 </Button>
@@ -994,7 +994,7 @@ function ProductEditor({
                   variant="outline"
                   disabled={saving || processingImages}
                   onClick={() => void save(undefined, false)}
-                  className="min-h-10 border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 hover:text-white"
+                  className="min-h-10 border-border bg-card text-foreground hover:bg-muted hover:text-foreground"
                 >
                   <DocumentArrowDownIcon className="mr-1.5 size-4" />
                   Taslak olarak kaydet
@@ -1003,7 +1003,7 @@ function ProductEditor({
                   type="button"
                   disabled={saving || processingImages}
                   onClick={() => void save(undefined, true)}
-                  className="min-h-10 rounded-lg bg-neutral-100 px-5 font-semibold text-neutral-950 hover:bg-white"
+                  className="min-h-10 rounded-lg bg-muted px-5 font-semibold text-foreground hover:bg-white"
                 >
                   <PlusIcon className="mr-1.5 size-4" />
                   Ürünü ekle

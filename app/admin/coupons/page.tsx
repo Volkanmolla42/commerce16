@@ -195,7 +195,7 @@ function AdminCouponsContent() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-mono text-sm font-semibold text-foreground">{coupon.code}</h2>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${coupon.isActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                         {coupon.isActive ? "Açık" : "Kapalı"}
                       </span>
                     </div>

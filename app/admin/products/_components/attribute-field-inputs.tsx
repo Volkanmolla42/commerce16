@@ -45,11 +45,11 @@ export function AttributeMultiSelect({
   };
 
   return (
-    <div className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-950/60 p-3">
+    <div className="space-y-2 rounded-xl border border-border bg-background/60 p-3">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-neutral-400">
+        <span className="text-muted-foreground">
           {value.length > 0 && (
-            <span className="font-medium text-neutral-200">
+            <span className="font-medium text-foreground">
               {value.length} / {options.length}
             </span>
           )}
@@ -59,7 +59,7 @@ export function AttributeMultiSelect({
             <button
               type="button"
               onClick={selectAll}
-              className="text-[11px] text-neutral-400 hover:text-neutral-200 underline underline-offset-2"
+              className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
             >
               Tümü
             </button>
@@ -68,7 +68,7 @@ export function AttributeMultiSelect({
             <button
               type="button"
               onClick={clearAll}
-              className="text-[11px] text-red-400 hover:text-red-300"
+              className="text-[11px] text-destructive hover:text-red-300"
             >
               Temizle
             </button>
@@ -82,13 +82,13 @@ export function AttributeMultiSelect({
             <span
               key={item}
               role="listitem"
-              className="inline-flex items-center gap-1 rounded-md bg-neutral-200 px-2 py-0.5 text-xs font-medium text-neutral-900"
+              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
             >
               <span>{item}</span>
               <button
                 type="button"
                 onClick={() => removeOption(item)}
-                className="inline-flex size-4 items-center justify-center rounded hover:bg-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                className="inline-flex size-4 items-center justify-center rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={`${item} seçimini kaldır`}
               >
                 <XMarkIcon className="size-3" />
@@ -108,13 +108,13 @@ export function AttributeMultiSelect({
             autoComplete="off"
             spellCheck={false}
             aria-label={`${attribute.label} seçeneklerinde ara`}
-            className="h-8 w-full rounded-lg border border-neutral-800 bg-neutral-900 pl-2.5 pr-8 text-xs text-neutral-100 placeholder:text-neutral-600 outline-none focus:border-neutral-700 focus-visible:ring-2 focus-visible:ring-neutral-500/40"
+            className="h-8 w-full rounded-lg border border-border bg-card pl-2.5 pr-8 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-border focus-visible:ring-2 focus-visible:ring-ring/40"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-neutral-500 hover:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Aramayı temizle"
             >
               <XMarkIcon className="size-3.5" />
@@ -133,15 +133,15 @@ export function AttributeMultiSelect({
               role="checkbox"
               aria-checked={isSelected}
               onClick={() => toggle(option)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 isSelected
-                  ? "border-neutral-300 bg-neutral-100 text-neutral-950 font-semibold shadow-xs"
-                  : "border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                  ? "border-border bg-muted text-foreground font-semibold shadow-xs"
+                  : "border-border bg-card/80 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
               }`}
             >
               <span
                 className={`size-1.5 rounded-full ${
-                  isSelected ? "bg-neutral-950" : "bg-neutral-600"
+                  isSelected ? "bg-background" : "bg-muted"
                 }`}
               />
               {option}
@@ -149,7 +149,7 @@ export function AttributeMultiSelect({
           );
         })}
         {filteredOptions.length === 0 && (
-          <p role="status" className="text-xs text-neutral-500 py-1">Sonuç yok</p>
+          <p role="status" className="text-xs text-muted-foreground py-1">Sonuç yok</p>
         )}
       </div>
     </div>
@@ -175,7 +175,7 @@ export function AttributeSingleSelect({
         required={attribute.required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full appearance-none rounded-lg border border-neutral-700 bg-neutral-900 pl-3 pr-8 text-sm text-neutral-100 outline-none transition focus:border-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-400/30"
+        className="h-11 w-full appearance-none rounded-lg border border-border bg-card pl-3 pr-8 text-sm text-foreground outline-none transition focus:border-border focus-visible:ring-2 focus-visible:ring-ring/30"
       >
         <option value="">Seçin</option>
         {options.map((opt) => (
@@ -188,13 +188,13 @@ export function AttributeSingleSelect({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="absolute right-7 inline-flex size-6 items-center justify-center rounded text-neutral-500 hover:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+          className="absolute right-7 inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={`${attribute.label} seçimini temizle`}
         >
           <XMarkIcon className="size-3.5" />
         </button>
       )}
-      <div className="pointer-events-none absolute right-2.5 text-neutral-400">
+      <div className="pointer-events-none absolute right-2.5 text-muted-foreground">
         <ChevronUpDownIcon className="size-4" />
       </div>
     </div>
@@ -214,17 +214,17 @@ export function AttributeBooleanToggle({
     <div
       role="radiogroup"
       aria-label={attribute.label}
-      className="flex h-11 items-center gap-1 rounded-lg border border-neutral-700 bg-neutral-900 p-1"
+      className="flex h-11 items-center gap-1 rounded-lg border border-border bg-card p-1"
     >
       <button
         type="button"
         role="radio"
         aria-checked={value === "true"}
         onClick={() => onChange("true")}
-        className={`flex-1 h-full rounded-md text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
+        className={`flex-1 h-full rounded-md text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           value === "true"
-            ? "bg-neutral-200 text-neutral-900 font-semibold shadow-xs"
-            : "text-neutral-400 hover:text-neutral-200"
+            ? "bg-muted text-foreground font-semibold shadow-xs"
+            : "text-muted-foreground hover:text-foreground"
         }`}
       >
         Evet
@@ -234,10 +234,10 @@ export function AttributeBooleanToggle({
         role="radio"
         aria-checked={value === "false"}
         onClick={() => onChange("false")}
-        className={`flex-1 h-full rounded-md text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
+        className={`flex-1 h-full rounded-md text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           value === "false"
-            ? "bg-neutral-200 text-neutral-900 font-semibold shadow-xs"
-            : "text-neutral-400 hover:text-neutral-200"
+            ? "bg-muted text-foreground font-semibold shadow-xs"
+            : "text-muted-foreground hover:text-foreground"
         }`}
       >
         Hayır
@@ -246,7 +246,7 @@ export function AttributeBooleanToggle({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="px-2 text-[11px] text-neutral-500 hover:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+          className="px-2 text-[11px] text-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={`${attribute.label} seçimini sıfırla`}
         >
           ✕
@@ -275,11 +275,11 @@ export function AttributeNumberInput({
         required={attribute.required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-lg border-neutral-700 bg-neutral-900 pr-12 text-sm text-neutral-100 focus-visible:ring-2 focus-visible:ring-neutral-400/30"
+        className="h-11 rounded-lg border-border bg-card pr-12 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
         placeholder="0"
       />
       {attribute.unit && (
-        <span className="pointer-events-none absolute right-3 rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] font-medium text-neutral-400">
+        <span className="pointer-events-none absolute right-3 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
           {attribute.unit}
         </span>
       )}

@@ -79,23 +79,23 @@ const statusConfig: Record<
 > = {
   active: {
     label: "Bekliyor",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    className: "border-border bg-muted text-muted-foreground",
   },
   sending: {
     label: "Gönderiliyor",
-    className: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+    className: "border-border bg-muted text-muted-foreground",
   },
   sent: {
     label: "Hatırlatıldı",
-    className: "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+    className: "border-border bg-muted text-muted-foreground",
   },
   converted: {
     label: "Satışa Dönüştü",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    className: "border-border bg-muted text-muted-foreground",
   },
   unsubscribed: {
     label: "Abonelikten Çıktı",
-    className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-600 dark:text-zinc-400",
+    className: "border-border bg-muted text-muted-foreground",
   },
   failed: {
     label: "Gönderilemedi",
@@ -195,7 +195,7 @@ function CartDetailModal({
             </div> : <div>
               <span className="text-xs font-medium text-muted-foreground">E-posta hatırlatma izni</span>
               <p className="mt-0.5 flex items-center gap-1.5 font-semibold text-foreground">
-                {cart.emailConsent ? <><CheckCircleIcon className="size-4 text-emerald-600 dark:text-emerald-400" /><span>İzin verildi</span></> : <><ClockIcon className="size-4 text-muted-foreground" /><span>İzin verilmedi</span></>}
+                {cart.emailConsent ? <><CheckCircleIcon className="size-4 text-muted-foreground" /><span>İzin verildi</span></> : <><ClockIcon className="size-4 text-muted-foreground" /><span>İzin verilmedi</span></>}
               </p>
             </div>}
             <div>
@@ -209,7 +209,7 @@ function CartDetailModal({
             {!isLiveCart && cart.emailSentAt && (
               <div>
                 <span className="text-xs font-medium text-muted-foreground">E-posta Gönderilme Zamanı</span>
-                <p className="mt-0.5 text-foreground flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                <p className="mt-0.5 flex items-center gap-1 text-muted-foreground">
                   <EnvelopeIcon className="size-4" />
                   {formatDate(cart.emailSentAt)}
                 </p>
@@ -250,7 +250,7 @@ function CartDetailModal({
                 onClick={copyRecoverLink}
                 className="h-10 shrink-0 gap-1.5 px-3"
               >
-                {copied ? <CheckIcon className="size-4 text-emerald-600" /> : <ClipboardDocumentIcon className="size-4" />}
+                {copied ? <CheckIcon className="size-4 text-muted-foreground" /> : <ClipboardDocumentIcon className="size-4" />}
                 <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
               </Button>
               <Button
@@ -492,7 +492,7 @@ export default function AdminCartsPage() {
                 <div><span className="mb-1 block text-xs text-muted-foreground md:hidden">Durum</span><Badge variant="outline" className={`rounded-md px-2 py-0.5 text-xs font-medium ${isLiveCart ? "" : statusInfo.className}`}>{isLiveCart ? "Aktif sepet" : statusInfo.label}</Badge>{!isLiveCart && cart.emailConsent && <span className="ml-2 text-xs text-muted-foreground">İzinli</span>}</div>
                 <div><span className="mb-1 block text-xs text-muted-foreground md:hidden">Son hareket</span><p className="text-xs text-muted-foreground">{formatDate(isLiveCart ? cart.updatedAt : cart.lastActivityAt)}</p></div>
                 <div className="flex items-center gap-1 md:justify-end">
-                  {!isLiveCart && <Button type="button" variant="ghost" size="sm" onClick={() => void copyLink(cart)} className="h-9 px-2 text-xs" title="Kurtarma bağlantısını kopyala">{copiedId === cart._id ? <CheckIcon className="size-4 text-emerald-600" /> : <ClipboardDocumentIcon className="size-4" />}<span className="ml-1">{copiedId === cart._id ? "Kopyalandı" : "Link"}</span></Button>}
+                  {!isLiveCart && <Button type="button" variant="ghost" size="sm" onClick={() => void copyLink(cart)} className="h-9 px-2 text-xs" title="Kurtarma bağlantısını kopyala">{copiedId === cart._id ? <CheckIcon className="size-4 text-muted-foreground" /> : <ClipboardDocumentIcon className="size-4" />}<span className="ml-1">{copiedId === cart._id ? "Kopyalandı" : "Link"}</span></Button>}
                   <Button type="button" variant="outline" size="sm" onClick={() => setSelectedCart(cart)} className="h-9 px-2.5 text-xs"><EyeIcon className="mr-1 size-4" />İncele</Button>
                 </div>
               </article>;

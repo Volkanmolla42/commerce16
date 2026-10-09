@@ -94,7 +94,7 @@ function OrderDetails({
                   <span className="text-xs text-muted-foreground">{emailStatusLabels[emailEvent.status]}</span>
                 </div>
                 {emailEvent.error && <p className="text-xs text-destructive">{emailEvent.error}</p>}
-                {emailEvent.status === "review" && <p className="text-xs text-amber-700 dark:text-amber-300">Mükerrer gönderimi önlemek için tekrar kapalı. Resend panelinde kontrol edin.</p>}
+                {emailEvent.status === "review" && <p className="text-xs text-muted-foreground">Mükerrer gönderimi önlemek için tekrar kapalı. Resend panelinde kontrol edin.</p>}
                 {(emailEvent.status === "failed" || emailEvent.status === "not_configured") && (
                   <Button type="button" size="sm" variant="outline" disabled={retryingEmailKey === `${order._id}:${emailEvent.event}`} onClick={() => onRetryEmail(emailEvent.event)}>
                     {retryingEmailKey === `${order._id}:${emailEvent.event}` ? "Kuyruğa alınıyor…" : "E-postayı yeniden dene"}
@@ -114,7 +114,7 @@ function OrderDetails({
             {order.couponCode && (
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">Kupon · {order.couponCode}</span>
-                <span className="font-medium tabular-nums text-emerald-700 dark:text-emerald-400">−{formatMoney((order.couponDiscountKurus ?? 0) / 100)}</span>
+                <span className="font-medium tabular-nums text-muted-foreground">−{formatMoney((order.couponDiscountKurus ?? 0) / 100)}</span>
               </div>
             )}
             <div className="flex items-center justify-between">

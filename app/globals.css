@@ -146,117 +146,79 @@ button {
   @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-50 dark:focus-visible:ring-neutral-600 dark:focus-visible:ring-offset-neutral-900;
 }
 
-/* Admin is deliberately light even when the storefront follows a dark OS theme. */
-:root:has(.admin-theme) {
+/* Admin colors are scoped to the admin shell; storefront themes remain independent. */
+:root:has(.admin-theme[data-admin-theme="light"]) {
   color-scheme: light;
-  --background: oklch(0.975 0.004 250);
-  --foreground: oklch(0.2 0.025 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.025 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.025 255);
+  --background: oklch(0.955 0 0);
+  --foreground: oklch(0.2 0 0);
+  --card: oklch(0.985 0 0);
+  --card-foreground: oklch(0.2 0 0);
+  --popover: oklch(0.985 0 0);
+  --popover-foreground: oklch(0.2 0 0);
   --primary: oklch(0.22 0 0);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.955 0.008 250);
-  --secondary-foreground: oklch(0.25 0.025 255);
-  --muted: oklch(0.955 0.008 250);
-  --muted-foreground: oklch(0.5 0.025 255);
+  --secondary: oklch(0.94 0 0);
+  --secondary-foreground: oklch(0.25 0 0);
+  --muted: oklch(0.94 0 0);
+  --muted-foreground: oklch(0.5 0 0);
   --accent: oklch(0.94 0 0);
   --accent-foreground: oklch(0.25 0 0);
   --destructive: oklch(0.52 0.19 28);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.9 0.012 250);
-  --input: oklch(0.86 0.016 250);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.84 0 0);
   --ring: oklch(0.62 0 0);
 }
 
-.admin-theme {
-  color-scheme: light;
+:root:has(.admin-theme[data-admin-theme="dark"]) {
+  color-scheme: dark;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
 }
 
-body:has(.admin-theme) {
+.admin-theme[data-admin-theme="light"] {
+  color-scheme: light;
+  color: var(--foreground);
+  background-color: var(--background);
+}
+
+.admin-theme[data-admin-theme="dark"] {
+  color-scheme: dark;
+  color: var(--foreground);
+  background-color: var(--background);
+}
+
+body:has(.admin-theme[data-admin-theme="light"]) {
   color: var(--foreground);
   color-scheme: light;
   background-color: var(--background);
 }
 
-:root:has(.admin-theme) .scheme-dark {
-  color-scheme: light;
+body:has(.admin-theme[data-admin-theme="dark"]) {
+  color: var(--foreground);
+  color-scheme: dark;
+  background-color: var(--background);
 }
 
-/* Older admin screens still use neutral-scale utilities; translate that palette in one place. */
-:root:has(.admin-theme) [class~="bg-neutral-950"] { background-color: #fff; }
-:root:has(.admin-theme) [class~="bg-neutral-950/95"] { background-color: rgb(255 255 255 / 95%); }
-:root:has(.admin-theme) [class~="bg-neutral-950/90"] { background-color: rgb(255 255 255 / 95%); }
-:root:has(.admin-theme) [class~="bg-neutral-950/70"] { background-color: rgb(255 255 255 / 75%); }
-:root:has(.admin-theme) [class~="bg-neutral-950/60"] { background-color: rgb(255 255 255 / 65%); }
-:root:has(.admin-theme) [class~="bg-neutral-950/50"] { background-color: rgb(255 255 255 / 55%); }
-:root:has(.admin-theme) [class~="bg-neutral-950/40"] { background-color: rgb(255 255 255 / 45%); }
-:root:has(.admin-theme) [class~="bg-neutral-950/30"] { background-color: rgb(255 255 255 / 35%); }
-:root:has(.admin-theme) [class~="bg-neutral-900"] { background-color: #f8fafc; }
-:root:has(.admin-theme) [class~="bg-neutral-900/80"] { background-color: rgb(248 250 252 / 85%); }
-:root:has(.admin-theme) [class~="bg-neutral-900/70"] { background-color: rgb(248 250 252 / 75%); }
-:root:has(.admin-theme) [class~="bg-neutral-800"] { background-color: #f1f5f9; }
-:root:has(.admin-theme) [class~="bg-neutral-700"] { background-color: #e2e8f0; }
-:root:has(.admin-theme) [class~="bg-neutral-600"] { background-color: #cbd5e1; }
-:root:has(.admin-theme) [class~="bg-neutral-300"] { background-color: #e2e8f0; }
-:root:has(.admin-theme) [class~="bg-neutral-200"] { background-color: #f1f5f9; }
-:root:has(.admin-theme) [class~="bg-neutral-100"] { background-color: #f8fafc; }
-:root:has(.admin-theme) [class~="bg-rose-950"] { background-color: #fff1f2; }
-:root:has(.admin-theme) [class~="bg-emerald-950"],
-:root:has(.admin-theme) [class~="bg-emerald-100"],
-:root:has(.admin-theme) [class~="bg-emerald-500/10"] { background-color: #f4f4f5; }
-:root:has(.admin-theme) [class~="text-neutral-100"],
-:root:has(.admin-theme) [class~="text-neutral-50"] { color: #111827; }
-:root:has(.admin-theme) [class~="text-neutral-200"] { color: #1f2937; }
-:root:has(.admin-theme) [class~="text-neutral-300"] { color: #334155; }
-:root:has(.admin-theme) [class~="text-neutral-400"] { color: #64748b; }
-:root:has(.admin-theme) [class~="text-neutral-500"] { color: #64748b; }
-:root:has(.admin-theme) [class~="text-neutral-600"] { color: #475569; }
-:root:has(.admin-theme) [class~="text-neutral-900"],
-:root:has(.admin-theme) [class~="text-neutral-950"],
-:root:has(.admin-theme) [class~="text-white"] { color: #111827; }
-:root:has(.admin-theme) [class~="text-red-400"],
-:root:has(.admin-theme) [class~="text-red-300"] { color: #b91c1c; }
-:root:has(.admin-theme) [class~="text-rose-300"],
-:root:has(.admin-theme) [class~="text-rose-200"] { color: #be123c; }
-:root:has(.admin-theme) [class~="text-emerald-400"],
-:root:has(.admin-theme) [class~="text-emerald-300"],
-:root:has(.admin-theme) [class~="text-emerald-700"],
-:root:has(.admin-theme) [class~="text-emerald-800"],
-:root:has(.admin-theme) [class~="text-emerald-600"] { color: #404040; }
-:root:has(.admin-theme) [class~="text-amber-300"],
-:root:has(.admin-theme) [class~="text-amber-400"] { color: #a16207; }
-:root:has(.admin-theme) [class~="text-sky-400"] { color: #0369a1; }
-:root:has(.admin-theme) [class~="text-indigo-400"] { color: #4338ca; }
-:root:has(.admin-theme) [class~="text-zinc-400"],
-:root:has(.admin-theme) [class~="text-zinc-600"] { color: #52525b; }
-:root:has(.admin-theme) [class~="border-neutral-800"],
-:root:has(.admin-theme) [class~="border-neutral-800/80"] { border-color: #e2e8f0; }
-:root:has(.admin-theme) [class~="border-neutral-700"] { border-color: #cbd5e1; }
-:root:has(.admin-theme) [class~="border-neutral-600"],
-:root:has(.admin-theme) [class~="border-neutral-500"] { border-color: #94a3b8; }
-:root:has(.admin-theme) [class~="border-white/10"] { border-color: rgb(15 23 42 / 10%); }
-:root:has(.admin-theme) [class~="divide-neutral-800"] { border-color: #e2e8f0; }
-:root:has(.admin-theme) [class~="ring-neutral-300"],
-:root:has(.admin-theme) [class~="ring-neutral-400"],
-:root:has(.admin-theme) [class~="ring-neutral-500/40"] { --tw-ring-color: rgb(64 64 64 / 35%); }
-:root:has(.admin-theme) [class~="border-emerald-500/30"] { border-color: #d4d4d8; }
-:root:has(.admin-theme) [class~="ring-offset-2"] { --tw-ring-offset-color: #fff; }
-:root:has(.admin-theme) [class~="hover:bg-neutral-800"]:hover { background-color: #e2e8f0; }
-:root:has(.admin-theme) [class~="hover:bg-neutral-700"]:hover { background-color: #e2e8f0; }
-:root:has(.admin-theme) [class~="hover:bg-neutral-800/70"]:hover { background-color: rgb(226 232 240 / 75%); }
-:root:has(.admin-theme) [class~="hover:bg-rose-950"]:hover { background-color: #ffe4e6; }
-:root:has(.admin-theme) [class~="hover:text-white"]:hover { color: #0f172a; }
-:root:has(.admin-theme) [class~="dark:text-amber-400"],
-:root:has(.admin-theme) [class~="dark:text-amber-300"] { color: #a16207; }
-:root:has(.admin-theme) [class~="dark:text-sky-400"] { color: #0369a1; }
-:root:has(.admin-theme) [class~="dark:text-indigo-400"] { color: #4338ca; }
-:root:has(.admin-theme) [class~="dark:text-emerald-400"],
-:root:has(.admin-theme) [class~="dark:text-emerald-300"] { color: #404040; }
-:root:has(.admin-theme) [class~="dark:text-zinc-400"] { color: #52525b; }
-:root:has(.admin-theme) [class~="dark:bg-emerald-950"] { background-color: #f4f4f5; }
-
+.admin-theme[data-admin-theme="light"] .scheme-dark { color-scheme: light; }
+.admin-theme[data-admin-theme="dark"] .scheme-dark { color-scheme: dark; }
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
