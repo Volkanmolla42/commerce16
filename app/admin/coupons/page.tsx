@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Card, Input, Label } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 
@@ -176,13 +176,7 @@ function AdminCouponsContent() {
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Kuponlar</h1>
-          <p className="mt-1 text-sm text-muted-foreground">İndirim kuralları ve kullanım limitleri</p>
-        </div>
-        <Button onClick={() => setEditingCoupon(null)}>Kupon ekle</Button>
-      </div>
+      <AdminPageHeader title="Kuponlar" description="İndirim kuralları ve kullanım limitleri" actions={<Button onClick={() => setEditingCoupon(null)}>Kupon ekle</Button>} />
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
       <Card className="overflow-hidden rounded-lg">
         {loading ? <div className="p-5"><AdminLoading label="Kuponlar" /></div> : !coupons?.length ? (

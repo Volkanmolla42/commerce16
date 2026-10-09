@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
 import { AnalyticsDashboard } from "@/lib/analytics/types";
 import { Card } from "@/components/ui";
@@ -29,12 +29,10 @@ export function AnalyticsContent() {
 
   return (
     <>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">E-ticaret analitiği</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Satın alma hunisi, müşteri değeri ve kampanya performansı.</p>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <AdminPageHeader
+        title="E-ticaret analitiği"
+        description="Satın alma hunisi, müşteri değeri ve kampanya performansı."
+        actions={<label className="flex items-center gap-2 text-sm font-medium text-foreground">
           Dönem
           <select
             value={days}
@@ -45,8 +43,8 @@ export function AnalyticsContent() {
             <option value={30}>Son 30 gün</option>
             <option value={90}>Son 90 gün</option>
           </select>
-        </label>
-      </div>
+        </label>}
+      />
 
       {error && <div className="mb-4"><AdminNotice kind="error">{error}</AdminNotice></div>}
       {data ? (

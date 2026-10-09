@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Input, Label } from "@/components/ui";
-import { AdminLoading, AdminNotice } from "../../_components/admin-primitives";
+import { AdminLoading, AdminNotice, AdminPageHeader } from "../../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
 import { adminPath } from "@/lib/admin/routes";
@@ -662,12 +662,13 @@ function ProductEditor({
   };
 
   return (
-    <main className="scheme-dark mx-auto w-full max-w-7xl px-4 py-5 text-foreground sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{title || (product ? "Ürün detayları" : "Yeni ürün")}</h1>
-        </div>
-      </header>
+    <div className="scheme-dark w-full text-foreground">
+      <AdminPageHeader
+        title={title || (product ? "Ürün detayları" : "Yeni ürün")}
+        description={product
+          ? "Ürün bilgilerini, görsellerini ve varyantlarını düzenleyin."
+          : "Yeni ürünün bilgilerini, görsellerini ve varyantlarını tanımlayın."}
+      />
 
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
@@ -1013,7 +1014,7 @@ function ProductEditor({
           </div>
         </div>
       </form>
-    </main>
+    </div>
   );
 }
 
@@ -1030,9 +1031,9 @@ function ProductEditorData({ productId }: { productId?: string }) {
   const loading = categoriesLoading || (Boolean(productId) && productsLoading);
   const error = categoriesError || (productId && productsError) || null;
 
-  if (loading) return <div className="mx-auto max-w-6xl p-6"><AdminLoading label="Ürün formu" /></div>;
-  if (error) return <div className="mx-auto max-w-6xl p-6"><AdminNotice kind="error">{error}</AdminNotice></div>;
-  if (productId && !product) return <div className="mx-auto max-w-6xl p-6"><AdminNotice kind="error">Ürün bulunamadı.</AdminNotice></div>;
+  if (loading) return <div className="w-full"><AdminLoading label="Ürün formu" /></div>;
+  if (error) return <div className="w-full"><AdminNotice kind="error">{error}</AdminNotice></div>;
+  if (productId && !product) return <div className="w-full"><AdminNotice kind="error">Ürün bulunamadı.</AdminNotice></div>;
 
   return (
     <ProductEditor

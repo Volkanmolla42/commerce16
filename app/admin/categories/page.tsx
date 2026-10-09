@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Button, Card } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { CategoryEditor, type AdminCategory } from "./_components/category-editor";
 
@@ -29,10 +29,7 @@ function AdminCategoriesContent() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Kategoriler</h1>
-        <Button onClick={() => { setEditorCategory(null); setEditorOpen(true); }}>Kategori ekle</Button>
-      </div>
+      <AdminPageHeader title="Kategoriler" description="Ürünleri mağazada düzenli sunmak için kategorileri yönetin." actions={<Button onClick={() => { setEditorCategory(null); setEditorOpen(true); }}>Kategori ekle</Button>} />
       {(message || actionError || error) && (
         <div className="mb-4">
           <AdminNotice kind={actionError || error ? "error" : "success"}>

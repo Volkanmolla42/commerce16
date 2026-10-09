@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button, Input, Card } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -58,10 +58,7 @@ function AdminProductsContent() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Ürünler</h1>
-        <Button asChild><Link href={adminPath("products/add")}>Yeni ürün ekle</Link></Button>
-      </div>
+      <AdminPageHeader title="Ürünler" description="Ürün kataloğunu görüntüleyin, filtreleyin ve ürün bilgilerini yönetin." actions={<Button asChild><Link href={adminPath("products/add")}>Yeni ürün ekle</Link></Button>} />
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
       <Card className="overflow-hidden rounded-lg">

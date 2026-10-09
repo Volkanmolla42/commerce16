@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader, OrderStatusBadge } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 import { orderStatusLabels } from "@/lib/orders";
@@ -202,9 +202,7 @@ function AdminOrdersContent() {
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Siparişler</h1>
-      </div>
+      <AdminPageHeader title="Siparişler" description="Müşteri siparişlerini ve ödeme durumlarını takip edin." />
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
       <Card className="overflow-hidden rounded-lg">

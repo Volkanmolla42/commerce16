@@ -26,7 +26,7 @@ import {
   DialogTitle,
   Input,
 } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 import { adminPath } from "@/lib/admin/routes";
@@ -400,16 +400,14 @@ export default function AdminCartsPage() {
   const liveCartValue = (activeCarts ?? []).reduce((sum, cart) => sum + (Number.parseFloat(cart.estimatedTotal) || 0), 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Sepetler</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Aktif sepetleri ve terk edilen sepet hatırlatmalarını görüntüleyin.</p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void refreshCarts()} className="gap-2 self-start sm:self-auto">
+    <div className="space-y-5">
+      <AdminPageHeader
+        title="Sepetler"
+        description="Aktif sepetleri ve terk edilen sepet hatırlatmalarını görüntüleyin."
+        actions={<Button type="button" variant="outline" size="sm" onClick={() => void refreshCarts()} className="gap-2">
           <ArrowPathIcon className="size-4" /> Yenile
-        </Button>
-      </div>
+        </Button>}
+      />
 
       {currentError && <AdminNotice kind="error">{currentError}</AdminNotice>}
 

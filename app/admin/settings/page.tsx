@@ -13,6 +13,7 @@ import {
   AdminEmpty,
   AdminLoading,
   AdminNotice,
+  AdminPageHeader,
 } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import type { StoreSettings } from "@/lib/catalog";
@@ -137,9 +138,7 @@ function AdminSettingsContent() {
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Mağaza ayarları</h1>
-      </div>
+      <AdminPageHeader title="Mağaza ayarları" description="Mağaza bilgilerini, iletişim seçeneklerini ve duyuru alanını düzenleyin." />
       {(message || actionError || error) && (
         <div className="mb-5">
           <AdminNotice kind={actionError || error ? "error" : "success"}>

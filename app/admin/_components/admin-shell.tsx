@@ -173,7 +173,7 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-7 sm:py-8">
+        <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
           {logoutError && <p role="alert" className="mb-4 text-sm text-destructive">{logoutError}</p>}
           {children}
         </main>
@@ -202,7 +202,7 @@ export function AdminShellFallback() {
         <div className="border-b border-border bg-card p-4 lg:hidden">
           <div className="h-8 w-32 rounded bg-muted" />
         </div>
-        <main aria-label="Yönetim paneli yükleniyor" className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-7 sm:py-8">
+        <main aria-label="Yönetim paneli yükleniyor" className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8 sm:py-8">
           <div className="h-8 w-44 rounded bg-muted" />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 rounded-xl border border-border bg-card" />)}

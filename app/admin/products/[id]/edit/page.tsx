@@ -10,7 +10,7 @@ export default function EditProductPage({
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-6xl p-6">
+        <div className="w-full">
           <AdminLoading label="Ürün formu" />
         </div>
       }

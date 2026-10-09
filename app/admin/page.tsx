@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Card } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "./_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader, OrderStatusBadge } from "./_components/admin-primitives";
 import { useAdminResource } from "./_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -31,9 +31,7 @@ function AdminOverviewContent() {
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Genel Bakış</h1>
-      </div>
+      <AdminPageHeader title="Genel Bakış" description="Mağazanızın ürün, kategori, sipariş ve ciro özetini takip edin." />
       {error && <div className="mb-5"><AdminNotice kind="error">{error}</AdminNotice></div>}
 
       {!data ? (

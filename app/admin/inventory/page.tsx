@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Input } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 
@@ -46,10 +46,7 @@ export default function InventoryPage() {
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Stok</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Ürün ve varyant stok adetleri.</p>
-      </div>
+      <AdminPageHeader title="Stok" description="Ürün ve varyant stok adetleri." />
 
       {error && <div className="mb-4"><AdminNotice kind="error">{error}</AdminNotice></div>}
 
