@@ -10,7 +10,7 @@ export function FavoritesLink() {
 
   return (
     <Link
-      href="/favorites"
+      href="/account/favorites"
       aria-label={count ? `Favorilerim, ${count} ürün` : "Favorilerim"}
       className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-rose-600 sm:w-auto sm:gap-2 sm:px-3 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:text-rose-400"
     >

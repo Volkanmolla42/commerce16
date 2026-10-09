@@ -39,7 +39,6 @@ function normalizeAddress(input: AddressInput): AddressInput {
     fullName: input.fullName.trim(), phone: input.phone.trim(), city: province.name,
     district: district.name, provinceId: province.id, districtId: district.id,
     addressLine1: input.addressLine1.trim(),
-    addressLine2: input.addressLine2?.trim(), postalCode: input.postalCode?.trim(),
   };
 }
 

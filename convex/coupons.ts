@@ -103,19 +103,16 @@ export async function reserveCouponForOrder(ctx: MutationCtx, order: Doc<"orders
     const price = Math.round(Number(item.price) * 100);
     return sum + price * item.quantity;
   }, 0);
-  const shippingCostKurus = order.shippingCostKurus ?? 0;
   const orderTotalKurus = Math.round(Number(order.total) * 100);
-  const merchandiseTotalKurus = orderTotalKurus - shippingCostKurus;
   const quote = quoteCouponRecord(coupon, subtotalKurus, Date.now());
-  if (!Number.isSafeInteger(shippingCostKurus) || shippingCostKurus < 0 ||
-    !Number.isSafeInteger(orderTotalKurus) || merchandiseTotalKurus < 0 || !quote.valid ||
-    quote.discountKurus !== order.couponDiscountKurus || quote.totalKurus !== merchandiseTotalKurus) {
+  if (!Number.isSafeInteger(orderTotalKurus) || orderTotalKurus < 0 || !quote.valid ||
+    quote.discountKurus !== order.couponDiscountKurus || quote.totalKurus !== orderTotalKurus) {
     throw new Error(quote.valid ? "Kupon koşulları değişti. Siparişinizi yeniden oluşturun." : quote.message);
   }
   if (coupon.usageLimit !== undefined && coupon.usedCount >= coupon.usageLimit) {
     throw new Error("Kupon kullanım hakkı az önce tükendi. Tekrar deneyin.");
   }
-  await ctx.db.patch(coupon._id, { usedCount: coupon.usedCount + 1, updatedAt: Date.now() });
+  await ctx.db.patch(coupon._id, { usedCount: coupon.usedCount + 1 });
   await ctx.db.patch(order._id, { couponReserved: true });
 }
 
@@ -124,7 +121,7 @@ export async function releaseCouponReservation(ctx: MutationCtx, order: Doc<"ord
   const coupon = order.couponId
     ? await ctx.db.get(order.couponId)
     : await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", order.couponCode!)).unique();
-  if (coupon) await ctx.db.patch(coupon._id, { usedCount: Math.max(0, coupon.usedCount - 1), updatedAt: Date.now() });
+  if (coupon) await ctx.db.patch(coupon._id, { usedCount: Math.max(0, coupon.usedCount - 1) });
   await ctx.db.patch(order._id, { couponReserved: false });
 }
 
@@ -164,7 +161,6 @@ export const create = mutation({
     if (await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code)).unique()) {
       throw new Error("Bu kupon kodu zaten mevcut.");
     }
-    const now = Date.now();
     return await ctx.db.insert("coupons", {
       code,
       discountType: args.discountType,
@@ -175,8 +171,6 @@ export const create = mutation({
       usedCount: 0,
       expiresAt: args.expiresAt,
       isActive: args.isActive,
-      createdAt: now,
-      updatedAt: now,
     });
   },
 });
@@ -217,7 +211,6 @@ export const update = mutation({
       code,
       discountType: next.discountType,
       discountValue: next.discountValue,
-      updatedAt: Date.now(),
       ...(args.isActive !== undefined ? { isActive: args.isActive } : {}),
       ...(args.expiresAt !== undefined ? { expiresAt: args.expiresAt ?? undefined } : {}),
       ...(args.minOrderAmountKurus !== undefined ? { minOrderAmountKurus: args.minOrderAmountKurus ?? undefined } : {}),
@@ -236,7 +229,7 @@ export const disable = mutation({
     assertAdminApiSecret(adminSecret);
     const coupon = await ctx.db.get(id);
     if (!coupon) throw new Error("Kupon bulunamadı.");
-    await ctx.db.patch(id, { isActive: false, updatedAt: Date.now() });
+    await ctx.db.patch(id, { isActive: false });
     return null;
   },
 });

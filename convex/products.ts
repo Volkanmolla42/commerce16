@@ -1,64 +1,46 @@
 import { query, mutation } from "./_generated/server";
-import { paginationResultValidator } from "convex/server";
+import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import schema from "./schema";
 import { insertCatalogProduct, patchCatalogProduct, deleteCatalogProduct, withoutCatalogMetadata } from "./catalogModel";
 import { assertAdminApiSecret } from "./adminAuth";
-import { internal } from "./_generated/api";
+import { getProductPriceRange } from "../lib/catalog/variants";
+import { catalogSearchQuery } from "../lib/catalog/smart-search";
 import {
-  normalizeProductSkus,
+  normalizeVariantSkus,
   normalizeSku,
-  recordInitialInventory,
-  recordInventoryMovement,
-  syncSkuRegistry,
-} from "./inventory";
+  syncProductSkus,
+} from "./productSkus";
 
 const productDocumentValidator = schema.doc("products");
 const productInputValidator = productDocumentValidator.omit(
-  "_id", "_creationTime", "updatedAt", "priceValue", "searchText",
+  "_id", "_creationTime", "updatedAt", "priceValue",
 );
 const adminStoredImageValidator = v.object({
   storageId: v.id("_storage"), fileName: v.string(), url: v.union(v.string(), v.null()),
+  selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+});
+const publicImageValidator = v.object({
+  url: v.string(), selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+});
+const publicVariantValidator = v.object({
+  id: v.string(),
+  title: v.string(),
+  availableForSale: v.boolean(),
+  selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
+  price: v.string(),
+  sku: v.optional(v.string()),
+  barcode: v.optional(v.string()),
 });
 const productValidator = productDocumentValidator.omit(
-  "storageImages", "priceValue", "searchText",
-);
+  "images", "variants", "priceValue",
+).extend({ price: v.string(), images: v.array(publicImageValidator), variants: v.array(publicVariantValidator) });
 const sitemapProductValidator = v.object({ slug: v.string(), updatedAt: v.string() });
 
-const adminProductValidator = productValidator.extend({
-  storageImages: v.array(adminStoredImageValidator),
-});
-
-function productHasAvailableStock(product: Pick<Doc<"products">, "availableForSale" | "stockQuantity" | "variants">) {
-  if (!product.availableForSale) return false;
-  const variants = product.variants ?? [];
-  if (variants.length > 0) {
-    return variants.some((variant) => {
-      const stockQuantity = variant.stockQuantity ?? product.stockQuantity;
-      return variant.availableForSale && (stockQuantity == null || stockQuantity > 0);
-    });
-  }
-  return product.stockQuantity == null || product.stockQuantity > 0;
-}
-
-function validateVatRate(rate?: number | null, label = "KDV oranı") {
-  if (rate == null) return;
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100 || Math.round(rate * 100) !== rate * 100) {
-    throw new Error(`${label} 0 ile 100 arasında ve en fazla iki ondalık basamaklı olmalı.`);
-  }
-}
-
-function validateStockQuantity(quantity?: number | null, label = "Stok adedi", required = false) {
-  if (quantity == null) {
-    if (required) throw new Error(`${label} girilmesi zorunludur.`);
-    return;
-  }
-  if (!Number.isSafeInteger(quantity) || quantity < 0) {
-    throw new Error(`${label} sıfır veya daha büyük bir tam sayı olmalı.`);
-  }
-}
+const adminProductValidator = productDocumentValidator.omit("priceValue")
+  .extend({ images: v.array(adminStoredImageValidator) });
 
 function normalizeKey(value: string) {
   return value.trim().toLocaleLowerCase("tr-TR");
@@ -118,9 +100,13 @@ function validateProductVariants(
   const combinations = new Set<string>();
 
   for (const variant of variants) {
-    validateVatRate(variant.vatRate, "Varyant KDV oranı");
-    validateStockQuantity(variant.stockQuantity, "Varyant stok adedi", true);
-
+    if (!Number.isSafeInteger(variant.stockQuantity) || variant.stockQuantity < 0) {
+      throw new Error("Her varyant için sıfır veya daha büyük tam sayı stok girin.");
+    }
+    const priceInCents = Math.round(Number(variant.price) * 100);
+    if (!/^\d+(?:\.\d{1,2})?$/.test(variant.price) || !Number.isSafeInteger(priceInCents) || priceInCents < 0) {
+      throw new Error("Her varyant için geçerli bir satış fiyatı girin.");
+    }
     const sku = normalizeSku(variant.sku);
     if (!sku) throw new Error("Her varyant için ayrı bir SKU girin.");
     if (skus.has(sku)) throw new Error("Her varyantın SKU kodu benzersiz olmalı.");
@@ -149,107 +135,33 @@ function validateProductVariants(
   }
 }
 
-function validateProductInventoryAndVariants(product: Pick<Doc<"products">, "stockQuantity" | "variants" | "options" | "vatRate">) {
-  validateVatRate(product.vatRate);
-  validateStockQuantity(product.stockQuantity);
+function validateProductVariantsAndOptions(product: Pick<Doc<"products">, "variants" | "options">) {
   const options = product.options ?? [];
   const variants = product.variants ?? [];
   validateProductOptions(options);
   validateProductVariants(variants, options);
 }
 
-
-async function recordStockChanges(
-  ctx: MutationCtx,
-  productId: Id<"products">,
-  previous: Doc<"products">,
-  next: Doc<"products">,
-) {
-  const productDelta = (next.stockQuantity ?? 0) - (previous.stockQuantity ?? 0);
-  if (productDelta !== 0) {
-    await recordInventoryMovement(ctx, {
-      productId,
-      productTitle: next.title,
-      sku: normalizeSku(next.sku) ?? `PRODUCT-${productId}`,
-      quantityDelta: productDelta,
-      reason: "manual_adjustment",
-    });
-  }
-
-  const previousVariants = new Map((previous.variants ?? []).map((variant) => [variant.id, variant]));
-  const nextVariants = new Map((next.variants ?? []).map((variant) => [variant.id, variant]));
-  for (const variantId of new Set([...previousVariants.keys(), ...nextVariants.keys()])) {
-    const oldVariant = previousVariants.get(variantId);
-    const newVariant = nextVariants.get(variantId);
-    const delta = (newVariant?.stockQuantity ?? 0) - (oldVariant?.stockQuantity ?? 0);
-    if (delta === 0) continue;
-    await recordInventoryMovement(ctx, {
-      productId,
-      productTitle: next.title,
-      variantId,
-      sku: normalizeSku(newVariant?.sku ?? oldVariant?.sku) ?? `VARIANT-${productId}-${variantId}`,
-      quantityDelta: delta,
-      reason: "manual_adjustment",
-    });
-  }
-}
-
-function getRestockTargets(previous: Doc<"products">, next: Doc<"products">) {
-  const targets: string[] = [];
-  const productInventoryChanged = previous.stockQuantity !== next.stockQuantity ||
-    previous.availableForSale !== next.availableForSale;
-  const nextVariants = next.variants ?? [];
-
-  if (nextVariants.length > 0) {
-    for (const variant of nextVariants) {
-      const previousVariant = previous.variants?.find((candidate) => candidate.id === variant.id);
-      const nextQuantity = variant.stockQuantity ?? next.stockQuantity;
-      const previousQuantity = previousVariant?.stockQuantity ?? previous.stockQuantity;
-      const nextAvailable = next.availableForSale && variant.availableForSale && (nextQuantity == null || nextQuantity > 0);
-      const wasAvailable = Boolean(previousVariant && previous.availableForSale && previousVariant.availableForSale &&
-        (previousQuantity == null || previousQuantity > 0));
-      const inventoryChanged = previousVariant?.stockQuantity !== variant.stockQuantity ||
-        (variant.stockQuantity == null && productInventoryChanged);
-      const saleStatusChanged = previous.availableForSale !== next.availableForSale ||
-        previousVariant?.availableForSale !== variant.availableForSale;
-      if (nextAvailable && (!wasAvailable || inventoryChanged || saleStatusChanged)) targets.push(variant.id);
-    }
-    return targets;
-  }
-
-  if (productHasAvailableStock(next) && (!productHasAvailableStock(previous) || productInventoryChanged)) {
-    targets.push("");
-  }
-  return targets;
-}
-
 async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
-  const storageImages = product.storageImages ?? [];
-  const storageUrls = await Promise.all(
-    storageImages.map(({ storageId }) => ctx.storage.getUrl(storageId)),
-  );
+  const images = await Promise.all(product.images.map(async ({ storageId, selectedOptions }) => {
+    const url = await ctx.storage.getUrl(storageId);
+    return url ? { url, ...(selectedOptions ? { selectedOptions } : {}) } : null;
+  }));
   return {
     _id: product._id,
     _creationTime: product._creationTime,
     slug: product.slug,
     title: product.title,
-    price: product.price,
-    sku: product.sku,
-    availableForSale: productHasAvailableStock(product),
-    stockQuantity: product.stockQuantity ?? null,
-    brand: product.brand,
-    material: product.material,
+    price: getProductPriceRange(product).min,
+    availableForSale: product.availableForSale,
     attributes: product.attributes,
     categorySlug: product.categorySlug,
-    images: [...product.images, ...storageUrls.filter((url): url is string => Boolean(url))],
+    images: images.filter((image): image is NonNullable<typeof image> => Boolean(image)),
     options: product.options,
-    variants: product.variants?.map((variant) => {
-      const stockQuantity = variant.stockQuantity ?? product.stockQuantity ?? null;
-      return {
-        ...variant,
-        availableForSale: product.availableForSale && variant.availableForSale && (stockQuantity == null || stockQuantity > 0),
-        stockQuantity,
-      };
+    variants: product.variants.map((variant) => {
+      const { stockQuantity, ...publicVariant } = variant;
+      void stockQuantity;
+      return publicVariant;
     }),
     updatedAt: product.updatedAt,
   };
@@ -320,10 +232,14 @@ async function validateProductAttributes(
   }
 }
 
-async function validateStoredImages(
+async function validateProductImages(
   ctx: MutationCtx,
-  images: { storageId: Id<"_storage">; fileName: string }[],
+  images: { storageId: Id<"_storage">; fileName: string; selectedOptions?: { name: string; value: string }[] }[],
+  options: Doc<"products">["options"],
+  variants: Doc<"products">["variants"],
 ) {
+  const availableOptions = options;
+  const availableVariants = variants;
   const storageIds = new Set<string>();
   for (const image of images) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.webp$/.test(image.fileName)) {
@@ -333,6 +249,13 @@ async function validateStoredImages(
       throw new Error("Aynı görsel birden fazla eklenemez.");
     }
     storageIds.add(image.storageId);
+
+    const scope = image.selectedOptions ?? [];
+    if (new Set(scope.map(({ name }) => normalizeKey(name))).size !== scope.length ||
+      scope.some(({ name, value }) => !availableOptions.some((option) => normalizeKey(option.name) === normalizeKey(name) && option.values.includes(value))) ||
+      !availableVariants.some((variant) => scope.every(({ name, value }) => variant.selectedOptions.some((selected) => normalizeKey(selected.name) === normalizeKey(name) && selected.value === value)))) {
+      throw new Error("Görsel kapsamı geçerli bir varyant seçeneğiyle eşleşmiyor.");
+    }
 
     const metadata = await ctx.db.system.get("_storage", image.storageId);
     if (!metadata || metadata.contentType !== "image/webp" || metadata.size <= 0) {
@@ -348,7 +271,7 @@ export const getByIdAdmin = query({
     assertAdminApiSecret(args.adminSecret);
     const product = await ctx.db.get("products", args.id);
     if (!product) return null;
-    return { ...withoutCatalogMetadata(product), storageImages: await Promise.all((product.storageImages ?? []).map(async (image) => ({
+    return { ...withoutCatalogMetadata(product), images: await Promise.all(product.images.map(async (image) => ({
       ...image, url: await ctx.storage.getUrl(image.storageId),
     }))) };
   },
@@ -396,11 +319,61 @@ export const listAllAdmin = query({
     const items = await ctx.db.query("products").order("desc").take(100);
     return await Promise.all(items.map(async (item) => ({
         ...withoutCatalogMetadata(item),
-        storageImages: await Promise.all((item.storageImages ?? []).map(async (image) => ({
+        images: await Promise.all(item.images.map(async (image) => ({
           ...image,
           url: await ctx.storage.getUrl(image.storageId),
         }))),
       })));
+  },
+});
+
+const stockProductValidator = v.object({
+  productId: v.id("products"),
+  title: v.string(),
+  slug: v.string(),
+  variants: v.array(v.object({
+    id: v.string(),
+    title: v.string(),
+    sku: v.optional(v.string()),
+    stockQuantity: v.number(),
+  })),
+});
+
+export const listStockAdmin = query({
+  args: {
+    adminSecret: v.string(),
+    query: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: paginationResultValidator(stockProductValidator),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    if (args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 24) {
+      throw new Error("Stok sayfa boyutu 1-24 arasında olmalı.");
+    }
+
+    const search = catalogSearchQuery(args.query);
+    const result = args.query.trim() && !search
+      ? { page: [], isDone: true, continueCursor: "" }
+      : await (search
+        ? ctx.db.query("products").withSearchIndex("search_catalog", (q) => q.search("title", search))
+        : ctx.db.query("products").order("desc")
+      ).paginate(args.paginationOpts);
+
+    return {
+      ...result,
+      page: result.page.map((product) => ({
+        productId: product._id,
+        title: product.title,
+        slug: product.slug,
+        variants: product.variants.map((variant) => ({
+          id: variant.id,
+          title: variant.title,
+          ...(variant.sku ? { sku: variant.sku } : {}),
+          stockQuantity: variant.stockQuantity,
+        })),
+      })),
+    };
   },
 });
 
@@ -423,13 +396,9 @@ export const getAvailability = query({
   returns: v.union(
     v.object({
       availableForSale: v.boolean(),
-      productEnabledForSale: v.boolean(),
-      stockQuantity: v.union(v.number(), v.null()),
       variants: v.array(v.object({
         id: v.string(),
-        enabledForSale: v.boolean(),
         availableForSale: v.boolean(),
-        stockQuantity: v.union(v.number(), v.null()),
       })),
     }),
     v.null(),
@@ -438,18 +407,8 @@ export const getAvailability = query({
     const product = await ctx.db.get(productId);
     if (!product) return null;
     return {
-      availableForSale: productHasAvailableStock(product),
-      productEnabledForSale: product.availableForSale,
-      stockQuantity: product.stockQuantity ?? null,
-      variants: (product.variants ?? []).map((variant) => {
-        const stockQuantity = variant.stockQuantity ?? product.stockQuantity ?? null;
-        return {
-          id: variant.id,
-          enabledForSale: variant.availableForSale,
-          availableForSale: product.availableForSale && variant.availableForSale && (stockQuantity == null || stockQuantity > 0),
-          stockQuantity,
-        };
-      }),
+      availableForSale: product.availableForSale,
+      variants: (product.variants ?? []).map(({ id, availableForSale }) => ({ id, availableForSale })),
     };
   },
 });
@@ -495,14 +454,11 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const { adminSecret, ...input } = args;
     const product = { ...input };
-    delete product.sku;
-    delete product.stockQuantity;
     assertAdminApiSecret(adminSecret);
-    const normalizedProduct = normalizeProductSkus(product);
-    validateProductInventoryAndVariants(normalizedProduct);
+    const normalizedProduct = normalizeVariantSkus(product);
+    validateProductVariantsAndOptions(normalizedProduct);
     await validateProductAttributes(ctx, normalizedProduct);
-    const storageImages = normalizedProduct.storageImages ?? [];
-    await validateStoredImages(ctx, storageImages);
+    await validateProductImages(ctx, normalizedProduct.images, normalizedProduct.options, normalizedProduct.variants);
     const existing = await ctx.db
       .query("products")
       .withIndex("by_slug", (q) => q.eq("slug", normalizedProduct.slug))
@@ -510,9 +466,8 @@ export const create = mutation({
     if (existing) throw new Error("Bu ürün adresi zaten kullanılıyor.");
 
     const updatedAt = new Date().toISOString();
-    const productId = await insertCatalogProduct(ctx, { ...normalizedProduct, storageImages, updatedAt });
-    await syncSkuRegistry(ctx, productId, normalizedProduct);
-    await recordInitialInventory(ctx, productId, normalizedProduct);
+    const productId = await insertCatalogProduct(ctx, { ...normalizedProduct, updatedAt });
+    await syncProductSkus(ctx, productId, normalizedProduct);
     return productId;
   },
 });
@@ -525,16 +480,16 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { adminSecret, id, storageImages, ...rest } = args;
+    const { adminSecret, id, ...rest } = args;
     assertAdminApiSecret(adminSecret);
     const current = await ctx.db.get(id);
     if (!current) throw new Error("Ürün bulunamadı");
-    const next = normalizeProductSkus({ ...current, ...rest, sku: undefined, stockQuantity: undefined });
-    validateProductInventoryAndVariants(next);
+    const next = normalizeVariantSkus({ ...current, ...rest });
+    validateProductVariantsAndOptions(next);
     await validateProductAttributes(ctx, next);
 
-    const nextStorageImages = storageImages ?? current.storageImages ?? [];
-    await validateStoredImages(ctx, nextStorageImages);
+    const nextImages = rest.images ?? current.images;
+    await validateProductImages(ctx, nextImages, next.options, next.variants);
 
     if (rest.slug && rest.slug !== current.slug) {
       const duplicate = await ctx.db
@@ -544,20 +499,13 @@ export const update = mutation({
       if (duplicate) throw new Error("Bu ürün adresi zaten kullanılıyor.");
     }
 
-    await syncSkuRegistry(ctx, id, next);
+    await syncProductSkus(ctx, id, next);
     await patchCatalogProduct(ctx, current, {
       ...rest,
-      vatRate: undefined,
-      sku: undefined,
-      stockQuantity: undefined,
       variants: next.variants,
-      storageImages: nextStorageImages,
+      images: nextImages,
       updatedAt: new Date().toISOString(),
     });
-    await recordStockChanges(ctx, id, current, next);
-    for (const variantId of getRestockTargets(current, next)) {
-      await ctx.scheduler.runAfter(0, internal.restockNotifications.processRestock, { productId: id, variantId });
-    }
     return null;
   },
 });
@@ -572,31 +520,12 @@ export const remove = mutation({
     assertAdminApiSecret(args.adminSecret);
     const product = await ctx.db.get(args.id);
     if (product) {
-      for (const sku of [
-        { sku: product.sku ?? `PRODUCT-${product._id}`, quantity: product.stockQuantity ?? 0 },
-        ...(product.variants ?? []).map((variant) => ({
-          sku: variant.sku ?? `VARIANT-${product._id}-${variant.id}`,
-          quantity: variant.stockQuantity ?? 0,
-          variantId: variant.id,
-        })),
-      ]) {
-        if (sku.quantity <= 0) continue;
-        await recordInventoryMovement(ctx, {
-          productId: product._id,
-          productTitle: product.title,
-          ...("variantId" in sku && sku.variantId ? { variantId: sku.variantId } : {}),
-          sku: normalizeSku(sku.sku)!,
-          quantityDelta: -sku.quantity,
-          reason: "product_removed",
-        });
-      }
-      const registry = await ctx.db.query("inventorySkuRegistry")
+      const registry = await ctx.db.query("productSkus")
         .withIndex("by_product", (q) => q.eq("productId", args.id))
         .take(101);
       for (const entry of registry) await ctx.db.delete(entry._id);
     }
     if (product) await deleteCatalogProduct(ctx, product);
-    await ctx.scheduler.runAfter(0, internal.restockNotifications.deleteForProduct, { productId: args.id });
     return null;
   },
 });

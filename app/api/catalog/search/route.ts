@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     ...catalog.products.slice(0, 5).map((product) => {
       const range = getProductPriceRange(product);
       return { key: `product-${product.slug}`, kind: "product", title: product.title,
-        href: `/product/${encodeURIComponent(product.slug)}`, image: product.images[0] ?? null,
+        href: `/product/${encodeURIComponent(product.slug)}`, image: product.images[0]?.url ?? null,
         price: range.min, maxPrice: range.max };
     }),
   ];

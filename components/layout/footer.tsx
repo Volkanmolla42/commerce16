@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import LogoSquare from "@/components/logo-square";
+import StoreInitial from "@/components/store-initial";
 import { getMenu, getStoreSettings } from "@/lib/catalog";
 import { Menu } from "@/lib/catalog/types";
 import { cacheTag } from "next/cache";
@@ -28,7 +28,7 @@ export default async function Footer() {
               {settings.logoUrl ? (
                 <Image src={settings.logoUrl} alt={settings.storeName} width={30} height={30} unoptimized className="h-[30px] w-[30px] rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
               ) : (
-                <LogoSquare size="sm" />
+                <StoreInitial storeName={settings.storeName} size="sm" />
               )}
               <span className="text-base font-semibold tracking-wider uppercase">
                 {settings.storeName}

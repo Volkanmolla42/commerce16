@@ -28,13 +28,16 @@ export type ProductVariant = {
   availableForSale: boolean;
   sku?: string;
   barcode?: string;
-  stockQuantity?: number | null;
   selectedOptions: {
     name: string;
     value: string;
   }[];
-  /** When omitted, the variant uses the product's base price. */
-  price?: Money;
+  price: Money;
+};
+
+export type ProductImage = {
+  url: string;
+  selectedOptions?: { name: string; value: string }[];
 };
 
 export type SEO = {
@@ -57,17 +60,14 @@ export type Product = {
   id: string;
   slug: string;
   title: string;
+  /** Derived minimum price for listing and metadata; sellable prices live on variants. */
   price: string;
   /** Precomputed card prices avoid transferring every SKU to product lists. */
   priceRange?: { min: string; max: string };
-  sku?: string;
   availableForSale: boolean;
-  stockQuantity?: number | null;
-  brand?: string;
-  material?: string;
   attributes?: ProductAttribute[];
   categorySlug?: string;
-  images: string[];
+  images: ProductImage[];
   options?: ProductOption[];
   variants?: ProductVariant[];
   updatedAt: string;

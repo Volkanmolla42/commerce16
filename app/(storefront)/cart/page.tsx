@@ -28,7 +28,7 @@ import {
   Badge,
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
-import { getProductUnitPrice } from "@/lib/catalog/variants";
+import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
 import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
 
 function CartContent() {
@@ -68,17 +68,14 @@ function CartContent() {
         id: product._id,
         slug: product.slug,
         title: product.title,
-        price: product.price || "0.00",
+        price: getProductPriceRange(product).min,
         availableForSale: product.availableForSale ?? true,
-        stockQuantity: product.stockQuantity ?? null,
-        brand: product.brand,
-        material: product.material,
         categorySlug: product.categorySlug,
         images: product.images,
         options: product.options,
-        variants: product.variants?.map(({ price, ...variant }) => ({
+        variants: product.variants.map(({ price, ...variant }) => ({
           ...variant,
-          ...(price ? { price: { amount: price, currencyCode: "TRY" } } : {}),
+          price: { amount: price, currencyCode: "TRY" },
         })),
         updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
       });
@@ -107,9 +104,6 @@ function CartContent() {
         ? product.variants?.find((candidate) => candidate.id === resolvedVariantId)
         : undefined;
       if (resolvedVariantId && (!variant || !variant.availableForSale)) continue;
-      const stock = variant?.stockQuantity ?? product.stockQuantity;
-      if (stock != null && stock <= 0) continue;
-
       const currentQuantity = items.find((item) =>
         item.product.id === product.id && item.variantId === resolvedVariantId
       )?.quantity ?? 0;
@@ -198,11 +192,11 @@ function CartContent() {
                       className="flex-none overflow-hidden rounded-2xl border border-border bg-muted/30"
                     >
                       {item.product.images[0] ? <Image
-                        src={item.product.images[0]}
+                        src={item.product.images[0].url}
                         width={96}
                         height={96}
                         alt={item.product.title}
-                        className="h-24 w-24 object-cover transition hover:scale-105"
+                        className="h-24 w-24 object-cover"
                       /> : (
                         <div className="flex h-24 w-24 items-center justify-center text-muted-foreground">
                           <ShoppingBag01Icon className="h-8 w-8" />
@@ -310,14 +304,6 @@ function CartContent() {
                 <span className="font-semibold text-foreground">
                   {formatMoney(totalAmount)}
                 </span>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Tahmini Kargo</span>
-                <Badge variant="success">Ücretsiz</Badge>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>KDV</span>
-                <span className="font-semibold text-foreground">Dahil</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold text-foreground pt-1">

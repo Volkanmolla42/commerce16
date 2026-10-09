@@ -18,7 +18,6 @@ import {
   GlobeAltIcon,
   PlusCircleIcon,
   PlusIcon,
-  Squares2X2Icon,
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -30,12 +29,12 @@ import {
 } from "./attribute-field-inputs";
 import { VariantOptionValuesInput } from "./variant-option-values-input";
 
-type StoredImage = NonNullable<Doc<"products">["storageImages"]>[number] & {
+type StoredImage = NonNullable<Doc<"products">["images"]>[number] & {
   url: string | null;
 };
-export type Product = Omit<Doc<"products">, "priceValue" | "searchText"> & { storageImages?: StoredImage[] };
+export type Product = Omit<Doc<"products">, "priceValue" | "images"> & { images: StoredImage[] };
 export type Category = Doc<"categories">;
-type PendingImage = { id: string; blob: Blob; fileName: string; previewUrl: string };
+type PendingImage = { id: string; blob: Blob; fileName: string; previewUrl: string; selectedOptions?: { name: string; value: string }[] };
 type VariantOptionDraft = { id: string; name: string; values: string[] };
 type VariantDraft = {
   id?: string;
@@ -43,7 +42,6 @@ type VariantDraft = {
   sku: string;
   barcode?: string;
   price: string;
-  vatRate: string;
   stockQuantity: string;
   availableForSale: boolean;
 };
@@ -146,18 +144,6 @@ function ProductEditor({
 }) {
   const [title, setTitle] = useState(product?.title || "");
   const [slug, setSlug] = useState(product?.slug || "");
-  const [price, setPrice] = useState(product?.price || "");
-  const defaultVariant = product?.variants?.find((variant) => variant.selectedOptions.length === 0);
-  const [baseSku, setBaseSku] = useState(defaultVariant?.sku || product?.sku || generatedVariantSku(product?.slug || slug, []));
-  const [baseBarcode, setBaseBarcode] = useState(defaultVariant?.barcode || "");
-  const [baseStockQuantity, setBaseStockQuantity] = useState(
-    defaultVariant?.stockQuantity == null
-      ? product?.stockQuantity == null ? "0" : String(product.stockQuantity)
-      : String(defaultVariant.stockQuantity),
-  );
-  const [baseVatRate, setBaseVatRate] = useState(defaultVariant?.vatRate == null
-    ? product?.vatRate == null ? "" : String(product.vatRate)
-    : String(defaultVariant.vatRate));
   const [variantOptions, setVariantOptions] = useState<VariantOptionDraft[]>(() =>
     (product?.options ?? []).map((option) => ({ ...option, values: option.values })),
   );
@@ -176,28 +162,31 @@ function ProductEditor({
     }
     return map;
   });
-  const [storageImages, setStorageImages] = useState<StoredImage[]>(product?.storageImages || []);
+  const [images, setImages] = useState<StoredImage[]>(product?.images || []);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [processingImages, setProcessingImages] = useState(false);
   const previewUrls = useRef<string[]>([]);
   const [availableForSale, setAvailableForSale] = useState(product?.availableForSale ?? true);
-  const [variantRows, setVariantRows] = useState<VariantDraft[]>(() =>
-    (product?.variants ?? [])
-      .filter((variant) => variant.selectedOptions.length > 0)
-      .map((variant) => ({
+  const [variantRows, setVariantRows] = useState<VariantDraft[]>(() => {
+    const existingVariants = (product?.variants ?? []).map((variant) => ({
         id: variant.id,
         selectedOptions: variant.selectedOptions.map(({ name, value }) => ({ name, value })),
         sku: variant.sku ?? "",
         barcode: variant.barcode ?? "",
-        price: variant.price ?? product?.price ?? "",
-        vatRate: variant.vatRate == null ? product?.vatRate == null ? "" : String(product.vatRate) : String(variant.vatRate),
-        stockQuantity: String(variant.stockQuantity ?? 0),
+        price: variant.price,
+        stockQuantity: String(variant.stockQuantity),
         availableForSale: variant.availableForSale,
-      })),
-  );
-  const [isVariantProduct, setIsVariantProduct] = useState(() =>
-    Boolean(product?.variants?.some((variant) => variant.selectedOptions.length > 0)),
-  );
+      }));
+    return existingVariants.length ? existingVariants : [{
+      id: createEditorId(),
+      selectedOptions: [],
+      sku: generatedVariantSku(product?.slug || "", []),
+      barcode: "",
+      price: "",
+      stockQuantity: "0",
+      availableForSale: true,
+    }];
+  });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -254,6 +243,7 @@ function ProductEditor({
 
     const usedSkus = new Set<string>();
     const claimedParentCounts = new Map<VariantDraft, number>();
+    const defaultRow = variantRows.find((variant) => variant.selectedOptions.length === 0);
 
     const ensureUniqueSku = (candidate: string, fallbackSlug: string, selOptions: { name: string; value: string }[]) => {
       let cleaned = candidate.trim().replace(/[^A-Za-z0-9._-]/g, "").slice(0, 64);
@@ -352,10 +342,17 @@ function ProductEditor({
           selectedOptions: comb,
           sku,
           barcode: claimCount === 0 ? (bestMatch.barcode ?? "") : "",
-          price: bestMatch.price || price || "",
-          vatRate: bestMatch.vatRate || baseVatRate,
-          stockQuantity: claimCount === 0 ? (bestMatch.stockQuantity || "0") : "0",
+          price: bestMatch.price || defaultRow?.price || variantRows[0]?.price || "",
+          stockQuantity: "0",
           availableForSale: bestMatch.availableForSale ?? true,
+        };
+      }
+
+      if (defaultRow && index === 0) {
+        return {
+          ...defaultRow,
+          selectedOptions: comb,
+          sku: ensureUniqueSku(defaultRow.sku, slug, comb),
         };
       }
 
@@ -365,35 +362,48 @@ function ProductEditor({
         selectedOptions: comb,
         sku,
         barcode: "",
-        price: price || "",
-        vatRate: baseVatRate,
+        price: defaultRow?.price || variantRows[0]?.price || "",
         stockQuantity: "0",
         availableForSale: true,
       };
     });
 
     setVariantRows(nextVariantRows);
+    setImages((current) => current.map((image) => {
+      const selectedOptions = image.selectedOptions?.filter(({ name, value }) =>
+        options.some((option) => normalizeOptionKey(option.name) === normalizeOptionKey(name) && option.values.includes(value)),
+      );
+      return { ...image, selectedOptions: selectedOptions?.length ? selectedOptions : undefined };
+    }));
+    setPendingImages((current) => current.map((image) => {
+      const selectedOptions = image.selectedOptions?.filter(({ name, value }) =>
+        options.some((option) => normalizeOptionKey(option.name) === normalizeOptionKey(name) && option.values.includes(value)),
+      );
+      return { ...image, selectedOptions: selectedOptions?.length ? selectedOptions : undefined };
+    }));
     setGeneratedOptionSignature(variantOptionSignature(options));
     setError(null);
   };
 
-  const toggleVariantProduct = () => {
-    if (isVariantProduct) {
-      const first = variantRows[0];
-      if (first) {
-        setBaseSku(first.sku);
-        setBaseBarcode(first.barcode || "");
-        setBaseStockQuantity(first.stockQuantity);
-        setPrice(first.price);
-        setBaseVatRate(first.vatRate);
-      }
-      setIsVariantProduct(false);
+  const removeVariantOption = (optionId: string) => {
+    const nextOptions = variantOptions.filter((option) => option.id !== optionId);
+    if (nextOptions.length > 0) {
+      setVariantOptions(nextOptions);
       return;
     }
-    if (variantOptions.length === 0) {
-      setVariantOptions([{ id: createEditorId(), name: "", values: [] }]);
-    }
-    setIsVariantProduct(true);
+
+    const hasCombinations = variantRows.some((variant) => variant.selectedOptions.length > 0);
+    if (hasCombinations && variantRows.length > 1 && !window.confirm(
+      "Seçenekleri kaldırınca kombinasyonlar silinecek. İlk kombinasyonun SKU, fiyat ve stoku korunacak. Devam edilsin mi?",
+    )) return;
+
+    const firstVariant = variantRows[0];
+    if (firstVariant) setVariantRows([{ ...firstVariant, selectedOptions: [] }]);
+    setVariantOptions([]);
+    setGeneratedOptionSignature(variantOptionSignature([]));
+    setImages((current) => current.map((image) => ({ ...image, selectedOptions: undefined })));
+    setPendingImages((current) => current.map((image) => ({ ...image, selectedOptions: undefined })));
+    setError(null);
   };
 
   const updateVariant = (index: number, patch: Partial<VariantDraft>) => {
@@ -409,7 +419,7 @@ function ProductEditor({
     const files = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
     if (!files.length) return;
-    if (storageImages.length + pendingImages.length + files.length > 20) {
+    if (images.length + pendingImages.length + files.length > 20) {
       setError("Bir üründe en fazla 20 görsel olabilir.");
       return;
     }
@@ -420,7 +430,7 @@ function ProductEditor({
       const nextImages: PendingImage[] = [];
       for (const [index, file] of files.entries()) {
         const blob = await convertImageToWebp(file);
-        const position = storageImages.length + pendingImages.length + index;
+        const position = images.length + pendingImages.length + index;
         const fileName = productImageFileName(title || slug || "urun", position);
         const previewUrl = URL.createObjectURL(blob);
         previewUrls.current.push(previewUrl);
@@ -460,24 +470,21 @@ function ProductEditor({
     const { url } = await runAdminAction<{ url: string }>("product.image-url", {
       storageId: uploaded.storageId,
     });
-    return { storageId: uploaded.storageId as StoredImage["storageId"], fileName, url };
+    return {
+      storageId: uploaded.storageId as StoredImage["storageId"], fileName, url,
+      ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
+    };
   };
 
   const save = async (event?: React.FormEvent<HTMLFormElement>, publishStatusOverride?: boolean) => {
     if (event) event.preventDefault();
     const targetAvailableForSale = publishStatusOverride !== undefined ? publishStatusOverride : availableForSale;
-    const activeVariantRows = isVariantProduct ? variantRows : [];
-    const activeOptions = isVariantProduct ? variantOptions.map((option) => ({
+    const activeVariantRows = variantRows;
+    const activeOptions = variantOptions.map((option) => ({
       id: option.id,
       name: option.name.trim(),
       values: option.values.map((v) => v.trim()).filter(Boolean),
-    })) : [];
-    const basePrice = (activeVariantRows[0]?.price ?? price).trim();
-
-    if (activeVariantRows.length === 0 && !baseSku.trim()) {
-      setError("Ürün SKU kodunu gir.");
-      return;
-    }
+    }));
     if (!slug.trim()) {
       setError("Ürün adı geçerli bir mağaza adresi oluşturmalı.");
       return;
@@ -536,68 +543,47 @@ function ProductEditor({
         productAttributes.push({ key: definition.key, value: str });
       }
     }
-    if (activeVariantRows.length === 0 && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(baseSku.trim())) {
-      setError("SKU 1-64 karakter olmalı ve yalnızca harf, rakam, nokta, alt çizgi veya tire içermeli.");
-      return;
-    }
-    if (activeVariantRows.length === 0 && (!baseStockQuantity.trim() || !/^\d+$/.test(baseStockQuantity) || !Number.isSafeInteger(Number(baseStockQuantity)))) {
-      setError("Stok adedi sıfır veya daha büyük bir tam sayı olmalı.");
+    if (activeVariantRows.length === 0) {
+      setError("Ürün için en az bir kombinasyon gerekli.");
       return;
     }
     if (activeVariantRows.length > 100) {
       setError("Bir üründe en fazla 100 kombinasyon olabilir.");
       return;
     }
-    if (isVariantProduct && (activeOptions.length === 0 || activeOptions.some((option) => !option.name || option.values.length === 0))) {
-      setError("Kombinasyon seçeneklerine ad ve en az bir değer gir.");
+    if (activeOptions.some((option) => !option.name || option.values.length === 0)) {
+      setError("Her seçenek için bir ad ve en az bir değer gir.");
       return;
     }
-    if (isVariantProduct && variantOptionSignature(activeOptions) !== generatedOptionSignature) {
+    if (variantOptionSignature(activeOptions) !== generatedOptionSignature) {
       setError("Seçenekleri değiştirdin. Tabloyu güncellemek için 'Kombinasyonları oluştur' butonuna tıkla.");
       return;
     }
-    if (isVariantProduct && new Set(activeOptions.map((option) => option.name.toLocaleLowerCase("tr-TR"))).size !== activeOptions.length) {
+    if (new Set(activeOptions.map((option) => option.name.toLocaleLowerCase("tr-TR"))).size !== activeOptions.length) {
       setError("Seçenek adları birbirinden farklı olmalı.");
       return;
     }
-    if (isVariantProduct && activeOptions.some((option) => new Set(option.values.map((value) => value.toLocaleLowerCase("tr-TR"))).size !== option.values.length)) {
+    if (activeOptions.some((option) => new Set(option.values.map((value) => value.toLocaleLowerCase("tr-TR"))).size !== option.values.length)) {
       setError("Aynı seçenek değerini birden fazla ekleme.");
       return;
     }
     const combinationCount = activeOptions.reduce((count, option) => count * option.values.length, 1);
-    if (isVariantProduct && combinationCount > 100) {
+    if (combinationCount > 100) {
       setError("Bir üründe en fazla 100 kombinasyon olabilir.");
       return;
     }
-    if (isVariantProduct && activeVariantRows.length === 0) {
-      setError("En az bir satılabilir kombinasyon oluştur.");
-      return;
-    }
-    if (isVariantProduct && activeVariantRows.some((variant) =>
+    if ((activeOptions.length === 0 && activeVariantRows.length !== 1) || activeVariantRows.some((variant) =>
       variant.selectedOptions.length !== activeOptions.length ||
       activeOptions.some((option) => !variant.selectedOptions.some((selected) => normalizeOptionKey(selected.name) === normalizeOptionKey(option.name) && option.values.includes(selected.value))),
     )) {
       setError("Kombinasyon tablosunu güncel seçeneklerle yeniden oluştur.");
       return;
     }
-    if (!baseVatRate.trim() || !/^\d+(?:[.,]\d{1,2})?$/.test(baseVatRate.trim()) || Number(baseVatRate.replace(",", ".")) > 100) {
-      setError("0 ile 100 arasında geçerli bir KDV oranı gir.");
-      return;
-    }
     if (new Set(activeVariantRows.map((variant) => selectionKey(variant.selectedOptions))).size !== activeVariantRows.length) {
       setError("Kombinasyonlar birbirinden farklı olmalı.");
       return;
     }
-    if (!/^\d+(?:[.,]\d{1,2})?$/.test(basePrice) || !Number.isSafeInteger(Math.round(Number(basePrice.replace(",", ".")) * 100))) {
-      setError("Geçerli bir satış fiyatı gir.");
-      return;
-    }
     for (const draft of activeVariantRows) {
-      const variantStock = draft.stockQuantity.trim();
-      if (!variantStock || !/^\d+$/.test(variantStock) || !Number.isSafeInteger(Number(variantStock))) {
-        setError("Her kombinasyon için sıfır veya daha büyük bir stok adedi girin.");
-        return;
-      }
       const variantSku = draft.sku.trim();
       if (!variantSku) {
         setError("Her kombinasyon için ayrı bir SKU girin.");
@@ -611,52 +597,43 @@ function ProductEditor({
       setError("Her kombinasyon için geçerli bir satış fiyatı gir.");
         return;
       }
+      if (!/^\d+$/.test(draft.stockQuantity) || !Number.isSafeInteger(Number(draft.stockQuantity))) {
+        setError("Her kombinasyon için sıfır veya daha büyük tam sayı stok gir.");
+        return;
+      }
     }
     if (new Set(activeVariantRows.map((variant) => variant.sku.trim().toLocaleUpperCase("en-US"))).size !== activeVariantRows.length) {
       setError("Her kombinasyonun SKU kodu birbirinden farklı olmalı.");
       return;
     }
-    if (storageImages.length + pendingImages.length > 20) {
+    if (images.length + pendingImages.length > 20) {
       setError("Bir üründe en fazla 20 görsel olabilir.");
       return;
     }
     setSaving(true);
     setError(null);
-    const parsedVatRate = Number(baseVatRate.replace(",", "."));
     const input = {
       ...(product ? { id: product._id } : {}),
       title: title.trim(),
       slug: slug.trim(),
-      price: basePrice.replace(",", "."),
-      vatRate: parsedVatRate,
       categorySlug,
       attributes: productAttributes,
       images: [],
       availableForSale: targetAvailableForSale,
-      options: activeVariantRows.length > 0 ? activeOptions : [],
-      variants: activeVariantRows.length > 0 ? activeVariantRows.map((variant) => {
+      options: activeOptions,
+      variants: activeVariantRows.map((variant) => {
         const selectedOptions = variant.selectedOptions;
         return {
           id: variant.id || createEditorId(),
           sku: variant.sku.trim(),
           ...(variant.barcode?.trim() ? { barcode: variant.barcode.trim() } : {}),
-          title: selectedOptions.map(({ value }) => value).join(" / "),
+          title: selectedOptions.map(({ value }) => value).join(" / ") || "Ürünün kendisi",
           selectedOptions,
           price: variant.price.trim().replace(",", "."),
-          vatRate: parsedVatRate,
-          availableForSale: variant.availableForSale,
           stockQuantity: Number(variant.stockQuantity),
+          availableForSale: variant.availableForSale,
         };
-      }) : [{
-        id: variantRows[0]?.id || defaultVariant?.id || createEditorId(),
-        sku: baseSku.trim(),
-        ...(baseBarcode.trim() ? { barcode: baseBarcode.trim() } : {}),
-        title: "Ürünün kendisi",
-        selectedOptions: [],
-        vatRate: parsedVatRate,
-        availableForSale: targetAvailableForSale,
-        stockQuantity: Number(baseStockQuantity),
-      }],
+      }),
     };
 
     try {
@@ -664,14 +641,15 @@ function ProductEditor({
       for (const [index, image] of pendingImages.entries()) {
         uploadedImages.push(await uploadPendingImage(
           image,
-          productImageFileName(title || slug || "urun", storageImages.length + index),
+          productImageFileName(title || slug || "urun", images.length + index),
         ));
       }
       await runAdminAction(product ? "product.update" : "product.create", {
         ...input,
-        storageImages: [...storageImages, ...uploadedImages].map((image) => ({
+        images: [...images, ...uploadedImages].map((image) => ({
           storageId: image.storageId,
           fileName: image.fileName,
+          ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
         })),
       });
       onSaved();
@@ -694,35 +672,62 @@ function ProductEditor({
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
           <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-5">
-            <h2 className="text-sm font-semibold text-neutral-100">Görseller</h2>
-            <label htmlFor="product-image-upload" className={`flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-950 p-4 text-center transition hover:border-neutral-500 hover:bg-neutral-800/70 ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
-              <span className="grid size-9 place-items-center rounded-full bg-neutral-800 text-neutral-300"><PlusCircleIcon className="size-5" /></span>
-              <strong className="text-xs font-medium text-neutral-200">
-                {processingImages ? "Görseller hazırlanıyor…" : `Görsel ekle (${storageImages.length + pendingImages.length}/20)`}
-              </strong>
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-neutral-100">Görseller</h2>
+              <label htmlFor="product-image-upload" className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-xs font-medium text-neutral-200 transition-colors hover:border-neutral-500 hover:bg-neutral-800 ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
+                <PlusCircleIcon className="size-4" />
+                <span>{processingImages ? "Hazırlanıyor…" : "Görsel ekle"}</span>
+                <span className="rounded-md bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{images.length + pendingImages.length}/20</span>
+              </label>
+            </div>
             <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event)} className="sr-only" />
-            {(storageImages.length > 0 || pendingImages.length > 0) && <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
-              {storageImages.map((image) => <div key={image.storageId} className="group relative overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
-                {image.url ? <Image src={image.url} alt={title} width={240} height={240} unoptimized className="aspect-square w-full object-cover" /> : <div className="aspect-square" />}
-                <Button type="button" size="sm" variant="secondary" disabled={saving} className="absolute right-1 top-1 min-h-7 rounded-md bg-neutral-950/90 px-2 text-[10px] text-neutral-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => setStorageImages((current) => current.filter((item) => item.storageId !== image.storageId))}>
-                  <TrashIcon className="mr-1 size-3" />
-                  Kaldır
-                </Button>
+            {(images.length > 0 || pendingImages.length > 0) ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {images.map((image) => <div key={image.storageId} className="group overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950">
+                <div className="relative aspect-[4/5] overflow-hidden bg-neutral-900">
+                  {image.url ? <Image src={image.url} alt={title} width={400} height={500} unoptimized className="size-full object-cover" /> : null}
+                  <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-neutral-950/90 text-neutral-100 opacity-100 hover:bg-rose-950 hover:text-rose-200 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => setImages((current) => current.filter((item) => item.storageId !== image.storageId))}>
+                    <TrashIcon className="size-4" />
+                  </Button>
+                </div>
+                {variantOptions.length > 0 && <select aria-label={`${image.fileName} görsel kapsamı`} disabled={saving} value={JSON.stringify(image.selectedOptions ?? [])} onChange={(event) => {
+                  const selectedOptions: { name: string; value: string }[] = JSON.parse(event.target.value) as { name: string; value: string }[];
+                  setImages((current) => current.map((item) => item.storageId === image.storageId
+                    ? { ...item, selectedOptions: selectedOptions.length ? selectedOptions : undefined }
+                    : item));
+                }} className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-neutral-800 bg-neutral-900 px-2.5 text-xs text-neutral-200 outline-none focus-visible:border-neutral-600">
+                  <option value="[]">Tüm varyantlarda</option>
+                  {variantOptions.flatMap((option) => option.values.map((value) => {
+                    const scope = [{ name: option.name, value }];
+                    return <option key={`${option.id}:${value}`} value={JSON.stringify(scope)}>{option.name}: {value}</option>;
+                  }))}
+                </select>}
               </div>)}
-              {pendingImages.map((image) => <div key={image.id} className="group relative overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
-                <Image src={image.previewUrl} alt={title} width={240} height={240} unoptimized className="aspect-square w-full object-cover" />
-                <Button type="button" size="sm" variant="secondary" disabled={saving} className="absolute right-1 top-1 min-h-7 rounded-md bg-neutral-950/90 px-2 text-[10px] text-neutral-100 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
-                  <TrashIcon className="mr-1 size-3" />
-                  Kaldır
-                </Button>
+              {pendingImages.map((image) => <div key={image.id} className="group overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950">
+                <div className="relative aspect-[4/5] overflow-hidden bg-neutral-900">
+                  <Image src={image.previewUrl} alt={title} width={400} height={500} unoptimized className="size-full object-cover" />
+                  <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-neutral-950/90 text-neutral-100 opacity-100 hover:bg-rose-950 hover:text-rose-200 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
+                    <TrashIcon className="size-4" />
+                  </Button>
+                </div>
+                {variantOptions.length > 0 && <select aria-label={`${image.fileName} görsel kapsamı`} disabled={saving} value={JSON.stringify(image.selectedOptions ?? [])} onChange={(event) => {
+                  const selectedOptions: { name: string; value: string }[] = JSON.parse(event.target.value) as { name: string; value: string }[];
+                  setPendingImages((current) => current.map((item) => item.id === image.id
+                    ? { ...item, selectedOptions: selectedOptions.length ? selectedOptions : undefined }
+                    : item));
+                }} className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-neutral-800 bg-neutral-900 px-2.5 text-xs text-neutral-200 outline-none focus-visible:border-neutral-600">
+                  <option value="[]">Tüm varyantlarda</option>
+                  {variantOptions.flatMap((option) => option.values.map((value) => {
+                    const scope = [{ name: option.name, value }];
+                    return <option key={`${option.id}:${value}`} value={JSON.stringify(scope)}>{option.name}: {value}</option>;
+                  }))}
+                </select>}
               </div>)}
-            </div>}
+            </div> : <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950/50 px-4 py-5 text-center text-xs text-neutral-500">Henüz görsel eklenmedi</div>}
           </section>
           <section aria-label="Ürün Bilgileri" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
             <div className="space-y-5">
               <h2 className="text-sm font-semibold text-neutral-100">Ürün Bilgileri</h2>
-              <div className="grid gap-4 sm:grid-cols-[1fr_10rem] sm:items-start">
+              <div className="grid gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="product-title" className="text-xs font-medium text-neutral-300">Ürün adı <span className="text-red-400">*</span></Label>
                   <Input id="product-title" name="title" autoComplete="off" required minLength={2} maxLength={140} placeholder="Ürün adı" value={title} onChange={(event) => {
@@ -730,22 +735,6 @@ function ProductEditor({
                     setTitle(nextTitle);
                     setSlug(slugify(nextTitle));
                   }} className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-4 text-sm text-neutral-100 placeholder:text-neutral-600 focus-visible:ring-neutral-400" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product-vat-rate" className="text-xs font-medium text-neutral-300">KDV oranı (%) <span className="text-red-400">*</span></Label>
-                  <Input
-                    id="product-vat-rate"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    required
-                    value={baseVatRate}
-                    onChange={(event) => setBaseVatRate(event.target.value)}
-                    placeholder="Örn. 20"
-                    className="h-12 rounded-xl border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 focus-visible:ring-neutral-400"
-                  />
                 </div>
               </div>
 
@@ -874,14 +863,7 @@ function ProductEditor({
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold text-neutral-100">Varyantlar</h2>
-                <label className="flex h-10 cursor-pointer items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-950/60 px-4 text-xs font-medium text-neutral-200 hover:border-neutral-700">
-                  <input type="checkbox" checked={isVariantProduct} onChange={toggleVariantProduct} className="size-4 accent-neutral-200" />
-                  <Squares2X2Icon className="size-4 text-neutral-400" />
-                  <span>Varyantlı ürün</span>
-                </label>
               </div>
-              {isVariantProduct ? (
-                <>
                   <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h4 className="text-xs font-semibold text-neutral-200">Varyant seçenekleri</h4>
@@ -891,7 +873,7 @@ function ProductEditor({
                     </div>
                     {variantOptions.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-neutral-800 p-4 text-center text-xs text-neutral-400">
-                        Henüz seçenek eklenmedi. Başlamak için yukarıdaki &quot;Seçenek ekle&quot; butonuna tıklayın.
+                        Seçenek eklemeden ürün tek kombinasyon olarak kaydedilir.
                       </div>
                     ) : (
                       variantOptions.map((option, index) => (
@@ -911,41 +893,40 @@ function ProductEditor({
                               }
                             />
                           </div>
-                          <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} onClick={() => setVariantOptions((current) => current.filter((item) => item.id !== option.id))}>
+                          <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} onClick={() => removeVariantOption(option.id)}>
                             <TrashIcon className="size-4" />
                           </Button>
                         </div>
                       ))
                     )}
-                    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-800 pt-3">
+                    {variantOptions.length > 0 && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-800 pt-3">
                       <Button type="button" variant="secondary" className="min-h-9 rounded-lg px-3 text-xs" onClick={generateVariantRows}>
                         <ArrowPathIcon className="mr-1.5 size-3.5" />
                         Kombinasyonları oluştur
                       </Button>
-                    </div>
+                    </div>}
                   </section>
 
-                  {variantRows.length > 0 && <>
-                    <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
+                  <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
                       <table className="w-full min-w-[760px] border-collapse text-left text-xs">
                         <thead className="bg-neutral-950 text-neutral-400">
                           <tr>
                             <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
                             <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-red-400">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Adet <span className="text-red-400">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-red-400">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">Stok</th>
                             <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
                             <th scope="col" className="px-3 py-3 font-medium"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-800">
                           {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)}>
-                            <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-neutral-200">{variant.selectedOptions.map(({ value }) => value).join(" / ")}</td>
+                            <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-neutral-200">{variant.selectedOptions.map(({ value }) => value).join(" / ") || "Tek ürün"}</td>
                             <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
                             <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="w-20 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
                             <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
+                            <td className="w-24 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
                             <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" /></td>
                             <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-9 px-2 text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
                           </tr>)}
@@ -956,57 +937,16 @@ function ProductEditor({
                     <div className="space-y-3 md:hidden">
                       {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Kombinasyon ${index + 1}`} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200">{selected.name}: {selected.value}</span>)}</div>
+                          <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.length > 0 ? variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200">{selected.name}: {selected.value}</span>) : <span className="text-xs text-neutral-400">Tek ürün</span>}</div>
                           <Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-8 px-2 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
                         </div>
                         <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
                         <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-neutral-400">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-neutral-400">Adet <span className="text-red-400">*</span></Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                          <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                        </div>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
+                        <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-neutral-400">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
                         <label className="flex min-h-11 items-center gap-2 self-end text-xs text-neutral-300"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" />Satışta</label>
                       </section>)}
-                    </div>
-                  </>}
-                </>
-              ) : (
-                <>
-                  <div className="hidden overflow-x-auto rounded-xl border border-neutral-800 md:block">
-                    <table className="w-full min-w-[640px] border-collapse text-left text-xs">
-                      <thead className="bg-neutral-950 text-neutral-400">
-                        <tr>
-                          <th scope="col" className="px-3 py-3 font-medium">Ürün</th>
-                          <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-red-400">*</span></th>
-                          <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
-                          <th scope="col" className="px-3 py-3 font-medium">Adet <span className="text-red-400">*</span></th>
-                          <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-red-400">*</span></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="min-w-36 px-3 py-3"><div className="flex h-10 items-center rounded-lg border border-neutral-800 bg-neutral-900 px-3 text-xs text-neutral-400">Tek ürün</div></td>
-                          <td className="min-w-36 px-3 py-3"><Input aria-label="Ürün SKU" name="sku" required maxLength={64} value={baseSku} onChange={(event) => setBaseSku(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                          <td className="min-w-32 px-3 py-3"><Input aria-label="Ürün Barkod" placeholder="Barkod / GTIN" maxLength={64} value={baseBarcode} onChange={(event) => setBaseBarcode(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                          <td className="w-24 px-2 py-3"><Input aria-label="Ürün stok adedi" name="stockQuantity" required type="number" inputMode="numeric" min="0" step="1" value={baseStockQuantity} onChange={(event) => setBaseStockQuantity(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                          <td className="w-28 px-2 py-3"><Input aria-label="Ürün satış fiyatı" name="price" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs font-semibold text-neutral-100 placeholder:text-neutral-600" /></td>
-                        </tr>
-                      </tbody>
-                    </table>
                   </div>
-                  <div className="space-y-3 md:hidden">
-                    <section aria-label="Tek ürün" className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
-                      <span className="text-xs font-medium text-neutral-400">Tek ürün</span>
-                      <div className="space-y-2"><Label htmlFor="mobile-product-sku" className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id="mobile-product-sku" required maxLength={64} value={baseSku} onChange={(event) => setBaseSku(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                      <div className="space-y-2"><Label htmlFor="mobile-product-barcode" className="text-xs text-neutral-400">Barkod</Label><Input id="mobile-product-barcode" placeholder="Barkod / GTIN" maxLength={64} value={baseBarcode} onChange={(event) => setBaseBarcode(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2"><Label htmlFor="mobile-product-stock" className="text-xs text-neutral-400">Stok adedi <span className="text-red-400">*</span></Label><Input id="mobile-product-stock" required type="number" inputMode="numeric" min="0" step="1" value={baseStockQuantity} onChange={(event) => setBaseStockQuantity(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100" /></div>
-                        <div className="space-y-2"><Label htmlFor="mobile-product-price" className="text-xs text-neutral-400">Fiyat (₺) <span className="text-red-400">*</span></Label><Input id="mobile-product-price" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 text-sm text-neutral-100 placeholder:text-neutral-600" /></div>
-                      </div>
-                    </section>
-                  </div>
-                </>
-              )}
             </div>
           </section>
         </div>

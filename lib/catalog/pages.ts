@@ -24,7 +24,7 @@ export async function getCatalogPage(params: CatalogSearchParams, categorySlug?:
     categorySlug === undefined ? Promise.resolve({}) : fetchQuery(api.catalog.facets, { categorySlug }),
   ]);
   return { products: result.page, continueCursor: result.continueCursor, isDone: result.isDone,
-    facets: { inStock: true, outOfStock: true, attributes },
+    facets: { attributes },
     filters: args.filters, attributeFilters: args.attributes };
 }
 
@@ -32,13 +32,11 @@ export async function getAdminProductPage(params: CatalogSearchParams) {
   const { client, adminSecret } = getAdminBackend();
   const category = param(params, "category");
   const availability = param(params, "availability");
-  const stock = param(params, "stock");
   const result = await client.query(api.catalog.page, {
     ...pageArguments(params, category && category !== "all" ? category : undefined), adminSecret,
     availability: availability === "active" || availability === "inactive" ? availability : "all",
-    stock: stock === "in-stock" || stock === "out-of-stock" || stock === "untracked" ? stock : "all",
   });
-  return { items: result.page.map(({ id, ...item }) => ({ _id: id, ...item })),
+  return { items: result.page.map(({ id, ...item }) => ({ _id: id, ...item, images: item.images.map(({ url }) => url) })),
     continueCursor: result.continueCursor, isDone: result.isDone };
 }
 

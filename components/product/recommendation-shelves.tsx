@@ -12,7 +12,6 @@ import { Button } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
-import type { Doc } from "@/convex/_generated/dataModel";
 import type { Product } from "@/lib/catalog/types";
 import {
   getRecentProductSlugs,
@@ -21,7 +20,8 @@ import {
   RECENT_PRODUCTS_EVENT,
   recordRecentProduct,
 } from "@/lib/catalog/recommendations";
-import { getProductPriceRange, getSelectedVariant } from "@/lib/catalog/variants";
+import { getProductPriceRange, getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
+import { getProductImages, getVariantImages } from "@/lib/catalog/product-images";
 
 export function ProductViewTracker({ slug }: { slug: string }) {
   useEffect(() => recordRecentProduct(slug), [slug]);
@@ -56,13 +56,17 @@ function Shelf({ title, products, showCartActions = false, upsellSources, layout
               ? `/product/${product.slug}?${replacementParams.toString()}`
               : `/product/${product.slug}`;
             const priceRange = getProductPriceRange(product);
+            const imageUrl = getProductImages(product)[0]?.url;
+            const selectedProduct = defaultVariant
+              ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getVariantImages(product, defaultVariant) }
+              : product;
             return (
               <li key={product.id} className="min-w-0">
                 <article className="overflow-hidden rounded-2xl border border-border bg-card">
                   <div className="relative aspect-square bg-muted/30">
                     <Link href={productHref} aria-label={`${product.title} ürününü incele`} className="absolute inset-0">
-                      {product.images[0] && (
-                        <Image src={product.images[0]} alt={product.title} fill sizes="(min-width: 768px) 224px, 192px" className="object-contain p-3" />
+                      {imageUrl && (
+                        <Image src={imageUrl} alt={product.title} fill sizes="(min-width: 768px) 224px, 192px" className="object-contain p-3" />
                       )}
                     </Link>
                     <FavoriteButton product={product} className="absolute right-3 top-3 z-10" />
@@ -78,8 +82,8 @@ function Shelf({ title, products, showCartActions = false, upsellSources, layout
                       </Button>
                     ) : (
                       <Button type="button" size="sm" className="w-full" onClick={() => upsellSource
-                        ? replaceItem(upsellSource.product.id, upsellSource.variantId, product, upsellSource.quantity)
-                        : addItem(product, 1, defaultVariant?.id)}>
+                        ? replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id)
+                        : addItem(selectedProduct, 1, defaultVariant?.id)}>
                         {upsellSource ? "Sepettekiyle değiştir" : "Sepete ekle"}
                       </Button>
                     )}
@@ -91,7 +95,7 @@ function Shelf({ title, products, showCartActions = false, upsellSources, layout
         </ul>
       ) : (
         <Grid className={layout === "centered"
-          ? `mx-auto max-w-5xl ${products.length === 1 ? "grid-cols-1" : products.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
+          ? `mx-auto ${products.length === 1 ? "max-w-xs grid-cols-1" : products.length === 2 ? "max-w-2xl grid-cols-2" : "max-w-5xl grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
           : "grid-flow-col auto-cols-[12rem] overflow-x-auto pb-3 [scrollbar-width:thin] sm:auto-cols-[14rem]"}>
           <ProductGridItems
             products={products}
@@ -199,23 +203,19 @@ export function BoughtTogetherShelf({
   );
 }
 
-function mapRecommendationProduct(product: Omit<Doc<"products">, "priceValue" | "searchText">): Product {
+function mapRecommendationProduct(product: NonNullable<ReturnType<typeof useQuery<typeof api.products.list>>>[number]): Product {
   return {
     id: product._id,
     slug: product.slug,
     title: product.title,
     price: product.price,
-    sku: product.sku,
     availableForSale: product.availableForSale,
-    brand: product.brand,
-    material: product.material,
     categorySlug: product.categorySlug,
-    stockQuantity: product.stockQuantity,
-    images: product.images.slice(0, 1),
+    images: getProductImages(product).slice(0, 1),
     options: product.options,
-    variants: product.variants?.map(({ price, ...variant }) => ({
+    variants: product.variants.map(({ price, ...variant }) => ({
       ...variant,
-      ...(price ? { price: { amount: price, currencyCode: "TRY" } } : {}),
+      price: { amount: price, currencyCode: "TRY" },
     })),
     updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
   };
@@ -232,10 +232,9 @@ export function CartRecommendationShelf() {
     for (const candidate of candidates) {
       if (upsellSources.has(candidate.id)) continue;
       const availableVariants = (candidate.variants ?? []).filter((variant) => variant.availableForSale);
-      const sufficientStock = availableVariants.length > 0
-        ? availableVariants.some((variant) => variant.stockQuantity == null || variant.stockQuantity >= sourceItem.quantity)
-        : candidate.stockQuantity == null || candidate.stockQuantity >= sourceItem.quantity;
-      if (sufficientStock) upsellSources.set(candidate.id, sourceItem);
+      if (candidate.variants?.length ? availableVariants.length > 0 : candidate.availableForSale) {
+        upsellSources.set(candidate.id, sourceItem);
+      }
       if (upsellSources.size >= 8) break;
     }
     if (upsellSources.size >= 8) break;

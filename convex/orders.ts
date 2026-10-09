@@ -1,18 +1,16 @@
-import { env, internalMutation, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getCheckoutLegalDocuments } from "../lib/legal-documents";
 import schema from "./schema";
 import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertAdminApiSecret } from "./adminAuth";
+import { getImagesForVariant } from "../lib/catalog/product-images";
 import { components, internal } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import type { Id } from "./_generated/dataModel";
-import { commitOrderInventory, recordInventoryMovement, releaseOrderInventory, reserveOrderInventory } from "./inventory";
 import { getDistrictById, getProvinceById } from "../lib/turkey-provinces";
 import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation } from "./coupons";
-
-const reservationTtl = 30 * 60 * 1000;
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -52,17 +50,14 @@ export const getFrequentlyBoughtTogether = query({
     const sourceIds = new Set(productIds.slice(0, 10));
     if (sourceIds.size === 0) return [];
 
-    const orders = await Promise.all(
-      (["paid", "shipped", "delivered"] as const).map((status) =>
-        ctx.db.query("orders")
-          .withIndex("by_status", (q) => q.eq("status", status))
-          .order("desc")
-          .take(200),
-      ),
-    );
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "paid"))
+      .order("desc")
+      .take(200);
     const counts = new Map<string, number>();
 
-    for (const order of orders.flat()) {
+    for (const order of orders) {
       const productIdsInOrder = new Set(order.items.map((item) => item.productId));
       if (![...sourceIds].some((id) => productIdsInOrder.has(id))) continue;
       for (const productId of productIdsInOrder) {
@@ -83,17 +78,14 @@ export const getRecentPurchaseActivity = query({
   handler: async (ctx, { productId, now }) => {
     const day = 24 * 60 * 60 * 1000;
     const since = now - day;
-    const recentByStatus = await Promise.all(
-      (["paid", "shipped", "delivered"] as const).map((status) =>
-        ctx.db.query("orders")
-          .withIndex("by_status", (q) => q.eq("status", status).gte("_creationTime", since))
-          .order("desc")
-          .take(250),
-      ),
-    );
+    const recentOrders = await ctx.db
+      .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "paid").gte("_creationTime", since))
+      .order("desc")
+      .take(250);
     const latestPurchaseByBuyer = new Map<string, number>();
 
-    for (const order of recentByStatus.flat()) {
+    for (const order of recentOrders) {
       if (!order.items.some((item) => item.productId === productId)) continue;
       const buyer = order.customerEmail.trim().toLowerCase();
       latestPurchaseByBuyer.set(buyer, Math.max(latestPurchaseByBuyer.get(buyer) ?? 0, order._creationTime));
@@ -102,7 +94,7 @@ export const getRecentPurchaseActivity = query({
     const expirations = [...latestPurchaseByBuyer.values()].map((createdAt) => createdAt + day);
     return {
       buyerCount: latestPurchaseByBuyer.size,
-      limited: recentByStatus.some((orders) => orders.length === 250),
+      limited: recentOrders.length === 250,
       expiresAt: expirations.length > 0 ? Math.min(...expirations) : null,
     };
   },
@@ -154,14 +146,8 @@ export const createOrder = mutation({
       distanceSalesAgreementVersion: v.string(),
       preInformationFormVersion: v.string(),
     }),
-    invoiceRecipient: v.optional(v.object({
-      type: v.union(v.literal("individual"), v.literal("business")),
-      businessTitle: v.optional(v.string()),
-      taxNumber: v.optional(v.string()),
-      taxOffice: v.optional(v.string()),
-    })),
     saveAddress: v.optional(
-      schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1", "addressLine2", "postalCode")
+      schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1")
         .extend({ isDefault: v.optional(v.boolean()) })
     ),
   },
@@ -183,10 +169,6 @@ export const createOrder = mutation({
       args.legalAcceptance.preInformationFormVersion !== preInformation.version) {
       throw new Error("Yasal belgeler değişti veya onaylanmadı. Sayfayı yenileyip tekrar kontrol edin.");
     }
-    if (args.invoiceRecipient?.type === "business" &&
-      (!args.invoiceRecipient.businessTitle?.trim() || !/^\d{10}$/.test(args.invoiceRecipient.taxNumber ?? "") || !args.invoiceRecipient.taxOffice?.trim())) {
-      throw new Error("Kurumsal fatura için şirket unvanı, 10 haneli vergi numarası ve vergi dairesi gereklidir.");
-    }
     const emailKey = args.customerEmail.trim().toLowerCase();
     const emailLimit = await orderRateLimiter.limit(ctx, "orderByEmail", { key: emailKey });
     if (!emailLimit.ok) throw new Error("Bu e-posta adresiyle çok sık sipariş başlatıldı. Bir süre sonra tekrar deneyin.");
@@ -196,12 +178,6 @@ export const createOrder = mutation({
     }
     if (args.items.length === 0 || args.items.length > 100) throw new Error("Sipariş 1 ile 100 ürün içermeli.");
     const items = [];
-    const stockDeductions = new Map<string, {
-      productId: Id<"products">;
-      variantId?: string;
-      quantity: number;
-      tracking: "product" | "variant";
-    }>();
     let totalCents = 0;
     for (const item of args.items) {
       if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) throw new Error("Ürün adedi 1 ile 999 arasında tam sayı olmalı.");
@@ -213,29 +189,14 @@ export const createOrder = mutation({
         ? variants.find((candidate) => candidate.id === item.variantId)
         : variants.length === 1 ? variants[0] : undefined;
       if ((variants.length > 0 && !variant) || (item.variantId && !variant) || (variant && !variant.availableForSale)) throw new Error("Ürün seçeneği satışa uygun değil.");
-      const trackedVariantStock = variant?.stockQuantity != null;
-      const stockQuantity = trackedVariantStock ? variant.stockQuantity! : product.stockQuantity ?? null;
-      const tracking = trackedVariantStock ? "variant" as const : stockQuantity != null ? "product" as const : undefined;
-      if (stockQuantity === 0) throw new Error("Ürün seçeneği stokta kalmadı.");
-      if (tracking && stockQuantity != null) {
-        const key = tracking === "variant" ? `${product._id}:${variant!.id}` : product._id;
-        const previousQuantity = stockDeductions.get(key)?.quantity ?? 0;
-        if (previousQuantity + item.quantity > stockQuantity) throw new Error("Sipariş miktarı mevcut stok miktarını aşıyor.");
-        stockDeductions.set(key, {
-          productId: product._id,
-          variantId: tracking === "variant" ? variant!.id : undefined,
-          quantity: previousQuantity + item.quantity,
-          tracking,
-        });
-      }
-      const price = variant?.price ?? product.price;
+      const price = variant!.price;
       if (!/^\d+(?:\.\d{1,2})?$/.test(price)) throw new Error("Ürün fiyatı geçersiz.");
       const cents = Math.round(Number(price) * 100);
       if (!Number.isSafeInteger(cents) || cents < 0 || !Number.isSafeInteger(totalCents + cents * item.quantity)) throw new Error("Sipariş tutarı geçersiz.");
       if (Number(item.price) !== Number(price)) throw new Error("Sepet fiyatı değişti. Ürünleri yeniden sepete ekleyin.");
       totalCents += cents * item.quantity;
-      const storageImage = product.storageImages?.[0];
-      const image = product.images[0] ?? (storageImage ? await ctx.storage.getUrl(storageImage.storageId) : null);
+      const imageRecord = getImagesForVariant(product.images, variant!.selectedOptions)[0];
+      const image = imageRecord ? await ctx.storage.getUrl(imageRecord.storageId) : null;
       items.push({
         productId: product._id,
         variantId: variant?.id,
@@ -244,11 +205,8 @@ export const createOrder = mutation({
           : product.title,
         quantity: item.quantity,
         price: (cents / 100).toFixed(2),
-        sku: variant?.sku ?? product.sku,
-        vatRate: variant?.vatRate ?? product.vatRate,
+        sku: variant?.sku,
         image: image ?? undefined,
-        stockTracked: tracking !== undefined,
-        stockTracking: tracking,
       });
     }
     const coupon = args.couponCode?.trim()
@@ -256,14 +214,7 @@ export const createOrder = mutation({
       : undefined;
     const payableCents = coupon?.valid ? coupon.totalKurus : totalCents;
     if (payableCents <= 0) throw new Error("Kupon indirimi sepet toplamını sıfırlıyor; bu ödeme akışında ücretsiz sipariş oluşturulamıyor.");
-    const storeSettings = await ctx.db.query("storeSettings").withIndex("by_key", (q) => q.eq("key", "store")).unique();
-    const configuredShippingFeeKurus = storeSettings?.shippingFeeKurus ?? 0;
-    const freeShippingThresholdKurus = storeSettings?.freeShippingThresholdKurus ?? null;
-    const shippingCostKurus = configuredShippingFeeKurus > 0 && freeShippingThresholdKurus !== null && payableCents >= freeShippingThresholdKurus
-      ? 0
-      : configuredShippingFeeKurus;
-    const orderTotalCents = payableCents + shippingCostKurus;
-    if (!Number.isSafeInteger(orderTotalCents) || Number(args.total) !== orderTotalCents / 100) throw new Error("Sepet tutarı değişti. Sepetinizi kontrol edin.");
+    if (!Number.isSafeInteger(payableCents) || Number(args.total) !== payableCents / 100) throw new Error("Sepet tutarı değişti. Sepetinizi kontrol edin.");
 
     const analyticsSessionId = args.analyticsSessionId &&
       /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(args.analyticsSessionId)
@@ -299,15 +250,13 @@ export const createOrder = mutation({
     }
 
     // 3. Siparişi oluştur
-    const reservationExpiresAt = Date.now() + reservationTtl;
     const orderId = await ctx.db.insert("orders", {
       userId: userId ?? undefined,
       customerEmail: args.customerEmail.trim(),
       customerName: args.customerName.trim(),
       customerPhone: args.customerPhone?.trim(),
       items,
-      total: (orderTotalCents / 100).toFixed(2),
-      shippingCostKurus,
+      total: (payableCents / 100).toFixed(2),
       ...(coupon?.valid ? {
         couponId: coupon.couponId,
         couponCode: coupon.code,
@@ -315,12 +264,6 @@ export const createOrder = mutation({
         couponReserved: false,
       } : {}),
       status: "pending",
-      inventoryReserved: false,
-      reservationExpiresAt,
-      city: province.name,
-      district: district.name,
-      provinceId: province.id,
-      districtId: district.id,
       ...(analyticsSessionId ? { analyticsSessionId } : {}),
       shippingAddress: args.shippingAddress,
       legalAcceptance: {
@@ -336,40 +279,19 @@ export const createOrder = mutation({
           body: preInformation.body,
         },
       },
-      invoiceRecipient: args.invoiceRecipient,
     });
-    const createdOrder = await ctx.db.get(orderId);
-    if (createdOrder) {
-      await reserveOrderInventory(ctx, createdOrder, reservationExpiresAt);
-      if (coupon?.valid) {
-        await commitCouponReservation(ctx, createdOrder);
-      }
+    if (coupon?.valid) {
+      const createdOrder = await ctx.db.get(orderId);
+      if (createdOrder) await commitCouponReservation(ctx, createdOrder);
     }
-
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId });
     await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.markConvertedForOrder, { orderId });
-    await ctx.scheduler.runAfter(reservationTtl, internal.orders.expirePendingOrder, {
-      orderId,
-      reservationExpiresAt,
-    });
 
     return orderId;
   },
 });
 
-export const expirePendingOrder = internalMutation({
-  args: { orderId: v.id("orders"), reservationExpiresAt: v.number() },
-  returns: v.null(),
-  handler: async (ctx, { orderId, reservationExpiresAt }) => {
-    const order = await ctx.db.get(orderId);
-    if (!order || order.status !== "pending" || order.reservationExpiresAt !== reservationExpiresAt ||
-      reservationExpiresAt > Date.now()) return null;
-    await changeOrderStatus(ctx, orderId, "cancelled");
-    return null;
-  },
-});
-
-type OrderStatus = "pending" | "paid" | "shipped" | "delivered" | "cancelled";
+type OrderStatus = "pending" | "paid" | "cancelled";
 
 async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: OrderStatus) {
   const order = await ctx.db.get(id);
@@ -378,9 +300,7 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
 
   const transitions: Record<OrderStatus, readonly OrderStatus[]> = {
     pending: ["paid", "cancelled"],
-    paid: ["shipped", "cancelled"],
-    shipped: ["delivered"],
-    delivered: [],
+    paid: ["cancelled"],
     cancelled: [],
   };
   if (!transitions[order.status].includes(status)) {
@@ -392,100 +312,6 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
   if (!canceling && status !== "pending" && status !== "cancelled") {
     await commitCouponReservation(ctx, order);
   }
-  if (canceling && order.inventoryReserved) {
-    const restockTargets = await releaseOrderInventory(ctx, id);
-    for (const target of restockTargets) {
-      await ctx.scheduler.runAfter(0, internal.restockNotifications.processRestock, target);
-    }
-  } else if (canceling && order.inventoryReserved === undefined) {
-    const quantities = new Map<string, {
-      productId: Id<"products">;
-      variantId?: string;
-      sku?: string;
-      quantity: number;
-      tracking: "product" | "variant";
-    }>();
-    for (const item of order.items) {
-      const tracking = item.stockTracking ?? (item.stockTracked ? "product" : undefined);
-      if (!tracking) continue;
-      const key = tracking === "variant" && item.variantId
-        ? `${item.productId}:${item.variantId}`
-        : item.productId;
-      const previous = quantities.get(key);
-      quantities.set(key, {
-        productId: item.productId as Id<"products">,
-        variantId: tracking === "variant" ? item.variantId : undefined,
-        sku: previous?.sku ?? item.sku,
-        quantity: (previous?.quantity ?? 0) + item.quantity,
-        tracking,
-      });
-    }
-
-    const restockTargets: Array<{ productId: Id<"products">; variantId: string }> = [];
-    for (const item of quantities.values()) {
-      const product = await ctx.db.get(item.productId);
-      if (!product) continue;
-
-      if (item.tracking === "variant" && item.variantId) {
-        const variants = product.variants ?? [];
-        const index = variants.findIndex((candidate) => candidate.id === item.variantId);
-        const variant = variants[index];
-        if (!variant || variant.stockQuantity == null) continue;
-        const nextQuantity = variant.stockQuantity + item.quantity;
-        await ctx.db.patch(product._id, {
-          variants: variants.map((candidate, variantIndex) => variantIndex === index
-            ? { ...candidate, stockQuantity: nextQuantity }
-            : candidate),
-          updatedAt: new Date().toISOString(),
-        });
-        await recordInventoryMovement(ctx, {
-          productId: product._id,
-          productTitle: product.title,
-          variantId: item.variantId,
-          sku: item.sku ?? `VARIANT-${product._id}-${item.variantId}`,
-          quantityDelta: item.quantity,
-          reason: "reservation_release",
-          orderId: id,
-        });
-        if (canceling && variant.stockQuantity === 0 && nextQuantity > 0 && product.availableForSale && variant.availableForSale) {
-          restockTargets.push({ productId: product._id, variantId: variant.id });
-        }
-      } else if (product.stockQuantity != null) {
-        await ctx.db.patch(product._id, {
-          stockQuantity: product.stockQuantity + item.quantity,
-          updatedAt: new Date().toISOString(),
-        });
-        await recordInventoryMovement(ctx, {
-          productId: product._id,
-          productTitle: product.title,
-          sku: item.sku ?? `PRODUCT-${product._id}`,
-          quantityDelta: item.quantity,
-          reason: "reservation_release",
-          orderId: id,
-        });
-        if (canceling && product.stockQuantity === 0 && product.availableForSale) {
-          const variantIds = (product.variants ?? []).filter((variant) =>
-            variant.availableForSale && variant.stockQuantity == null,
-          ).map((variant) => variant.id);
-          for (const variantId of variantIds) restockTargets.push({ productId: product._id, variantId });
-          if (variantIds.length === 0 && (product.variants?.length ?? 0) === 0) {
-            restockTargets.push({ productId: product._id, variantId: "" });
-          }
-        }
-      }
-    }
-
-    for (const target of restockTargets) {
-      await ctx.scheduler.runAfter(0, internal.restockNotifications.processRestock, target);
-    }
-  }
-
-  if (!canceling && status !== "pending" && status !== "cancelled" && order.inventoryReserved === false) {
-    await reserveOrderInventory(ctx, order, Date.now() + reservationTtl);
-  }
-  if (status !== "pending" && status !== "cancelled" && order.inventoryReserved !== undefined) {
-    await commitOrderInventory(ctx, id);
-  }
 
   await ctx.db.patch(id, {
     status,
@@ -495,25 +321,10 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId: id });
   }
   if (order.status !== "paid" && status === "paid") {
-    await ctx.scheduler.runAfter(0, internal.invoices.issueForOrder, { orderId: id });
-    await ctx.scheduler.runAfter(0, internal.shipping.createForPaidOrderScheduled, { orderId: id });
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmation" });
-  }
-  if (order.status !== "shipped" && status === "shipped") {
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "shipping_update" });
   }
   return null;
 }
-
-export const cancelPendingOrder = internalMutation({
-  args: { id: v.id("orders") },
-  returns: v.null(),
-  handler: async (ctx, { id }) => {
-    const order = await ctx.db.get(id);
-    if (order?.status === "pending") await changeOrderStatus(ctx, id, "cancelled");
-    return null;
-  },
-});
 
 export const updateStatus = mutation({
   args: {

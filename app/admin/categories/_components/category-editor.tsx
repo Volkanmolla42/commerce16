@@ -147,6 +147,17 @@ export function CategoryEditor({
     setAttributes((current) => current.map((attribute) => attribute.key === key ? { ...attribute, ...patch } : attribute));
   };
 
+  const removeAttribute = (attribute: CategoryAttributeDefinition) => {
+    if (
+      category?.attributes?.some((saved) => saved.key === attribute.key) &&
+      !window.confirm(
+        `“${attribute.label || "Bu özellik"}” kaldırılırsa ${category.title} kategorisindeki ürünlerden bu özellik ve kayıtlı değerleri de silinecek. Bu işlem kategori değişikliklerini kaydettiğinde uygulanır. Devam edilsin mi?`,
+      )
+    ) return;
+
+    setAttributes((current) => current.filter((item) => item.key !== attribute.key));
+  };
+
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving || savingPresetKey !== null || libraryBusy) return;
@@ -290,7 +301,7 @@ export function CategoryEditor({
                         <Button type="button" variant="ghost" size="sm" disabled={saving || savingPresetKey !== null || libraryBusy || !attribute.label.trim()} onClick={() => void saveAttributePreset(attribute)}>
                           {savingPresetKey === attribute.key ? "Kaydediliyor…" : "Kütüphaneye kaydet"}
                         </Button>
-                        <Button type="button" variant="ghost" size="sm" disabled={saving || savingPresetKey !== null || libraryBusy} aria-label={`Kaldır: ${attribute.label || `Özellik ${index + 1}`}`} onClick={() => setAttributes((current) => current.filter((item) => item.key !== attribute.key))}>Kaldır</Button>
+                        <Button type="button" variant="ghost" size="sm" disabled={saving || savingPresetKey !== null || libraryBusy} aria-label={`Kaldır: ${attribute.label || `Özellik ${index + 1}`}`} onClick={() => removeAttribute(attribute)}>Kaldır</Button>
                       </div>
                     </div>
                     <CategoryAttributeFields value={attribute} onChange={(patch) => updateAttribute(attribute.key, patch)} disabled={saving || savingPresetKey !== null || libraryBusy} />

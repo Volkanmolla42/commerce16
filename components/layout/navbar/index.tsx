@@ -1,4 +1,4 @@
-import LogoSquare from "@/components/logo-square";
+import StoreInitial from "@/components/store-initial";
 import { getMenu, getStoreSettings } from "@/lib/catalog";
 import { Menu } from "@/lib/catalog/types";
 import Link from "next/link";
@@ -33,7 +33,7 @@ export async function Navbar() {
             {settings.logoUrl ? (
               <Image src={settings.logoUrl} alt={settings.storeName} width={40} height={40} unoptimized className="h-10 w-10 rounded-xl border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black" />
             ) : (
-              <LogoSquare />
+              <StoreInitial storeName={settings.storeName} />
             )}
             <span className="text-sm font-semibold tracking-wider uppercase text-black dark:text-white">
               {settings.storeName}

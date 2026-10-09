@@ -2,14 +2,23 @@
 
 import { useSyncExternalStore } from "react";
 import type { CartItem } from "./cart-store";
+import type { ProductImage } from "@/lib/catalog/types";
 
-const QUICK_BUY_STORAGE_KEY = "commerce_quick_buy_v1";
+const QUICK_BUY_STORAGE_KEY = "commerce_quick_buy_v2";
 
 type QuickBuySnapshot = { ready: boolean; item: CartItem | null };
 const SERVER_SNAPSHOT: QuickBuySnapshot = { ready: false, item: null };
 let snapshot = SERVER_SNAPSHOT;
 let initialized = false;
 const listeners = new Set<() => void>();
+
+function isProductImage(value: unknown): value is ProductImage {
+  if (!value || typeof value !== "object") return false;
+  const image = value as Partial<ProductImage>;
+  return typeof image.url === "string" &&
+    (image.selectedOptions === undefined || (Array.isArray(image.selectedOptions) && image.selectedOptions.every((option) =>
+      typeof option.name === "string" && typeof option.value === "string")));
+}
 
 function isCartItem(value: unknown): value is CartItem {
   if (!value || typeof value !== "object") return false;
@@ -24,7 +33,7 @@ function isCartItem(value: unknown): value is CartItem {
     /^\d+(?:\.\d{1,2})?$/.test(product.price) &&
     typeof product.availableForSale === "boolean" &&
     Array.isArray(product.images) &&
-    product.images.every((image) => typeof image === "string") &&
+    product.images.every(isProductImage) &&
     item.quantity === 1 &&
     (item.variantId === undefined || typeof item.variantId === "string")
   );

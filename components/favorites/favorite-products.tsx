@@ -8,10 +8,8 @@ import ProductGridItems from "@/components/layout/product-grid-items";
 import { useFavorites } from "./favorites-context";
 import Link from "next/link";
 import { Button, Card } from "@/components/ui";
+import { formatProduct } from "@/lib/catalog/format-product";
 import { FavoritesSkeleton } from "./favorites-skeleton";
-
-const EMPTY_PRODUCT_IMAGE =
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80";
 
 export function FavoriteProducts() {
   const { favoriteSlugs, isReady } = useFavorites();
@@ -24,17 +22,13 @@ export function FavoriteProducts() {
     return <FavoritesSkeleton />;
   }
 
-  const favoriteProducts = products ?? [];
-  const displayProducts = favoriteProducts.map((product) =>
-    product.images[0] ? product : { ...product, images: [EMPTY_PRODUCT_IMAGE] },
-  );
-
+  const favoriteProducts = (products ?? []).map(formatProduct);
   return (
     <section className="space-y-6">
       {favoriteProducts.length ? (
         <Grid className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           <ProductGridItems
-            products={displayProducts}
+            products={favoriteProducts}
             imageSizes="(min-width: 1280px) 18vw, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, 50vw"
             cardLayout="stacked"
             imageFit="cover"

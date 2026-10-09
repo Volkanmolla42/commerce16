@@ -13,7 +13,7 @@ import {
 import { useFavorites } from "@/components/favorites/favorites-context";
 
 const NAV_ITEMS = [
-  { label: "Favorilerim", href: "/favorites", icon: HeartIcon },
+  { label: "Favorilerim", href: "/account/favorites", icon: HeartIcon },
   { label: "Siparişlerim", href: "/account/orders", icon: ShoppingBag01Icon },
   { label: "Adreslerim", href: "/account/addresses", icon: Location01Icon },
   { label: "Profil ve Güvenlik", href: "/account/profile", icon: UserIcon },
@@ -52,7 +52,7 @@ function AccountNavLinks({
           href === "/account/profile"
             ? pathname === href
             : pathname.startsWith(href);
-        const count = href === "/favorites"
+        const count = href === "/account/favorites"
           ? favoriteCount
           : href === "/account/orders"
             ? orderCount

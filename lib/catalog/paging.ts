@@ -5,7 +5,6 @@ import {
 
 export const CATALOG_PAGE_SIZE = 24;
 export type CatalogFacetOptions = {
-  inStock: boolean; outOfStock: boolean;
   attributes: Record<string, string[]>;
 };
 export type CatalogSearchParams = Record<string, string | string[] | undefined>;
@@ -39,7 +38,6 @@ export function readCatalogFilters(params: CatalogSearchParams) {
   const filters: CatalogFilters = {
     ...EMPTY_CATALOG_FILTERS,
     minPrice: numberInput(raw.minPrice), maxPrice: numberInput(raw.maxPrice),
-    stock: raw.stock === "in" || raw.stock === "out" ? raw.stock : "",
   };
   const attributes: CategoryAttributeFilters = {};
   for (const [key, rawFilter] of Object.entries(objectParam(param(params, "attributes"))).slice(0, 100)) {

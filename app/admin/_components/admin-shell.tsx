@@ -8,9 +8,10 @@ import {
   Cog6ToothIcon,
   ChartBarIcon,
   CubeIcon,
+  ArchiveBoxIcon,
   FolderIcon,
-  ArrowsRightLeftIcon,
   ShoppingBagIcon,
+  ShoppingCartIcon,
   Squares2X2Icon,
   TagIcon,
 } from "@heroicons/react/24/outline";
@@ -19,14 +20,16 @@ import { Button } from "@/components/ui";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { adminPath } from "@/lib/admin/routes";
+import StoreInitial from "@/components/store-initial";
 
 const navigation = [
   { label: "Genel Bakış", href: adminPath(), icon: Squares2X2Icon },
   { label: "Ürünler", href: adminPath("products"), icon: CubeIcon },
-  { label: "Stok hareketleri", href: adminPath("inventory"), icon: ArrowsRightLeftIcon },
+  { label: "Stok", href: adminPath("inventory"), icon: ArchiveBoxIcon },
   { label: "Kategoriler", href: adminPath("categories"), icon: FolderIcon },
   { label: "Kuponlar", href: adminPath("coupons"), icon: TagIcon },
   { label: "Siparişler", href: adminPath("orders"), icon: ShoppingBagIcon },
+  { label: "Sepetler", href: adminPath("carts"), icon: ShoppingCartIcon },
   { label: "Analitik", href: adminPath("analytics"), icon: ChartBarIcon },
   { label: "Mağaza ayarları", href: adminPath("settings"), icon: Cog6ToothIcon },
 ];
@@ -99,11 +102,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground">
+    <div data-admin-theme="light" className="admin-theme min-h-[100dvh] bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
         <div className="mb-8 flex items-center gap-3 px-2">
           <Link href={adminPath()} aria-label="Yönetim paneli ana sayfası" className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-            {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : "C"}
+            {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : <StoreInitial storeName={storeName} size="xs" />}
           </Link>
           <span className="min-w-0">
             <Link href="/" target="_blank" className="flex max-w-52 items-center gap-1 text-sm font-semibold text-foreground hover:underline">
@@ -125,7 +128,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-30 border-b border-border bg-card lg:hidden">
           <div className="flex min-h-14 items-center gap-3 px-4">
             <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-              {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : "C"}
+              {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : <StoreInitial storeName={storeName} size="xs" />}
             </span>
             <Link href="/" target="_blank" className="flex min-w-0 items-center gap-1 text-sm font-medium hover:underline">
               <span className="truncate">{storeName}</span>

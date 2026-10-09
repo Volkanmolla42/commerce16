@@ -5,7 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { assertAdminApiSecret } from "./adminAuth";
 
-const eventValidator = v.union(v.literal("payment_confirmation"), v.literal("shipping_update"));
+const eventValidator = v.literal("payment_confirmation");
 const eventRecordValidator = schema.doc("orderEmailEvents");
 const emailPayloadValidator = v.object({
   orderId: v.id("orders"),
@@ -15,12 +15,9 @@ const emailPayloadValidator = v.object({
   total: v.string(),
   itemCount: v.number(),
   items: v.array(v.object({ title: v.string(), quantity: v.number(), price: v.string() })),
-  carrierName: v.union(v.string(), v.null()),
-  trackingNumber: v.union(v.string(), v.null()),
-  trackingUrl: v.union(v.string(), v.null()),
 });
 
-type EmailEvent = "payment_confirmation" | "shipping_update";
+type EmailEvent = "payment_confirmation";
 type EmailPayload = {
   orderId: Id<"orders">;
   event: EmailEvent;
@@ -29,9 +26,6 @@ type EmailPayload = {
   total: string;
   itemCount: number;
   items: { title: string; quantity: number; price: string }[];
-  carrierName: string | null;
-  trackingNumber: string | null;
-  trackingUrl: string | null;
 };
 
 export const getOrderEmailPayload = internalQuery({
@@ -40,15 +34,7 @@ export const getOrderEmailPayload = internalQuery({
   handler: async (ctx, { orderId, event }) => {
     const order = await ctx.db.get(orderId);
     if (!order) return null;
-    if (event === "payment_confirmation" && order.status !== "paid") return null;
-    if (event === "shipping_update" && order.status !== "shipped") return null;
-    const shipment = event === "shipping_update"
-      ? await ctx.db.query("shippingShipments")
-        .withIndex("by_order_and_created_at", (q) => q.eq("orderId", orderId))
-        .order("desc")
-        .first()
-      : null;
-    if (event === "shipping_update" && (!shipment || shipment.status !== "purchased" || !shipment.trackingNumber)) return null;
+    if (order.status !== "paid") return null;
     return {
       orderId,
       event,
@@ -57,9 +43,6 @@ export const getOrderEmailPayload = internalQuery({
       total: order.total,
       itemCount: order.items.length,
       items: order.items.slice(0, 20).map((item) => ({ title: item.title, quantity: item.quantity, price: item.price })),
-      carrierName: shipment?.carrierName ?? null,
-      trackingNumber: shipment?.trackingNumber ?? null,
-      trackingUrl: shipment?.trackingUrl?.startsWith("https://") ? shipment.trackingUrl : null,
     };
   },
 });
@@ -79,7 +62,6 @@ export const beginSend = internalMutation({
         status: "review",
         error: "E-posta gönderiminin sonucu doğrulanamadı. Gönderici kutusunu kontrol etmeden tekrar göndermeyin.",
         leaseUntil: undefined,
-        updatedAt: now,
       });
       return null;
     }
@@ -88,20 +70,15 @@ export const beginSend = internalMutation({
         status: "processing",
         error: undefined,
         leaseUntil: now + 60_000,
-        attempts: existing.attempts + 1,
-        updatedAt: now,
       });
       return existing._id;
     }
-    const eventKey = event === "payment_confirmation" ? "order-confirmation" : "order-shipping-update";
     return await ctx.db.insert("orderEmailEvents", {
       orderId,
       event,
       status: "processing",
-      idempotencyKey: `${eventKey}/${orderId}`,
-      attempts: 1,
+      idempotencyKey: `order-confirmation/${orderId}`,
       leaseUntil: now + 60_000,
-      updatedAt: now,
     });
   },
 });
@@ -110,7 +87,6 @@ export const recordSendResult = internalMutation({
   args: {
     eventId: v.id("orderEmailEvents"),
     status: v.union(v.literal("sent"), v.literal("failed"), v.literal("not_configured"), v.literal("review")),
-    providerEmailId: v.optional(v.string()),
     error: v.optional(v.string()),
   },
   returns: v.null(),
@@ -119,11 +95,8 @@ export const recordSendResult = internalMutation({
     if (!event || event.status === "sent") return null;
     await ctx.db.patch(event._id, {
       status: args.status,
-      ...(args.providerEmailId ? { providerEmailId: args.providerEmailId.slice(0, 200) } : {}),
       ...(args.error ? { error: args.error.slice(0, 300) } : { error: undefined }),
-      ...(args.status === "sent" ? { sentAt: Date.now() } : {}),
       leaseUntil: undefined,
-      updatedAt: Date.now(),
     });
     return null;
   },
@@ -161,21 +134,14 @@ function formatTRY(value: string) {
 
 function buildEmail(payload: EmailPayload) {
   const orderNumber = String(payload.orderId);
-  const isShipping = payload.event === "shipping_update";
-  const subject = isShipping ? "Siparişiniz kargoya verildi" : "Siparişiniz alındı";
+  const subject = "Siparişiniz alındı";
   const itemLines = payload.items.map((item) => `${item.title} × ${item.quantity} · ${formatTRY(String(Number(item.price) * item.quantity))}`);
   const moreCount = Math.max(0, payload.itemCount - payload.items.length);
   const lineText = [...itemLines, ...(moreCount ? [`ve ${moreCount} ürün daha`] : [])].join("\n");
   const itemHtml = payload.items.map((item) => `<li>${escapeHtml(item.title)} × ${item.quantity} <span>${escapeHtml(formatTRY(String(Number(item.price) * item.quantity)))}</span></li>`).join("");
-  const trackingText = isShipping
-    ? `\nKargo firması: ${payload.carrierName ?? ""}\nTakip numarası: ${payload.trackingNumber ?? ""}${payload.trackingUrl ? `\nTakip bağlantısı: ${payload.trackingUrl}` : ""}`
-    : "";
-  const trackingHtml = isShipping
-    ? `<p>Kargo firması: <strong>${escapeHtml(payload.carrierName ?? "")}</strong><br/>Takip numarası: <strong>${escapeHtml(payload.trackingNumber ?? "")}</strong>${payload.trackingUrl ? `<br/><a href="${escapeHtml(payload.trackingUrl)}">Kargo takibini aç</a>` : ""}</p>`
-    : "";
-  const text = `Merhaba ${payload.customerName},\n\n${subject}.\nSipariş no: ${orderNumber}\n\n${lineText}${trackingText}\n\nToplam: ${formatTRY(payload.total)}\nASHLESHA`;
+  const text = `Merhaba ${payload.customerName},\n\n${subject}.\nSipariş no: ${orderNumber}\n\n${lineText}\n\nToplam: ${formatTRY(payload.total)}\nASHLESHA`;
   const moreHtml = moreCount ? `<li>ve ${moreCount} ürün daha</li>` : "";
-  const html = `<div style="font-family:Arial,sans-serif;color:#171717;line-height:1.6;max-width:600px;margin:auto"><h1 style="font-size:22px">${escapeHtml(subject)}</h1><p>Merhaba ${escapeHtml(payload.customerName)},</p><p>Sipariş numaranız: <strong>${escapeHtml(orderNumber)}</strong></p>${trackingHtml}<ul>${itemHtml}${moreHtml}</ul><p style="font-size:18px"><strong>Toplam: ${escapeHtml(formatTRY(payload.total))}</strong></p><p>ASHLESHA</p></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#171717;line-height:1.6;max-width:600px;margin:auto"><h1 style="font-size:22px">${escapeHtml(subject)}</h1><p>Merhaba ${escapeHtml(payload.customerName)},</p><p>Sipariş numaranız: <strong>${escapeHtml(orderNumber)}</strong></p><ul>${itemHtml}${moreHtml}</ul><p style="font-size:18px"><strong>Toplam: ${escapeHtml(formatTRY(payload.total))}</strong></p><p>ASHLESHA</p></div>`;
   return { subject, text, html };
 }
 
@@ -218,13 +184,10 @@ export const sendForOrderScheduled = internalAction({
         }),
         signal: AbortSignal.timeout(15_000),
       });
-      const result: unknown = await response.json().catch(() => null);
-      const responseBody = result && typeof result === "object" ? result as Record<string, unknown> : null;
-      if (response.ok && typeof responseBody?.id === "string") {
+      if (response.ok) {
         await ctx.runMutation(internal.notifications.recordSendResult, {
           eventId,
           status: "sent",
-          providerEmailId: responseBody.id,
         });
       } else {
         await ctx.runMutation(internal.notifications.recordSendResult, {
@@ -256,7 +219,7 @@ export const retry = mutation({
   handler: async (ctx, { adminSecret, orderId, event }) => {
     assertAdminApiSecret(adminSecret);
     const order = await ctx.db.get(orderId);
-    const canRetry = event === "payment_confirmation" ? order?.status === "paid" : order?.status === "shipped";
+    const canRetry = order?.status === "paid";
     if (!canRetry) throw new Error("Bu e-posta türü için sipariş durumu uygun değil.");
     const existing = await ctx.db.query("orderEmailEvents")
       .withIndex("by_order_and_event", (q) => q.eq("orderId", orderId).eq("event", event))

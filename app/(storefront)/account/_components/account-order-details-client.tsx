@@ -9,14 +9,11 @@ import Image from "next/image";
 import {
   ArrowLeft01Icon,
   ShoppingBag01Icon,
-  DeliveryTruck01Icon,
   CheckmarkBadge01Icon,
   Clock01Icon,
   Cancel01Icon,
   Location01Icon,
   CreditCardIcon,
-  PackageIcon,
-  PrinterIcon,
 } from "hugeicons-react";
 import { orderStatusLabels } from "@/lib/orders";
 import { formatMoney } from "@/lib/format-money";
@@ -47,28 +44,10 @@ function OrderDetailsBackLink() {
   );
 }
 
-function OrderDetailsPrintButton() {
-  return (
-    <div className="flex gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => window.print()}
-        className="rounded-xl border-border gap-2 font-medium"
-      >
-        <PrinterIcon className="h-4 w-4 text-muted-foreground" />
-        <span>Faturayı Yazdır</span>
-      </Button>
-    </div>
-  );
-}
-
 export function AccountOrderDetailsSkeleton() {
   const stepLabels = [
     "Sipariş Alındı",
     orderStatusLabels.paid,
-    orderStatusLabels.shipped,
-    orderStatusLabels.delivered,
   ];
 
   return (
@@ -88,7 +67,6 @@ export function AccountOrderDetailsSkeleton() {
             <SkLine className="h-3 w-36" />
           </p>
         </div>
-        <OrderDetailsPrintButton />
       </div>
 
       <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
@@ -169,12 +147,6 @@ export function AccountOrderDetailsSkeleton() {
               <span className="text-muted-foreground">Ara Toplam:</span>
               <Sk className="h-3.5 w-20" />
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Kargo Ücreti:</span>
-              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                Ücretsiz
-              </span>
-            </div>
             <Separator className="my-2" />
             <div className="flex items-center justify-between text-sm">
               <span className="font-bold text-foreground">Genel Toplam:</span>
@@ -223,7 +195,6 @@ export default function AccountOrderDetailsClient({
               <div className="h-3 w-44 rounded bg-muted" />
             </div>
           </div>
-          <OrderDetailsPrintButton />
         </div>
         <AccountOrderDetailsSkeleton />
       </div>
@@ -254,8 +225,6 @@ export default function AccountOrderDetailsClient({
   const steps = [
     { key: "pending", label: "Sipariş Alındı", icon: Clock01Icon },
     { key: "paid", label: orderStatusLabels.paid, icon: CheckmarkBadge01Icon },
-    { key: "shipped", label: orderStatusLabels.shipped, icon: DeliveryTruck01Icon },
-    { key: "delivered", label: orderStatusLabels.delivered, icon: PackageIcon },
   ];
 
   const isCancelled = order.status === "cancelled";
@@ -287,7 +256,6 @@ export default function AccountOrderDetailsClient({
           </p>
         </div>
 
-        <OrderDetailsPrintButton />
       </div>
 
       {/* Durum İlerleme Çubuğu */}
@@ -308,7 +276,7 @@ export default function AccountOrderDetailsClient({
               {/* Çizgi */}
               <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted">
                 <div
-                  className="h-full bg-primary transition-all duration-500"
+                  className="h-full bg-primary transition-[width] duration-300 ease-out"
                   style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
                 />
               </div>
@@ -322,7 +290,7 @@ export default function AccountOrderDetailsClient({
                 return (
                   <div key={step.key} className="relative z-10 flex flex-col items-center">
                     <div
-                      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-all ${
+                      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,box-shadow] duration-150 ${
                         isPassed
                           ? "border-primary bg-primary text-primary-foreground shadow-md"
                           : "border-border bg-card text-muted-foreground"
@@ -452,13 +420,6 @@ export default function AccountOrderDetailsClient({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Ara Toplam:</span>
               <span className="font-medium text-foreground">{formatMoney(order.total)}</span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Kargo Ücreti:</span>
-              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                Ücretsiz
-              </span>
             </div>
 
             <Separator className="my-2" />

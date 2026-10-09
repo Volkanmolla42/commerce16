@@ -1,10 +1,11 @@
 import type { Category, Menu, Product } from "./types";
-import type { Doc } from "@/convex/_generated/dataModel";
 import { fetchQuery } from "convex/nextjs";
 import { cacheTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 import { getProductSearchFields, rankSearchItems } from "./smart-search";
 import { getSimilarProducts } from "./recommendations";
+import { formatProduct } from "./format-product";
+import { getProductImages } from "./product-images";
 
 type ProductFilters = {
   category?: string;
@@ -22,10 +23,6 @@ export type StoreSettings = {
   email: string;
   address: string;
   announcement: string;
-  shippingCutoffMinutes: number | null;
-  shippingDays: number[];
-  shippingFeeKurus: number;
-  freeShippingThresholdKurus: number | null;
   isOpen: boolean;
 };
 
@@ -33,33 +30,6 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   "use cache";
   cacheTag("store-settings");
   return await fetchQuery(api.settings.getStoreSettings, {});
-}
-
-function formatProduct(item: Omit<Doc<"products">, "priceValue" | "searchText">): Product {
-  const slug = item.slug || "";
-
-  return {
-    id: item._id,
-    slug,
-    title: item.title,
-    price: item.price || "0.00",
-    sku: item.sku,
-    availableForSale: item.availableForSale ?? true,
-    stockQuantity: item.stockQuantity ?? null,
-    brand: item.brand,
-    material: item.material,
-    attributes: item.attributes,
-    categorySlug: item.categorySlug,
-    images: item.images.length > 0 ? item.images : [
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80"
-    ],
-    options: item.options,
-    variants: item.variants?.map(({ price, ...variant }) => ({
-      ...variant,
-      ...(price ? { price: { amount: price, currencyCode: "TRY" } } : {}),
-    })),
-    updatedAt: item.updatedAt || new Date(item._creationTime).toISOString(),
-  };
 }
 
 export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
@@ -123,11 +93,9 @@ export async function getRecommendationCatalog(limit = 100): Promise<Product[]> 
     title: product.title,
     price: product.price,
     availableForSale: product.availableForSale,
-    brand: product.brand,
-    material: product.material,
     attributes: product.attributes,
     categorySlug: product.categorySlug,
-    images: product.images.slice(0, 1),
+    images: getProductImages(product).slice(0, 1),
     updatedAt: product.updatedAt,
   }));
 }
@@ -140,7 +108,7 @@ export async function getCategories(): Promise<Category[]> {
     slug: c.slug,
     title: c.title,
     description: c.description,
-    path: c.path,
+    path: `/search/${c.slug}`,
     seo: { title: c.title, description: c.description || `${c.title} ürünleri` },
     updatedAt: c.updatedAt,
     imageUrl: c.imageUrl,
@@ -172,7 +140,7 @@ export async function getCategory(slug: string): Promise<Category | undefined> {
     slug: item.slug,
     title: item.title,
     description: item.description,
-    path: item.path,
+    path: `/search/${item.slug}`,
     seo: { title: item.title, description: item.description || `${item.title} ürünleri` },
     updatedAt: item.updatedAt,
     attributes: item.attributes,

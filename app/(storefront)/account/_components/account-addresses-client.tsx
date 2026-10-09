@@ -111,8 +111,6 @@ export default function AccountAddressesPage() {
     district: "",
     districtId: "",
     addressLine1: "",
-    addressLine2: "",
-    postalCode: "",
     isDefault: false,
   });
 
@@ -127,8 +125,6 @@ export default function AccountAddressesPage() {
       district: "",
       districtId: "",
       addressLine1: "",
-      addressLine2: "",
-      postalCode: "",
       isDefault: !addresses || addresses.length === 0,
     });
     setErrorMessage(null);
@@ -148,8 +144,6 @@ export default function AccountAddressesPage() {
       district: district?.name ?? addr.district,
       districtId: district?.id ?? "",
       addressLine1: addr.addressLine1,
-      addressLine2: addr.addressLine2 || "",
-      postalCode: addr.postalCode || "",
       isDefault: addr.isDefault,
     });
     setErrorMessage(null);
@@ -187,8 +181,6 @@ export default function AccountAddressesPage() {
           provinceId: form.provinceId,
           districtId: form.districtId,
           addressLine1: form.addressLine1.trim(),
-          addressLine2: form.addressLine2.trim() || undefined,
-          postalCode: form.postalCode.trim() || undefined,
           isDefault: form.isDefault,
         });
       } else {
@@ -201,8 +193,6 @@ export default function AccountAddressesPage() {
           provinceId: form.provinceId,
           districtId: form.districtId,
           addressLine1: form.addressLine1.trim(),
-          addressLine2: form.addressLine2.trim() || undefined,
-          postalCode: form.postalCode.trim() || undefined,
           isDefault: form.isDefault,
         });
       }
@@ -267,10 +257,9 @@ export default function AccountAddressesPage() {
                   <p className="text-muted-foreground">{addr.phone}</p>
                   <p className="text-foreground leading-relaxed pt-1">
                     {addr.addressLine1}
-                    {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
                   </p>
                   <p className="text-muted-foreground font-medium">
-                    {addr.district} / {addr.city} {addr.postalCode ? `(${addr.postalCode})` : ""}
+                    {addr.district} / {addr.city}
                   </p>
                 </div>
               </div>
@@ -445,7 +434,7 @@ export default function AccountAddressesPage() {
                   value={form.addressLine1}
                   onChange={(e) => setForm({ ...form, addressLine1: e.target.value })}
                   placeholder="Caferağa Mah. Moda Cad. No: 10 Daire: 4"
-                  className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
+                  className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-[border-color,background-color,box-shadow] duration-150"
                 />
               </div>
 

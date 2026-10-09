@@ -9,6 +9,7 @@
  */
 
 import type * as abandonedCartRecovery from "../abandonedCartRecovery.js";
+import type * as activeCarts from "../activeCarts.js";
 import type * as addresses from "../addresses.js";
 import type * as adminAuth from "../adminAuth.js";
 import type * as analytics from "../analytics.js";
@@ -21,17 +22,12 @@ import type * as coupons from "../coupons.js";
 import type * as crons from "../crons.js";
 import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
-import type * as inventory from "../inventory.js";
-import type * as invoices from "../invoices.js";
 import type * as legalDocuments from "../legalDocuments.js";
 import type * as notifications from "../notifications.js";
 import type * as orders from "../orders.js";
-import type * as parasut from "../parasut.js";
+import type * as productSkus from "../productSkus.js";
 import type * as products from "../products.js";
-import type * as restockNotifications from "../restockNotifications.js";
-import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
-import type * as shipping from "../shipping.js";
 import type * as users from "../users.js";
 
 import type {
@@ -42,6 +38,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   abandonedCartRecovery: typeof abandonedCartRecovery;
+  activeCarts: typeof activeCarts;
   addresses: typeof addresses;
   adminAuth: typeof adminAuth;
   analytics: typeof analytics;
@@ -54,17 +51,12 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   favorites: typeof favorites;
   http: typeof http;
-  inventory: typeof inventory;
-  invoices: typeof invoices;
   legalDocuments: typeof legalDocuments;
   notifications: typeof notifications;
   orders: typeof orders;
-  parasut: typeof parasut;
+  productSkus: typeof productSkus;
   products: typeof products;
-  restockNotifications: typeof restockNotifications;
-  seed: typeof seed;
   settings: typeof settings;
-  shipping: typeof shipping;
   users: typeof users;
 }>;
 

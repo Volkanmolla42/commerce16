@@ -1,16 +1,20 @@
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { getProductSearchText } from "../lib/catalog/smart-search";
 import { getProductPriceRange } from "../lib/catalog/variants";
 
-export type CatalogProductInput = Omit<Doc<"products">, "_id" | "_creationTime" | "priceValue" | "searchText">;
+export type CatalogProductInput = Omit<Doc<"products">, "_id" | "_creationTime" | "priceValue">;
 
 export function catalogMetadata(product: CatalogProductInput) {
-  const basePrice = Number(product.price);
-  if (!product.price.trim() || !Number.isFinite(basePrice) || basePrice < 0) throw new Error("Ürün fiyatı geçersiz.");
+  if (product.variants.length === 0) throw new Error("Ürün en az bir fiyatlı varyant içermeli.");
+  for (const variant of product.variants) {
+    const cents = Math.round(Number(variant.price) * 100);
+    if (!/^\d+(?:\.\d{1,2})?$/.test(variant.price) || !Number.isSafeInteger(cents) || cents < 0) {
+      throw new Error("Varyant fiyatı geçersiz.");
+    }
+  }
   const priceValue = Number(getProductPriceRange(product).min);
   if (!Number.isFinite(priceValue) || priceValue < 0) throw new Error("Ürün fiyatı geçersiz.");
-  return { priceValue, searchText: getProductSearchText(product) };
+  return { priceValue };
 }
 
 function facetValues(product: CatalogProductInput | null) {
@@ -67,8 +71,7 @@ export async function deleteCatalogProduct(ctx: MutationCtx, product: Doc<"produ
 }
 
 export function withoutCatalogMetadata(product: Doc<"products">) {
-  const { priceValue, searchText, ...result } = product;
+  const { priceValue, ...result } = product;
   void priceValue;
-  void searchText;
   return result;
 }

@@ -4,46 +4,42 @@ import { query, type QueryCtx } from "./_generated/server";
 import type { DataModel, Doc } from "./_generated/dataModel";
 import { assertAdminApiSecret } from "./adminAuth";
 import { getProductPriceRange } from "../lib/catalog/variants";
-import { catalogSearchQuery, createCatalogSearchMatcher } from "../lib/catalog/smart-search";
+import { catalogSearchQuery, createCatalogSearchMatcher, getProductSearchFields } from "../lib/catalog/smart-search";
 import { matchesCatalogFilters, matchesCategoryAttributeFilters } from "../lib/catalog/facets";
 import type { Product } from "../lib/catalog/types";
+import { getImagesForVariant } from "../lib/catalog/product-images";
 
-const filtersValidator = v.object({ minPrice: v.string(), maxPrice: v.string(), stock: v.union(v.literal(""), v.literal("in"), v.literal("out")) });
+const filtersValidator = v.object({ minPrice: v.string(), maxPrice: v.string() });
 const attributeFiltersValidator = v.record(v.string(), v.object({ values: v.array(v.string()), min: v.string(), max: v.string() }));
 const availabilityValidator = v.union(v.literal("all"), v.literal("active"), v.literal("inactive"));
-const stockValidator = v.union(v.literal("all"), v.literal("in-stock"), v.literal("out-of-stock"), v.literal("untracked"));
+const imageValidator = v.object({
+  url: v.string(), selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+});
 const cardValidator = v.object({
   id: v.id("products"), title: v.string(), slug: v.string(), price: v.string(),
-  priceRange: v.object({ min: v.string(), max: v.string() }), images: v.array(v.string()),
-  availableForSale: v.boolean(), stockQuantity: v.union(v.number(), v.null()),
+  priceRange: v.object({ min: v.string(), max: v.string() }), images: v.array(imageValidator),
+  availableForSale: v.boolean(),
   updatedAt: v.string(), categorySlug: v.optional(v.string()),
 });
 
-function inventory(product: Doc<"products">) {
-  const variants = product.variants ?? [];
-  const quantity = variants.length
-    ? variants.some((variant) => variant.stockQuantity == null) ? null : variants.reduce((sum, variant) => sum + (variant.stockQuantity ?? 0), 0)
-    : product.stockQuantity ?? null;
-  const inStock = product.availableForSale && (variants.length
-    ? variants.some((variant) => variant.availableForSale && (variant.stockQuantity ?? product.stockQuantity ?? 1) > 0)
-    : product.stockQuantity == null || product.stockQuantity > 0);
-  return { quantity, inStock };
-}
-
-async function card(ctx: QueryCtx, product: Doc<"products">, admin: boolean) {
-  const image = product.images[0] || (product.storageImages?.[0] ? await ctx.storage.getUrl(product.storageImages[0].storageId) : null);
-  const stock = inventory(product);
-  return { id: product._id, title: product.title, slug: product.slug, price: product.price,
-    priceRange: getProductPriceRange(product), images: image ? [image] : [],
-    availableForSale: admin ? product.availableForSale : stock.inStock,
-    stockQuantity: stock.quantity, updatedAt: product.updatedAt, categorySlug: product.categorySlug };
+async function card(ctx: QueryCtx, product: Doc<"products">) {
+  const priceRange = getProductPriceRange(product);
+  const image = getImagesForVariant(product.images, [])[0];
+  const imageUrl = image ? await ctx.storage.getUrl(image.storageId) : null;
+  return { id: product._id, title: product.title, slug: product.slug, price: priceRange.min,
+    priceRange,
+    images: imageUrl && image
+      ? [{ url: imageUrl, ...(image.selectedOptions ? { selectedOptions: image.selectedOptions } : {}) }]
+      : [],
+    availableForSale: product.availableForSale,
+    updatedAt: product.updatedAt, categorySlug: product.categorySlug };
 }
 
 export const page = query({
   args: {
     paginationOpts: paginationOptsValidator, query: v.string(), categorySlug: v.optional(v.string()),
     sort: v.string(), filters: filtersValidator, attributes: attributeFiltersValidator,
-    adminSecret: v.optional(v.string()), availability: v.optional(availabilityValidator), stock: v.optional(stockValidator),
+    adminSecret: v.optional(v.string()), availability: v.optional(availabilityValidator),
   },
   returns: paginationResultValidator(cardValidator),
   handler: async (ctx, args) => {
@@ -59,7 +55,7 @@ export const page = query({
     let listing: OrderedQuery<DataModel["products"]>;
     if (search && !orderedSearch) {
       listing = ctx.db.query("products").withSearchIndex("search_catalog", (q) => {
-        let range = q.search("searchText", search);
+        let range = q.search("title", search);
         if (available !== undefined) range = range.eq("availableForSale", available);
         if (category !== undefined) range = range.eq("categorySlug", category);
         return range;
@@ -90,17 +86,13 @@ export const page = query({
     // Explicit search sorting uses the ordered index and checks text within the
     // bounded page, retaining its cursor even when no row matches.
     const matches = result.page.filter((product) => {
-      if (matchesSearch && !matchesSearch(product.searchText)) return false;
-      const stock = inventory(product);
-      if (admin && args.stock && args.stock !== "all") {
-        if (args.stock === "untracked" ? stock.quantity !== null : args.stock === "out-of-stock" ? stock.quantity !== 0 : stock.quantity == null || stock.quantity <= 0) return false;
-      }
+      if (matchesSearch && !matchesSearch(getProductSearchFields(product))) return false;
       const target: Product = { id: product._id, title: product.title, slug: product.slug, price: getProductPriceRange(product).min,
-        images: [], availableForSale: stock.inStock, stockQuantity: stock.quantity,
+        images: [], availableForSale: product.availableForSale,
         attributes: product.attributes, updatedAt: product.updatedAt };
       return matchesCatalogFilters(target, args.filters) && matchesCategoryAttributeFilters(target, definitions, args.attributes);
     });
-    return { ...result, page: await Promise.all(matches.map((product) => card(ctx, product, admin))) };
+    return { ...result, page: await Promise.all(matches.map((product) => card(ctx, product))) };
   },
 });
 

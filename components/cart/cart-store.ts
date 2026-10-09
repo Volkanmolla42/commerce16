@@ -1,9 +1,18 @@
 import type { Product } from "../../lib/catalog/types";
 import { trackAnalyticsEvent } from "@/lib/analytics-client";
+import type { ProductImage } from "@/lib/catalog/types";
 
 export type CartItem = { product: Product; quantity: number; variantId?: string };
-export const CART_STORAGE_KEY = "commerce_cart_v1";
+export const CART_STORAGE_KEY = "commerce_cart_v2";
 const EMPTY_CART: CartItem[] = [];
+
+function isProductImage(value: unknown): value is ProductImage {
+  if (!value || typeof value !== "object") return false;
+  const image = value as Partial<ProductImage>;
+  return typeof image.url === "string" &&
+    (image.selectedOptions === undefined || (Array.isArray(image.selectedOptions) && image.selectedOptions.every((option) =>
+      typeof option.name === "string" && typeof option.value === "string")));
+}
 
 function readItems(): CartItem[] {
   try {
@@ -15,7 +24,7 @@ function readItems(): CartItem[] {
         typeof product.title === "string" && typeof product.price === "string" &&
         /^\d+(?:\.\d{1,2})?$/.test(product.price) && Number.isFinite(Number(product.price)) &&
         typeof product.availableForSale === "boolean" && Array.isArray(product.images) &&
-        product.images.every((image: unknown) => typeof image === "string") &&
+        product.images.every(isProductImage) &&
         Number.isSafeInteger(item.quantity) && item.quantity > 0 && item.quantity <= 999 &&
         (item.variantId === undefined || typeof item.variantId === "string");
     });

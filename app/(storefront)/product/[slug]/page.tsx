@@ -17,6 +17,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { baseUrl } from "@/lib/utils";
+import { getProductImages } from "@/lib/catalog/product-images";
 
 function getProductUrl(slug: string) {
   return new URL(`/product/${slug}`, baseUrl).toString();
@@ -49,7 +50,7 @@ export async function generateMetadata(props: {
   const title = product.title;
   const description = getProductDescription(product);
   const productUrl = getProductUrl(product.slug);
-  const imageUrls = getAbsoluteHttpImageUrls(product.images);
+  const imageUrls = getAbsoluteHttpImageUrls(product.images.map(({ url }) => url));
 
   return {
     title,
@@ -95,15 +96,13 @@ async function ProductContent({
 
   if (!product) return notFound();
 
-  const productImageUrls = getAbsoluteHttpImageUrls(product.images);
+  const productImageUrls = getAbsoluteHttpImageUrls(product.images.map(({ url }) => url));
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     "@id": `${getProductUrl(product.slug)}#product`,
     name: product.title,
     description: getProductDescription(product),
-    ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
-    ...(product.material ? { material: product.material } : {}),
     url: getProductUrl(product.slug),
     ...(productImageUrls.length > 0 ? { image: productImageUrls } : {}),
     offers: {
@@ -127,24 +126,19 @@ async function ProductContent({
         }}
       />
       <ProductViewTracker slug={product.slug} />
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4">
-        <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-8 md:p-12 lg:flex-row lg:gap-8 dark:border-neutral-800 dark:bg-black">
-          <div className="h-full w-full basis-full lg:basis-4/6">
+      <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 py-6 sm:gap-10 sm:py-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:items-start lg:gap-16 lg:py-12">
+          <div className="min-w-0 lg:sticky lg:top-24">
             <Suspense
               fallback={
-                <div className="relative aspect-square h-full max-h-[550px] w-full overflow-hidden" />
+                <div className="relative aspect-[4/5] w-full animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-900" />
               }
             >
-              <Gallery
-                images={product.images.slice(0, 5).map((image: string) => ({
-                  src: image,
-                  altText: product.title,
-                }))}
-              />
+              <Gallery product={product} />
             </Suspense>
           </div>
 
-          <div className="basis-full lg:basis-2/6">
+          <div className="min-w-0 lg:py-3">
             <Suspense fallback={null}>
               <ProductDescription product={product} />
             </Suspense>
@@ -181,16 +175,14 @@ async function ProductMerchandising({ product }: {
 
 function ProductSkeleton() {
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4">
-      <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-8 md:p-12 lg:flex-row lg:gap-8 dark:border-neutral-800 dark:bg-black animate-pulse">
-        <div className="aspect-square h-full min-h-[350px] max-h-[550px] w-full basis-full rounded-md bg-neutral-200 lg:basis-4/6 dark:bg-neutral-800" />
-        <div className="flex flex-col gap-4 basis-full lg:basis-2/6 pt-6 lg:pt-0">
-          <div className="h-8 w-3/4 rounded bg-neutral-200 dark:bg-neutral-800" />
-          <div className="h-6 w-1/4 rounded bg-neutral-200 dark:bg-neutral-800" />
-          <div className="h-px w-full bg-neutral-200 dark:bg-neutral-800" />
-          <div className="h-24 w-full rounded bg-neutral-200 dark:bg-neutral-800" />
-          <div className="mt-8 h-12 w-full rounded-full bg-neutral-200 dark:bg-neutral-800" />
-        </div>
+    <div className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:gap-16 lg:px-8 lg:py-12">
+      <div className="aspect-[4/5] w-full animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-900" />
+      <div className="flex flex-col gap-5 pt-2 lg:pt-6">
+        <div className="h-10 w-4/5 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-900" />
+        <div className="h-7 w-1/3 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-900" />
+        <div className="h-px w-full bg-neutral-200 dark:bg-neutral-800" />
+        <div className="h-20 w-full animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-900" />
+        <div className="mt-5 h-12 w-full animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-900" />
       </div>
     </div>
   );
@@ -231,7 +223,7 @@ function RelatedProducts({ products }: { products: Awaited<ReturnType<typeof get
                     amount: product.price,
                     currencyCode: "TRY",
                   }}
-                  src={product.images[0]}
+                  src={getProductImages(product)[0]?.url}
                   fill
                   sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, (min-width: 475px) 50vw, 100vw"
                 />

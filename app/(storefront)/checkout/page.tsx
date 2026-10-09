@@ -11,7 +11,6 @@ import { useConvexAuth } from "@convex-dev/auth/react";
 import {
   CheckmarkBadge01Icon,
   ArrowLeft01Icon,
-  LockIcon,
   ShoppingBag01Icon,
 } from "hugeicons-react";
 import {
@@ -63,10 +62,7 @@ function CheckoutContent() {
   );
   const couponDiscountKurus = couponPreview?.valid ? couponPreview.discountKurus : 0;
   const payableKurus = Math.max(0, subtotalKurus - couponDiscountKurus);
-  const shippingQuote = useQuery(api.settings.getCheckoutShippingQuote, { subtotalKurus: payableKurus });
-  const shippingCostKurus = shippingQuote?.shippingCostKurus;
-  const orderTotalKurus = payableKurus + (shippingCostKurus ?? 0);
-  const payableAmount = orderTotalKurus / 100;
+  const payableAmount = payableKurus / 100;
   const createOrder = useMutation(api.orders.createOrder);
   const captureRecovery = useMutation(api.abandonedCartRecovery.capture);
   const linkRecoveryOrder = useMutation(api.abandonedCartRecovery.linkOrder);
@@ -82,14 +78,9 @@ function CheckoutContent() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [invoiceRecipientType, setInvoiceRecipientType] = useState<"individual" | "business">("individual");
-  const [businessTitle, setBusinessTitle] = useState("");
-  const [taxNumber, setTaxNumber] = useState("");
-  const [taxOffice, setTaxOffice] = useState("");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [preInformationAccepted, setPreInformationAccepted] = useState(false);
   const [emailReminderConsent, setEmailReminderConsent] = useState(false);
-  const [whatsappReminderConsent, setWhatsappReminderConsent] = useState(false);
 
   useEffect(() => {
     if (items.length > 0) void trackAnalyticsEvent("begin_checkout");
@@ -99,7 +90,7 @@ function CheckoutContent() {
     if (items.length === 0) return;
     let sessionKey: string | null;
     try {
-      sessionKey = getCartRecoverySessionKey(emailReminderConsent || whatsappReminderConsent);
+      sessionKey = getCartRecoverySessionKey(emailReminderConsent);
     } catch {
       return;
     }
@@ -108,20 +99,18 @@ function CheckoutContent() {
       void captureRecovery({
         sessionKey,
         ...(emailReminderConsent ? { email: customerEmail } : {}),
-        ...(whatsappReminderConsent ? { phone } : {}),
         emailConsent: emailReminderConsent,
-        whatsappConsent: whatsappReminderConsent,
-        items: emailReminderConsent || whatsappReminderConsent
+        items: emailReminderConsent
           ? items.map((item) => ({
-              productId: item.product.id,
-              ...(item.variantId ? { variantId: item.variantId } : {}),
-              quantity: item.quantity,
-            }))
+            productId: item.product.id,
+            ...(item.variantId ? { variantId: item.variantId } : {}),
+            quantity: item.quantity,
+          }))
           : [],
       }).catch(() => undefined);
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [captureRecovery, customerEmail, emailReminderConsent, items, phone, whatsappReminderConsent]);
+  }, [captureRecovery, customerEmail, emailReminderConsent, items]);
 
   const handleAddressSelect = (addressId: string) => {
     setAddressSelection(addressId);
@@ -173,32 +162,26 @@ function CheckoutContent() {
       setIsSubmitting(false);
       return;
     }
-    if (shippingQuote === undefined) {
-      setErrorMessage("Kargo ücreti hesaplanıyor. Biraz bekleyip tekrar deneyin.");
-      setIsSubmitting(false);
-      return;
-    }
-
     const fullShippingAddress = `${customerName}, Tel: ${phone} - ${addressLine}, ${district}/${city}`;
     const isNewAddress = selectedAddressId === "custom" || !addresses || addresses.length === 0;
     const shouldSave = isAuthenticated && isNewAddress && saveAddressToBook;
 
     const saveAddressPayload = shouldSave
       ? {
-          title: addressTitle.trim() || "Ev",
-          city: city.trim(),
-          district: district.trim(),
-          provinceId,
-          districtId,
-          addressLine1: addressLine.trim(),
-          isDefault: !addresses || addresses.length === 0,
-        }
+        title: addressTitle.trim() || "Ev",
+        city: city.trim(),
+        district: district.trim(),
+        provinceId,
+        districtId,
+        addressLine1: addressLine.trim(),
+        isDefault: !addresses || addresses.length === 0,
+      }
       : undefined;
 
     try {
       let recoverySessionKey: string | null = null;
       try {
-        recoverySessionKey = getCartRecoverySessionKey(emailReminderConsent || whatsappReminderConsent);
+        recoverySessionKey = getCartRecoverySessionKey(emailReminderConsent);
       } catch {
         recoverySessionKey = null;
       }
@@ -207,15 +190,13 @@ function CheckoutContent() {
         await captureRecovery({
           sessionKey: recoverySessionKey,
           ...(emailReminderConsent ? { email: customerEmail } : {}),
-          ...(whatsappReminderConsent ? { phone } : {}),
           emailConsent: emailReminderConsent,
-          whatsappConsent: whatsappReminderConsent,
-          items: emailReminderConsent || whatsappReminderConsent
+          items: emailReminderConsent
             ? items.map((item) => ({
-                productId: item.product.id,
-                ...(item.variantId ? { variantId: item.variantId } : {}),
-                quantity: item.quantity,
-              }))
+              productId: item.product.id,
+              ...(item.variantId ? { variantId: item.variantId } : {}),
+              quantity: item.quantity,
+            }))
             : [],
         }).catch(() => undefined);
       }
@@ -237,25 +218,17 @@ function CheckoutContent() {
           title: item.product.title,
           quantity: item.quantity,
           price: getProductUnitPrice(item.product, item.variantId),
-          image: item.product.images[0],
+          image: item.product.images[0]?.url,
         })),
         legalAcceptance: {
           accepted: true as const,
           distanceSalesAgreementVersion: legalDocuments.distanceSalesAgreement.version,
           preInformationFormVersion: legalDocuments.preInformationForm.version,
         },
-        invoiceRecipient: invoiceRecipientType === "business"
-          ? {
-              type: "business" as const,
-              businessTitle: businessTitle.trim(),
-              taxNumber: taxNumber.trim(),
-              taxOffice: taxOffice.trim(),
-            }
-          : { type: "individual" as const },
         saveAddress: saveAddressPayload,
       });
 
-      if (recoverySessionKey && (emailReminderConsent || whatsappReminderConsent)) {
+      if (recoverySessionKey && emailReminderConsent) {
         await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
       }
 
@@ -393,50 +366,11 @@ function CheckoutContent() {
             </div>
           </Card>
 
-          <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-4">
-            <CardHeader className="p-0">
-              <CardTitle className="text-base font-bold text-foreground">Fatura bilgileri</CardTitle>
-            </CardHeader>
-            <Separator />
-            <fieldset className="space-y-3">
-              <legend className="text-xs text-muted-foreground">Fatura türü</legend>
-              <div className="flex flex-wrap gap-4">
-                <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground">
-                  <input type="radio" name="invoice-recipient-type" checked={invoiceRecipientType === "individual"} onChange={() => setInvoiceRecipientType("individual")} className="h-4 w-4 accent-primary" />
-                  Bireysel
-                </label>
-                <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-foreground">
-                  <input type="radio" name="invoice-recipient-type" checked={invoiceRecipientType === "business"} onChange={() => setInvoiceRecipientType("business")} className="h-4 w-4 accent-primary" />
-                  Kurumsal
-                </label>
-              </div>
-              {invoiceRecipientType === "business" && (
-                <div className="grid gap-3 pt-2 sm:grid-cols-2">
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="invoice-business-title">Ticaret unvanı</Label>
-                    <Input id="invoice-business-title" autoComplete="organization" required maxLength={160} value={businessTitle} onChange={(event) => setBusinessTitle(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="invoice-tax-number">Vergi kimlik numarası</Label>
-                    <Input id="invoice-tax-number" inputMode="numeric" autoComplete="off" required maxLength={10} pattern="[0-9]{10}" value={taxNumber} onChange={(event) => setTaxNumber(event.target.value.replace(/\D/g, "").slice(0, 10))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="invoice-tax-office">Vergi dairesi</Label>
-                    <Input id="invoice-tax-office" autoComplete="off" required maxLength={100} value={taxOffice} onChange={(event) => setTaxOffice(event.target.value)} />
-                  </div>
-                </div>
-              )}
-              <p className="text-xs leading-5 text-muted-foreground">
-                Kurumsal fatura bilgileri sipariş kaydında ve yapılandırılmışsa fatura entegratörüne iletilir. <Link href="/privacy-policy" className="underline underline-offset-4">Gizlilik politikası</Link>
-              </p>
-            </fieldset>
-          </Card>
-
-          {/* 2. Teslimat Adresi */}
+          {/* Teslimat Adresi */}
           <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-4">
             <CardHeader className="p-0">
               <CardTitle className="text-base font-bold text-foreground">
-                2. Teslimat Adresi
+                Teslimat Adresi
               </CardTitle>
             </CardHeader>
             <Separator />
@@ -451,11 +385,10 @@ function CheckoutContent() {
                   {addresses.map((addr) => (
                     <label
                       key={addr._id}
-                      className={`relative flex flex-col p-4 rounded-2xl border cursor-pointer transition ${
-                        selectedAddressId === addr._id
-                          ? "border-primary bg-primary/5 shadow-xs"
-                          : "border-border hover:border-muted-foreground/40"
-                      }`}
+                      className={`relative flex flex-col p-4 rounded-2xl border cursor-pointer transition ${selectedAddressId === addr._id
+                        ? "border-primary bg-primary/5 shadow-xs"
+                        : "border-border hover:border-muted-foreground/40"
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-sm text-foreground">
@@ -479,11 +412,10 @@ function CheckoutContent() {
                   ))}
 
                   <label
-                    className={`relative flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition ${
-                      selectedAddressId === "custom"
-                        ? "border-primary bg-primary/5 shadow-xs"
-                        : "border-border hover:border-muted-foreground/40"
-                    }`}
+                    className={`relative flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition ${selectedAddressId === "custom"
+                      ? "border-primary bg-primary/5 shadow-xs"
+                      : "border-border hover:border-muted-foreground/40"
+                      }`}
                   >
                     <span className="font-semibold text-sm text-foreground">
                       + Farklı Bir Adres Gir
@@ -581,7 +513,7 @@ function CheckoutContent() {
                   </Label>
                   <textarea
                     id="checkout-address"
-                  autoComplete="street-address"
+                    autoComplete="street-address"
                     rows={3}
                     required
                     value={addressLine}
@@ -590,7 +522,7 @@ function CheckoutContent() {
                       setDraft({ ...draft, addressLine: e.target.value });
                     }}
                     placeholder="Örn: Caferağa Mah. Moda Cad. No: 12 Daire: 4"
-                    className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
+                    className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-[border-color,background-color,box-shadow] duration-150"
                   />
                 </div>
 
@@ -637,39 +569,24 @@ function CheckoutContent() {
 
 
 
-          {(recoveryAvailability?.email || recoveryAvailability?.whatsapp) && (
+          {recoveryAvailability?.email && (
             <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
               <fieldset className="space-y-3">
                 <legend className="text-sm font-semibold text-foreground">Sepet hatırlatması (isteğe bağlı)</legend>
                 <p className="text-xs text-muted-foreground">
-                  Ödeme tamamlanmazsa seçtiğiniz her kanaldan bir hatırlatma gönderilir.
+                  Ödeme tamamlanmazsa e-posta ile bir hatırlatma gönderilir.
                 </p>
-                {recoveryAvailability.email && (
-                  <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
-                    <input
-                      id="cart-reminder-email-consent"
-                      name="cart-reminder-email-consent"
-                      type="checkbox"
-                      checked={emailReminderConsent}
-                      onChange={(event) => setEmailReminderConsent(event.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                    />
-                    <span>Sepetimdeki ürünleri tamamlamam için e-posta ile bir hatırlatma gönderilmesine izin veriyorum.</span>
-                  </label>
-                )}
-                {recoveryAvailability.whatsapp && (
-                  <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
-                    <input
-                      id="cart-reminder-whatsapp-consent"
-                      name="cart-reminder-whatsapp-consent"
-                      type="checkbox"
-                      checked={whatsappReminderConsent}
-                      onChange={(event) => setWhatsappReminderConsent(event.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                    />
-                    <span>Sepetimdeki ürünleri tamamlamam için WhatsApp ile bir hatırlatma gönderilmesine izin veriyorum.</span>
-                  </label>
-                )}
+                <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
+                  <input
+                    id="cart-reminder-email-consent"
+                    name="cart-reminder-email-consent"
+                    type="checkbox"
+                    checked={emailReminderConsent}
+                    onChange={(event) => setEmailReminderConsent(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                  />
+                  <span>Sepetimdeki ürünleri tamamlamam için e-posta ile bir hatırlatma gönderilmesine izin veriyorum.</span>
+                </label>
               </fieldset>
             </Card>
           )}
@@ -691,7 +608,7 @@ function CheckoutContent() {
                 <div key={`${item.product.id}:${item.variantId ?? ""}`} className="py-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     {item.product.images[0] ? <Image
-                      src={item.product.images[0]}
+                      src={item.product.images[0].url}
                       width={48}
                       height={48}
                       alt={item.product.title}
@@ -753,7 +670,7 @@ function CheckoutContent() {
                   ? `${couponPreview.code} kuponu uygulandı.`
                   : couponPreview && !couponPreview.valid
                     ? couponPreview.message
-                    : appliedCouponCode ? "Kupon kontrol ediliyor…" : "Kupon kodunuz varsa burada uygulayın."}
+                    : appliedCouponCode ? "Kupon kontrol ediliyor…" : ""}
               </p>
             </div>
 
@@ -764,21 +681,6 @@ function CheckoutContent() {
                 <span>Ara Toplam</span>
                 <span>{formatMoney(totalAmount)}</span>
               </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Kargo</span>
-                {shippingQuote === undefined ? (
-                  <span>Hesaplanıyor…</span>
-                ) : shippingCostKurus === 0 ? (
-                  <Badge variant="success">Ücretsiz</Badge>
-                ) : (
-                  <span>{formatMoney(shippingQuote.shippingCostKurus / 100)}</span>
-                )}
-              </div>
-              {shippingQuote?.freeShippingRemainingKurus != null && shippingQuote.freeShippingRemainingKurus > 0 && shippingQuote.configuredShippingFeeKurus > 0 && (
-                <p className="text-right text-xs text-muted-foreground">
-                  {formatMoney(shippingQuote.freeShippingRemainingKurus / 100)} daha ekleyin, kargo ücretsiz olsun.
-                </p>
-              )}
               {couponDiscountKurus > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <span>Kupon indirimi</span>
@@ -796,7 +698,7 @@ function CheckoutContent() {
             <Button
               type="submit"
               size="lg"
-              disabled={isSubmitting || shippingQuote === undefined}
+              disabled={isSubmitting}
               className="mt-6 w-full rounded-2xl shadow-lg font-semibold gap-2 h-14"
             >
               {isSubmitting ? (

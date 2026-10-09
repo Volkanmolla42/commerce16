@@ -35,9 +35,6 @@ const dashboardValidator = v.object({
     averageOrderValueCents: v.number(),
     observedLtvCents: v.number(),
     repeatCustomerRate: v.number(),
-    attributedNewCustomers: v.number(),
-    marketingSpendCents: v.number(),
-    cacCents: v.union(v.number(), v.null()),
     unattributedPaidOrders: v.number(),
   }),
   funnel: v.array(v.object({
@@ -56,10 +53,8 @@ const dashboardValidator = v.object({
   channels: v.array(v.object({
     source: v.string(),
     campaign: v.string(),
-    spendCents: v.number(),
     newCustomers: v.number(),
     attributedRevenueCents: v.number(),
-    cacCents: v.union(v.number(), v.null()),
   })),
   cohorts: v.array(v.object({
     month: v.string(),
@@ -74,7 +69,6 @@ const dashboardValidator = v.object({
     funnelLimited: v.boolean(),
     purchaseLimited: v.boolean(),
     orderHistoryLimited: v.boolean(),
-    spendLimited: v.boolean(),
     orderHistoryMonths: v.number(),
   }),
 });
@@ -103,16 +97,6 @@ function monthKey(timestamp: number) {
 function monthIndex(month: string) {
   const [year, value] = month.split("-").map(Number);
   return year * 12 + value - 1;
-}
-
-function monthStartUtc(month: string) {
-  const [year, value] = month.split("-").map(Number);
-  return Date.UTC(year, value - 1, 1);
-}
-
-function monthEndUtc(month: string) {
-  const [year, value] = month.split("-").map(Number);
-  return Date.UTC(year, value, 1);
 }
 
 function centsFromAmount(value: string) {
@@ -179,7 +163,6 @@ export const recordEvent = mutation({
       sessionId: args.sessionId,
       visitorId: args.visitorId,
       startedAt: now,
-      lastSeenAt: now,
       source,
       medium,
       ...(campaign ? { campaign } : {}),
@@ -189,7 +172,6 @@ export const recordEvent = mutation({
       checkoutStarted: false,
     };
     const next = {
-      lastSeenAt: now,
       pageViews: session.pageViews + (args.eventType === "page_view" ? 1 : 0),
       productViews: session.productViews + (args.eventType === "product_view" ? 1 : 0),
       addedToCart: session.addedToCart || args.eventType === "add_to_cart",
@@ -206,47 +188,6 @@ export const recordEvent = mutation({
   },
 });
 
-export const upsertMarketingSpend = mutation({
-  args: {
-    adminSecret: v.string(),
-    month: v.string(),
-    source: v.string(),
-    campaign: v.string(),
-    amountCents: v.number(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    const source = cleanAttribution(args.source);
-    const campaign = cleanAttribution(args.campaign);
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(args.month) || !source || source.length > 100 || campaign.length > 120) {
-      throw new Error("Kampanya bilgileri geçersiz.");
-    }
-    if (!Number.isSafeInteger(args.amountCents) || args.amountCents < 0 || args.amountCents > 100_000_000_00) {
-      throw new Error("Harcama tutarı geçersiz.");
-    }
-
-    const existing = await ctx.db.query("analyticsMarketingSpend")
-      .withIndex("by_month_and_source_and_campaign", (q) =>
-        q.eq("month", args.month).eq("source", source).eq("campaign", campaign),
-      )
-      .unique();
-    const updatedAt = Date.now();
-    if (existing) {
-      await ctx.db.patch(existing._id, { amountCents: args.amountCents, updatedAt });
-    } else {
-      await ctx.db.insert("analyticsMarketingSpend", {
-        month: args.month,
-        source,
-        campaign,
-        amountCents: args.amountCents,
-        updatedAt,
-      });
-    }
-    return null;
-  },
-});
-
 export const syncOrderAttribution = internalMutation({
   args: { orderId: v.id("orders"), attempts: v.optional(v.number()) },
   returns: v.null(),
@@ -257,7 +198,7 @@ export const syncOrderAttribution = internalMutation({
     const existing = await ctx.db.query("analyticsPurchases")
       .withIndex("by_order_id", (q) => q.eq("orderId", orderId))
       .unique();
-    const isPaid = order.status === "paid" || order.status === "shipped" || order.status === "delivered";
+    const isPaid = order.status === "paid";
     if (!isPaid) {
       if (existing) await ctx.db.delete(existing._id);
       return null;
@@ -348,11 +289,10 @@ export const getDashboard = query({
     const from = now - days * 24 * 60 * 60 * 1000;
     const historyFrom = now - 730 * 24 * 60 * 60 * 1000;
     const currentMonth = monthKey(now);
-    const firstMonth = monthKey(from);
     const oldestCohortMonthIndex = monthIndex(currentMonth) - 11;
     const oldestCohortMonth = `${Math.floor(oldestCohortMonthIndex / 12).toString().padStart(4, "0")}-${String(oldestCohortMonthIndex % 12 + 1).padStart(2, "0")}`;
 
-    const [sessionRows, purchaseRows, spendRows, paidByStatus] = await Promise.all([
+    const [sessionRows, purchaseRows, paidByStatus] = await Promise.all([
       ctx.db.query("analyticsSessions")
         .withIndex("by_started_at", (q) => q.gte("startedAt", from))
         .order("desc")
@@ -361,21 +301,13 @@ export const getDashboard = query({
         .withIndex("by_paid_at", (q) => q.gte("paidAt", from))
         .order("desc")
         .take(5_001),
-      ctx.db.query("analyticsMarketingSpend")
-        .withIndex("by_month", (q) => q.gte("month", firstMonth).lte("month", currentMonth))
-        .take(1_001),
-      Promise.all((["paid", "shipped", "delivered"] as const).map((status) =>
-        ctx.db.query("orders")
-          .withIndex("by_status", (q) => q.eq("status", status).gte("_creationTime", historyFrom))
-          .order("desc")
-          .take(250),
-      )),
+      ctx.db.query("orders").withIndex("by_status", (q) => q.eq("status", "paid").gte("_creationTime", historyFrom)).order("desc").take(750),
     ]);
 
     const sessions = sessionRows.slice(0, 5_000);
     const purchases = purchaseRows.slice(0, 5_000);
-    const paidOrders = paidByStatus.flat();
-    const orderHistoryLimited = paidByStatus.some((orders) => orders.length === 250);
+    const paidOrders = paidByStatus;
+    const orderHistoryLimited = paidByStatus.length === 750;
     const customers = new Map<string, Array<{ orderId: string; paidAt: number; amountCents: number; month: string }>>();
     for (const order of paidOrders) {
       const customerKey = await hashCustomerKey(order.customerEmail.trim().toLowerCase(), env.ADMIN_API_SECRET);
@@ -436,78 +368,45 @@ export const getDashboard = query({
       stage("purchase", "Tamamlanan satın alma", purchasedSessions, checkoutSessions),
     ];
 
-    const spendByCampaign = new Map<string, { source: string; campaign: string; amountCents: number }>();
-    for (const spend of spendRows.slice(0, 1_000)) {
-      const monthStart = monthStartUtc(spend.month);
-      const monthEnd = monthEndUtc(spend.month);
-      const overlap = Math.max(0, Math.min(now, monthEnd) - Math.max(from, monthStart));
-      const fraction = overlap / (monthEnd - monthStart);
-      if (fraction <= 0) continue;
-      const key = `${spend.source.toLocaleLowerCase("tr-TR")}\n${spend.campaign.toLocaleLowerCase("tr-TR")}`;
-      const entry = spendByCampaign.get(key) ?? { source: spend.source, campaign: spend.campaign, amountCents: 0 };
-      entry.amountCents += Math.round(spend.amountCents * fraction);
-      spendByCampaign.set(key, entry);
-    }
-
     const firstOrderById = new Map<string, { customerKey: string; paidAt: number; amountCents: number }>();
     for (const [customerKey, customerOrders] of customers) {
       const first = [...customerOrders].sort((a, b) => a.paidAt - b.paidAt)[0];
       if (first) firstOrderById.set(first.orderId, { customerKey, paidAt: first.paidAt, amountCents: first.amountCents });
     }
 
-    const campaignPerformance = new Map<string, {
+    const campaignAttribution = new Map<string, {
       source: string;
       campaign: string;
-      spendCents: number;
-      spendTracked: boolean;
       newCustomerKeys: Set<string>;
       attributedRevenueCents: number;
     }>();
-    for (const [key, spend] of spendByCampaign) {
-      campaignPerformance.set(key, {
-        ...spend,
-        spendCents: spend.amountCents,
-        spendTracked: true,
-        newCustomerKeys: new Set<string>(),
-        attributedRevenueCents: 0,
-      });
-    }
 
     const trackedOrderIds = new Set<string>();
-    const measuredNewCustomerKeys = new Set<string>();
     for (const purchase of purchases) {
       trackedOrderIds.add(purchase.orderId);
       const campaignKey = `${purchase.source.toLocaleLowerCase("tr-TR")}\n${(purchase.campaign ?? "").toLocaleLowerCase("tr-TR")}`;
-      const entry = campaignPerformance.get(campaignKey) ?? {
+      const entry = campaignAttribution.get(campaignKey) ?? {
         source: purchase.source,
         campaign: purchase.campaign ?? "",
-        spendCents: 0,
-        spendTracked: false,
         newCustomerKeys: new Set<string>(),
         attributedRevenueCents: 0,
       };
       entry.attributedRevenueCents += purchase.amountCents;
-      campaignPerformance.set(campaignKey, entry);
+      campaignAttribution.set(campaignKey, entry);
 
       const first = firstOrderById.get(purchase.orderId);
       if (!first || first.paidAt < from || first.paidAt > now) continue;
       entry.newCustomerKeys.add(first.customerKey);
-      if (entry.spendTracked) measuredNewCustomerKeys.add(first.customerKey);
     }
 
-    const channels = [...campaignPerformance.values()]
+    const channels = [...campaignAttribution.values()]
       .map((entry) => ({
         source: entry.source,
         campaign: entry.campaign,
-        spendCents: entry.spendCents,
         newCustomers: entry.newCustomerKeys.size,
         attributedRevenueCents: entry.attributedRevenueCents,
-        cacCents: entry.spendTracked && entry.newCustomerKeys.size > 0
-          ? Math.round(entry.spendCents / entry.newCustomerKeys.size)
-          : null,
       }))
-      .sort((a, b) => b.spendCents - a.spendCents || a.source.localeCompare(b.source));
-    const marketingSpendCents = channels.reduce((sum, channel) => sum + channel.spendCents, 0);
+      .sort((a, b) => b.attributedRevenueCents - a.attributedRevenueCents || a.source.localeCompare(b.source));
     const cohortMonths = Array.from({ length: 12 }, (_, offset) => {
       const index = cohortStartIndex + offset;
       return `${Math.floor(index / 12).toString().padStart(4, "0")}-${String(index % 12 + 1).padStart(2, "0")}`;
@@ -526,8 +425,6 @@ export const getDashboard = query({
       }];
     });
     const observedLtvCents = customers.size > 0 ? Math.round(revenueCents / customers.size) : 0;
-    const attributedNewCustomers = measuredNewCustomerKeys.size;
-
     return {
       days,
       generatedAt: now,
@@ -542,9 +439,6 @@ export const getDashboard = query({
           : 0,
         observedLtvCents,
         repeatCustomerRate: percentage(repeatCustomers, customers.size),
-        attributedNewCustomers,
-        marketingSpendCents,
-        cacCents: attributedNewCustomers > 0 ? Math.round(marketingSpendCents / attributedNewCustomers) : null,
         unattributedPaidOrders: Math.max(0, periodPaidOrders - trackedOrderIds.size),
       },
       funnel,
@@ -554,7 +448,6 @@ export const getDashboard = query({
         funnelLimited: sessionRows.length > 5_000,
         purchaseLimited: purchaseRows.length > 5_000,
         orderHistoryLimited,
-        spendLimited: spendRows.length > 1_000,
         orderHistoryMonths: 24,
       },
     };

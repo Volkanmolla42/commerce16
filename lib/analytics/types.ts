@@ -10,9 +10,6 @@ export type AnalyticsDashboard = {
     averageOrderValueCents: number;
     observedLtvCents: number;
     repeatCustomerRate: number;
-    attributedNewCustomers: number;
-    marketingSpendCents: number;
-    cacCents: number | null;
     unattributedPaidOrders: number;
   };
   funnel: Array<{
@@ -25,10 +22,8 @@ export type AnalyticsDashboard = {
   channels: Array<{
     source: string;
     campaign: string;
-    spendCents: number;
     newCustomers: number;
     attributedRevenueCents: number;
-    cacCents: number | null;
   }>;
   cohorts: Array<{
     month: string;
@@ -43,7 +38,6 @@ export type AnalyticsDashboard = {
     funnelLimited: boolean;
     purchaseLimited: boolean;
     orderHistoryLimited: boolean;
-    spendLimited: boolean;
     orderHistoryMonths: number;
   };
 };

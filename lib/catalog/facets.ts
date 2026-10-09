@@ -4,7 +4,6 @@ import type { CategoryAttributeDefinition } from "./attributes";
 export type CatalogFilters = {
   minPrice: string;
   maxPrice: string;
-  stock: "" | "in" | "out";
 };
 
 export type CategoryAttributeFilter = { values: string[]; min: string; max: string };
@@ -56,20 +55,11 @@ export function getActiveCategoryAttributeFilterCount(filters: CategoryAttribute
 export const EMPTY_CATALOG_FILTERS: CatalogFilters = {
   minPrice: "",
   maxPrice: "",
-  stock: "",
 };
 
 function getProductPrice(product: Product) {
   const price = Number(product.price);
   return Number.isFinite(price) ? price : null;
-}
-
-export function isProductInStock(product: Product) {
-  if (!product.availableForSale || product.stockQuantity === 0) return false;
-  if (product.variants?.length) {
-    return product.variants.some((variant) => variant.availableForSale);
-  }
-  return product.availableForSale;
 }
 
 export function matchesCatalogFilters(product: Product, filters: CatalogFilters) {
@@ -80,16 +70,12 @@ export function matchesCatalogFilters(product: Product, filters: CatalogFilters)
   if (minPrice !== null && (price === null || price < minPrice)) return false;
   if (maxPrice !== null && (price === null || price > maxPrice)) return false;
 
-  if (filters.stock === "in" && !isProductInStock(product)) return false;
-  if (filters.stock === "out" && isProductInStock(product)) return false;
-
   return true;
 }
 
 export function getActiveCatalogFilterCount(filters: CatalogFilters) {
   return (
     Number(filters.minPrice !== "") +
-    Number(filters.maxPrice !== "") +
-    Number(filters.stock !== "")
+    Number(filters.maxPrice !== "")
   );
 }

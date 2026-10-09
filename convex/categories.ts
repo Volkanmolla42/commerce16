@@ -6,7 +6,7 @@ import { parseCategoryAttributes } from "../lib/catalog/attributes";
 import { patchCatalogProduct } from "./catalogModel";
 
 const categoryValidator = schema.doc("categories");
-const categoryInputValidator = categoryValidator.omit("_id", "_creationTime", "updatedAt", "path");
+const categoryInputValidator = categoryValidator.omit("_id", "_creationTime", "updatedAt");
 const categoryWithImageValidator = categoryValidator.extend({
   imageUrl: v.union(v.string(), v.null()),
 });
@@ -82,7 +82,6 @@ export const create = mutation({
     return await ctx.db.insert("categories", {
       ...category,
       attributes: category.attributes,
-      path: `/search/${category.slug}`,
       updatedAt,
     });
   },
@@ -101,6 +100,14 @@ export const update = mutation({
     const current = await ctx.db.get(id);
     if (!current) throw new Error("Kategori bulunamadı.");
     if (rest.attributes) rest.attributes = parseCategoryAttributes(rest.attributes);
+    const nextSlug = rest.slug ?? current.slug;
+    const slugChanged = nextSlug !== current.slug;
+    const nextAttributeKeys = new Set((rest.attributes ?? current.attributes ?? []).map((attribute) => attribute.key));
+    const removedAttributeKeys = new Set(
+      (current.attributes ?? [])
+        .filter((attribute) => !nextAttributeKeys.has(attribute.key))
+        .map((attribute) => attribute.key),
+    );
 
     if (rest.slug && rest.slug !== current.slug) {
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rest.slug)) {
@@ -113,7 +120,7 @@ export const update = mutation({
       if (duplicate) throw new Error("Bu kategori adresi zaten kullanılıyor.");
     }
 
-    if (rest.slug && rest.slug !== current.slug) {
+    if (slugChanged || removedAttributeKeys.size > 0) {
       let cursor: string | null = null;
       let isDone = false;
       while (!isDone) {
@@ -121,8 +128,16 @@ export const update = mutation({
           .withIndex("by_category", (q) => q.eq("categorySlug", current.slug))
           .paginate({ numItems: 100, cursor });
         for (const product of page.page) {
+          const attributes = product.attributes ?? [];
+          const nextAttributes = removedAttributeKeys.size > 0
+            ? attributes.filter((attribute) => !removedAttributeKeys.has(attribute.key))
+            : attributes;
+          const attributesChanged = nextAttributes.length !== attributes.length;
+          if (!slugChanged && !attributesChanged) continue;
+
           await patchCatalogProduct(ctx, product, {
-            categorySlug: rest.slug,
+            ...(slugChanged ? { categorySlug: nextSlug } : {}),
+            ...(attributesChanged ? { attributes: nextAttributes } : {}),
             updatedAt: new Date().toISOString(),
           });
         }
@@ -141,7 +156,6 @@ export const update = mutation({
 
     await ctx.db.patch(id, {
       ...rest,
-      ...(rest.slug ? { path: `/search/${rest.slug}` } : {}),
       updatedAt: new Date().toISOString(),
     });
     if (imageChanged && current.imageStorageId) {

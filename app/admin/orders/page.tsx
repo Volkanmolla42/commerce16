@@ -20,37 +20,24 @@ import { orderStatusLabels } from "@/lib/orders";
 import { adminPath } from "@/lib/admin/routes";
 
 type Order = Doc<"orders"> & {
-  invoice?: Doc<"invoiceRecords"> | null;
   emailEvents?: Doc<"orderEmailEvents">[];
-  shippingShipment?: Doc<"shippingShipments"> | null;
 };
 type OrderStatus = Order["status"];
 type OrderEmailEvent = Doc<"orderEmailEvents">["event"];
-const statuses: OrderStatus[] = ["pending", "paid", "shipped", "delivered", "cancelled"];
+const statuses: OrderStatus[] = ["pending", "paid", "cancelled"];
 
 function availableStatusOptions(order: Order) {
   const options: OrderStatus[] = [order.status];
   if (order.status === "pending") {
     options.push("paid", "cancelled");
   } else if (order.status === "paid") {
-    options.push("shipped", "cancelled");
-  } else if (order.status === "shipped") {
-    options.push("delivered");
+    options.push("cancelled");
   }
   return options;
 }
 
-const invoiceStatusLabels: Record<Doc<"invoiceRecords">["status"], string> = {
-  queued: "Sırada",
-  processing: "Düzenleniyor",
-  issued: "Düzenlendi",
-  failed: "Hata",
-  not_configured: "Entegratör ayarlı değil",
-  review: "Panelde kontrol gerekli",
-};
 const emailEventLabels: Record<OrderEmailEvent, string> = {
   payment_confirmation: "Ödeme ve sipariş özeti",
-  shipping_update: "Kargo takip bildirimi",
 };
 const emailStatusLabels: Record<Doc<"orderEmailEvents">["status"], string> = {
   processing: "Gönderiliyor",
@@ -59,68 +46,17 @@ const emailStatusLabels: Record<Doc<"orderEmailEvents">["status"], string> = {
   not_configured: "Resend ayarlı değil",
   review: "Gönderim sonucu kontrol edilmeli",
 };
-const shippingStatusLabels: Record<Doc<"shippingShipments">["status"], string> = {
-  creating: "Gönderi oluşturuluyor",
-  quoted: "Teklif seçimi bekleniyor",
-  purchasing: "Etiket satın alınıyor",
-  purchased: "Etiket satın alındı",
-  failed: "Gönderi oluşturulamadı",
-  review: "Sonuç incelemesi gerekli",
-};
-const shippingErrorLabels: Record<string, string> = {
-  not_configured: "Geliver ayarları eksik.",
-  invalid_store_url: "Mağaza URL ayarı geçersiz.",
-  recipient_phone_missing: "Müşteri telefon numarası kargo formatında değil.",
-  recipient_address_incomplete: "Teslimat adresi kargo için eksik.",
-  order_total_invalid: "Sipariş tutarı geçersiz.",
-  provider_rejected: "Geliver isteği reddetti.",
-  provider_unavailable: "Geliver şu anda yanıt vermiyor.",
-  provider_result_unknown: "Geliver sonucu doğrulanamadı.",
-  invalid_response: "Geliver beklenmeyen yanıt verdi.",
-  shipment_reference_missing: "Geliver gönderi referansı vermedi.",
-  transaction_reference_missing: "Satın alma yanıtında gönderi referansı bulunamadı.",
-};
-
 function OrderDetails({
   order,
   onClose,
-  onRetryInvoice,
-  retryingInvoice,
   onRetryEmail,
   retryingEmailKey,
-  onActionSuccess,
-  onShippingUpdate,
 }: {
   order: Order;
   onClose: () => void;
-  onRetryInvoice: () => void;
-  retryingInvoice: boolean;
   onRetryEmail: (event: OrderEmailEvent) => void;
   retryingEmailKey: string | null;
-  onActionSuccess: (message: string) => void;
-  onShippingUpdate: (record: Doc<"shippingShipments"> | null) => void;
 }) {
-  const [shippingBusy, setShippingBusy] = useState(false);
-  const [shippingError, setShippingError] = useState<string | null>(null);
-  const [shippingMessage, setShippingMessage] = useState<string | null>(null);
-
-  const runShippingAction = async (action: string, input: Record<string, string>) => {
-    if (shippingBusy) return;
-    setShippingBusy(true);
-    setShippingError(null);
-    setShippingMessage(null);
-    try {
-      const result = await runAdminAction<{ record: Doc<"shippingShipments"> | null; message: string; isError: boolean }>(action, input);
-      onShippingUpdate(result.record);
-      setShippingMessage(result.isError ? null : result.message);
-      setShippingError(result.isError ? result.message : null);
-    } catch (cause) {
-      setShippingError(cause instanceof Error ? cause.message : "Kargo işlemi tamamlanamadı.");
-    } finally {
-      setShippingBusy(false);
-    }
-  };
-
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto">
@@ -146,93 +82,6 @@ function OrderDetails({
           <section>
             <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Teslimat</h3>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{order.shippingAddress || "Adres girilmemiş."}</p>
-          </section>
-          {(order.status === "paid" || order.status === "shipped" || order.status === "delivered") && (
-            <section className="space-y-3 border-t border-border pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Geliver kargo</h3>
-                {order.shippingShipment && <span className="text-xs font-semibold text-muted-foreground">{shippingStatusLabels[order.shippingShipment.status]}</span>}
-              </div>
-              {order.shippingShipment?.carrierName && <p className="text-sm font-medium text-foreground">{order.shippingShipment.carrierName}</p>}
-              {order.shippingShipment?.trackingNumber && <p className="text-sm text-foreground">Takip no: <span className="font-mono">{order.shippingShipment.trackingNumber}</span></p>}
-              {order.shippingShipment?.trackingUrl && (
-                <a href={order.shippingShipment.trackingUrl} target="_blank" rel="noreferrer" className="block break-all text-sm text-primary underline underline-offset-4">Kargo takibini aç</a>
-              )}
-              {order.shippingShipment?.labelUrl && (
-                <a href={order.shippingShipment.labelUrl} target="_blank" rel="noreferrer" className="block break-all text-sm text-primary underline underline-offset-4">Kargo etiketini yazdır</a>
-              )}
-              {order.shippingShipment?.status === "purchased" && !order.shippingShipment.trackingNumber && (
-                <p className="text-xs text-muted-foreground">Kargo firması takip kodunu oluşturduğunda burada görünecek.</p>
-              )}
-              {order.shippingShipment?.status === "purchased" && (
-                <Button type="button" size="sm" variant="outline" disabled={shippingBusy} onClick={() => void runShippingAction("shipping.refresh-offers", { orderId: order._id })}>
-                  {shippingBusy ? "Kontrol ediliyor…" : "Takip durumunu kontrol et"}
-                </Button>
-              )}
-              {order.shippingShipment?.status === "review" && (
-                <AdminNotice kind="error">Satın alma sonucu belirsiz. Mükerrer ücret oluşmaması için işlemi otomatik tekrarlamayın.</AdminNotice>
-              )}
-              {order.shippingShipment?.errorCode && order.shippingShipment.status !== "review" && (
-                <p className="text-xs text-destructive">{shippingErrorLabels[order.shippingShipment.errorCode] ?? "Kargo sağlayıcısı hatası."}</p>
-              )}
-              {order.shippingShipment?.status === "quoted" && order.shippingShipment.offers.length > 0 && (
-                <div className="divide-y divide-border rounded-md border border-border">
-                  {[...order.shippingShipment.offers].sort((a, b) => a.priceKurus - b.priceKurus).map((offer) => {
-                    const cheapest = offer.priceKurus === Math.min(...order.shippingShipment!.offers.map((entry) => entry.priceKurus));
-                    const fastest = offer.estimatedDays !== undefined && offer.estimatedDays === Math.min(...order.shippingShipment!.offers.flatMap((entry) => entry.estimatedDays === undefined ? [] : [entry.estimatedDays]));
-                    return (
-                      <div key={offer.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground">{offer.carrierName} · {offer.serviceName}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {offer.estimatedDays ? `${offer.estimatedDays} iş günü` : "Teslimat süresi belirtilmedi"}
-                            {cheapest ? " · En uygun fiyat" : ""}{fastest ? " · En hızlı" : ""}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatMoney(offer.priceKurus / 100)}</span>
-                          <Button type="button" size="sm" variant="outline" disabled={shippingBusy} onClick={() => void runShippingAction("shipping.purchase-label", { orderId: order._id, offerId: offer.id })}>
-                            {shippingBusy ? "Bekleyin…" : "Etiketi satın al"}
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {order.shippingShipment?.status === "quoted" && order.shippingShipment.offers.length === 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">Kargo teklifleri hazırlanıyor.</p>
-                  <Button type="button" size="sm" variant="outline" disabled={shippingBusy} onClick={() => void runShippingAction("shipping.refresh-offers", { orderId: order._id })}>Teklifleri tekrar al</Button>
-                </div>
-              )}
-              {(!order.shippingShipment || order.shippingShipment.status === "failed") && order.status === "paid" && (
-                <Button type="button" variant="outline" disabled={shippingBusy} onClick={() => void runShippingAction("shipping.create", { orderId: order._id })}>
-                  {shippingBusy ? "Gönderi hazırlanıyor…" : "Kargo teklifi al"}
-                </Button>
-              )}
-              {shippingError && <AdminNotice kind="error">{shippingError}</AdminNotice>}
-              {shippingMessage && <AdminNotice kind="success">{shippingMessage}</AdminNotice>}
-            </section>
-          )}
-          <section className="space-y-2 border-t border-border pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">e-Fatura / e-Arşiv</h3>
-              {order.invoice && <span className="text-xs font-medium text-muted-foreground">{invoiceStatusLabels[order.invoice.status]}</span>}
-            </div>
-            {order.invoice?.documentType && <p className="text-sm text-foreground">{order.invoice.documentType === "e_fatura" ? "e-Fatura" : "e-Arşiv Fatura"} · {order.invoice.providerReference}</p>}
-            {order.invoice?.documentUrl && <a href={order.invoice.documentUrl} target="_blank" rel="noreferrer" className="block break-all text-sm text-primary underline underline-offset-4">Fatura belgesini aç</a>}
-            {order.invoice?.error && <p className="text-xs text-destructive">{order.invoice.error}</p>}
-            {order.invoiceRecipient?.type === "business" && (
-              <p className="text-xs text-muted-foreground">{order.invoiceRecipient.businessTitle} · VKN {order.invoiceRecipient.taxNumber} · {order.invoiceRecipient.taxOffice}</p>
-            )}
-            {order.status === "paid" && order.invoice?.status !== "issued" && order.invoice?.status !== "processing" && order.invoice?.status !== "review" && (
-              <Button type="button" size="sm" variant="outline" disabled={retryingInvoice} onClick={onRetryInvoice}>
-                {retryingInvoice ? "Kuyruğa alınıyor…" : "Faturayı yeniden dene"}
-              </Button>
-            )}
-            {order.invoice?.status === "review" && <p className="text-xs text-amber-700 dark:text-amber-300">Mükerrer belge riskini önlemek için otomatik tekrar kapalı. Paraşüt panelinde kontrol edin.</p>}
-            {!order.invoice && order.status !== "paid" && <p className="text-xs text-muted-foreground">Ödeme alındıktan sonra fatura kuyruğu başlatılır.</p>}
           </section>
           <section className="space-y-2 border-t border-border pt-4">
             <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">E-posta bildirimleri</h3>
@@ -287,7 +136,6 @@ function AdminOrdersContent() {
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [selectedOrderOverride, setSelectedOrderOverride] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [retryingInvoiceId, setRetryingInvoiceId] = useState<string | null>(null);
   const [retryingEmailKey, setRetryingEmailKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -333,21 +181,6 @@ function AdminOrdersContent() {
       setActionError(cause instanceof Error ? cause.message : "Sipariş durumu güncellenemedi.");
     } finally {
       setUpdatingId(null);
-    }
-  };
-
-  const retryInvoice = async (order: Order) => {
-    setRetryingInvoiceId(order._id);
-    setActionError(null);
-    setMessage(null);
-    try {
-      await runAdminAction("invoice.retry", { orderId: order._id });
-      setMessage(`Sipariş #${order._id.slice(-8).toUpperCase()} faturası kuyruğa alındı.`);
-      await refresh();
-    } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Fatura yeniden kuyruğa alınamadı.");
-    } finally {
-      setRetryingInvoiceId(null);
     }
   };
 
@@ -408,20 +241,8 @@ function AdminOrdersContent() {
         <OrderDetails
           order={selectedOrder}
           onClose={closeOrder}
-          onRetryInvoice={() => void retryInvoice(selectedOrder)}
-          retryingInvoice={retryingInvoiceId === selectedOrder._id}
           onRetryEmail={(event) => void retryEmail(selectedOrder, event)}
           retryingEmailKey={retryingEmailKey}
-          onActionSuccess={(text) => {
-            setMessage(text);
-            setActionError(null);
-            closeOrder();
-            void refresh();
-          }}
-          onShippingUpdate={(record) => {
-            setSelectedOrderOverride((current) => current?._id === selectedOrder._id ? { ...current, shippingShipment: record ?? undefined } : current);
-            void refresh();
-          }}
         />
       )}
     </>

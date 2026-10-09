@@ -40,7 +40,6 @@ export default async function HomePage() {
     getCategories(),
   ]);
   const availableProducts = products.filter((product) => product.availableForSale);
-  const organizationLogo = new URL(logoUrl || "/favicon.ico", baseUrl).toString();
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -61,7 +60,7 @@ export default async function HomePage() {
     "@type": "Organization",
     name: storeName,
     url: new URL("/", baseUrl).toString(),
-    logo: organizationLogo,
+    ...(logoUrl ? { logo: new URL(logoUrl, baseUrl).toString() } : {}),
   };
 
   return (

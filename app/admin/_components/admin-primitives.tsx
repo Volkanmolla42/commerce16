@@ -23,8 +23,6 @@ export function OrderStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     pending: "border-border bg-muted text-muted-foreground",
     paid: "border-transparent bg-primary text-primary-foreground",
-    shipped: "border-input bg-card text-foreground",
-    delivered: "border-input bg-accent text-accent-foreground",
     cancelled: "border-border bg-card text-muted-foreground",
   };
   return (

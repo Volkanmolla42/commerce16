@@ -28,39 +28,10 @@ type SettingsEdits = Partial<Pick<StoreSettings, TextSettingKey>> & {
   isOpen?: boolean;
 };
 
-const shippingDayOptions = [
-  { value: 1, label: "Pzt" },
-  { value: 2, label: "Sal" },
-  { value: 3, label: "Çar" },
-  { value: 4, label: "Per" },
-  { value: 5, label: "Cum" },
-  { value: 6, label: "Cmt" },
-  { value: 0, label: "Paz" },
-];
-
-function formatShippingCutoff(minutes: number | null | undefined) {
-  if (minutes == null) return "";
-  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-}
-
-function parseShippingCutoff(value: string) {
-  if (!value) return null;
-  const match = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!match) throw new Error("Kargo kesim saati geçersiz.");
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) throw new Error("Kargo kesim saati geçersiz.");
-  return hours * 60 + minutes;
-}
-
 function AdminSettingsContent() {
   const { data, error, loading, refresh } =
     useAdminResource<StoreSettings>("settings");
   const [edits, setEdits] = useState<SettingsEdits>({});
-  const [shippingCutoffInput, setShippingCutoffInput] = useState<string>();
-  const [shippingDaysEdit, setShippingDaysEdit] = useState<number[]>();
-  const [shippingFeeInput, setShippingFeeInput] = useState<string>();
-  const [freeShippingThresholdInput, setFreeShippingThresholdInput] = useState<string>();
   const [logoEdit, setLogoEdit] = useState<string | null | undefined>(undefined);
   const [pendingLogo, setPendingLogo] = useState<{ blob: Blob; previewUrl: string } | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -77,10 +48,6 @@ function AdminSettingsContent() {
 
   const text = (key: TextSettingKey) => edits[key] ?? data?.[key] ?? "";
   const isOpen = edits.isOpen ?? data?.isOpen ?? true;
-  const shippingDays = shippingDaysEdit ?? data?.shippingDays ?? [];
-  const shippingCutoffValue = shippingCutoffInput ?? formatShippingCutoff(data?.shippingCutoffMinutes);
-  const shippingFeeValue = shippingFeeInput ?? ((data?.shippingFeeKurus ?? 0) / 100).toFixed(2);
-  const freeShippingThresholdValue = freeShippingThresholdInput ?? (data?.freeShippingThresholdKurus == null ? "" : (data.freeShippingThresholdKurus / 100).toFixed(2));
   const logoPreview = pendingLogo?.previewUrl || data?.logoUrl || "";
 
   const set = (key: keyof SettingsEdits) => (
@@ -109,24 +76,6 @@ function AdminSettingsContent() {
     setActionError(null);
 
     try {
-      const shippingCutoffMinutes = parseShippingCutoff(shippingCutoffValue);
-      const parseKurus = (value: string, fieldName: string, optional: boolean) => {
-        const normalized = value.trim().replace(",", ".");
-        if (!normalized && optional) return null;
-        if (!/^\d{1,7}(?:\.\d{1,2})?$/.test(normalized)) {
-          throw new Error(`${fieldName} için geçerli bir tutar girin.`);
-        }
-        const kurus = Math.round(Number(normalized) * 100);
-        if (!Number.isSafeInteger(kurus) || kurus > 100_000_000) {
-          throw new Error(`${fieldName} en fazla 1.000.000 TL olabilir.`);
-        }
-        return kurus;
-      };
-      const shippingFeeKurus = parseKurus(shippingFeeValue, "Sabit kargo ücreti", false);
-      const freeShippingThresholdKurus = parseKurus(freeShippingThresholdValue, "Ücretsiz kargo limiti", true);
-      if (shippingCutoffMinutes !== null && shippingDays.length === 0) {
-        throw new Error("Kargo sayacını açmak için en az bir kargo günü seçin.");
-      }
       let nextLogoId = logoStorageId;
       if (pendingLogo) {
         setUploadingLogo(true);
@@ -160,17 +109,9 @@ function AdminSettingsContent() {
         email: text("email"),
         address: text("address"),
         announcement: text("announcement"),
-        shippingCutoffMinutes,
-        shippingDays,
-        shippingFeeKurus,
-        freeShippingThresholdKurus,
         isOpen,
       });
       setEdits({});
-      setShippingCutoffInput(undefined);
-      setShippingDaysEdit(undefined);
-      setShippingFeeInput(undefined);
-      setFreeShippingThresholdInput(undefined);
       setPendingLogo(null);
       setLogoEdit(nextLogoId);
       setMessage("Mağaza ayarları kaydedildi.");
@@ -237,7 +178,7 @@ function AdminSettingsContent() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="store-logo">Logo</Label>
-                {logoPreview ? (
+                {logoPreview && (
                   <div className="flex items-center gap-3">
                     <Image src={logoPreview} alt="Mağaza logosu" width={64} height={64} unoptimized className="h-16 w-16 rounded-md border border-border bg-muted object-contain" />
                     <Button
@@ -252,8 +193,6 @@ function AdminSettingsContent() {
                       Kaldır
                     </Button>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Logo yok, varsayılan kare logo kullanılıyor.</p>
                 )}
                 <input
                   id="store-logo"
@@ -263,7 +202,6 @@ function AdminSettingsContent() {
                   onChange={handleLogoSelection}
                   className="block min-h-11 w-full rounded-md border border-input bg-background text-sm text-muted-foreground file:mr-3 file:min-h-11 file:border-0 file:bg-muted file:px-4 file:font-medium"
                 />
-                <p className="text-xs text-muted-foreground">Seçilen dosya kaydedince Convex Storage&apos;a yüklenir.</p>
                 {uploadingLogo && <p role="status" className="text-sm text-muted-foreground">Logo yükleniyor…</p>}
               </div>
               <label className="flex min-h-11 items-center gap-3 rounded-md border border-border px-3 text-sm font-medium text-foreground">
@@ -322,91 +260,6 @@ function AdminSettingsContent() {
                     className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                   />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-lg">
-              <CardContent className="space-y-5 p-5 sm:p-6">
-                <h2 className="text-sm font-semibold text-foreground">Kargo ücretleri</h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="shipping-fee">Sabit kargo ücreti (TL)</Label>
-                    <Input
-                      id="shipping-fee"
-                      name="shippingFee"
-                      type="number"
-                      min="0"
-                      max="1000000"
-                      step="0.01"
-                      inputMode="decimal"
-                      value={shippingFeeValue}
-                      disabled={saving}
-                      onChange={(event) => setShippingFeeInput(event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="free-shipping-threshold">Ücretsiz kargo limiti (TL)</Label>
-                    <Input
-                      id="free-shipping-threshold"
-                      name="freeShippingThreshold"
-                      type="number"
-                      min="0"
-                      max="1000000"
-                      step="0.01"
-                      inputMode="decimal"
-                      placeholder="Kapalı"
-                      value={freeShippingThresholdValue}
-                      disabled={saving}
-                      onChange={(event) => setFreeShippingThresholdInput(event.target.value)}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">Limit boşsa sabit ücret her siparişte uygulanır. Ürün toplamı kupon indirimi sonrası limite ulaşınca kargo ücretsiz olur.</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-lg">
-              <CardContent className="space-y-5 p-5 sm:p-6">
-                <h2 className="text-sm font-semibold text-foreground">Bugünkü kargo çıkışı</h2>
-                <div className="space-y-2">
-                  <Label htmlFor="shipping-cutoff">Son sipariş saati (İstanbul)</Label>
-                  <Input
-                    id="shipping-cutoff"
-                    name="shippingCutoff"
-                    type="time"
-                    step={60}
-                    value={shippingCutoffValue}
-                    disabled={saving}
-                    onChange={(event) => setShippingCutoffInput(event.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">Boş bırakılırsa ürün sayfasında kargo sayacı gösterilmez.</p>
-                </div>
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-foreground">Kargo günleri</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {shippingDayOptions.map((day) => (
-                      <label key={day.value} className="flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-sm text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={shippingDays.includes(day.value)}
-                          disabled={saving}
-                          onChange={(event) => {
-                            const checked = event.target.checked;
-                            setShippingDaysEdit((current) => {
-                              const days = current ?? data?.shippingDays ?? [];
-                              return checked
-                                ? [...days, day.value].sort((left, right) => left - right)
-                                : days.filter((value) => value !== day.value);
-                            });
-                          }}
-                          className="h-4 w-4"
-                        />
-                        {day.label}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <p className="text-xs text-muted-foreground">Sayaç, seçilen günlerde ve son sipariş saatinden önce görünür. Özel tatil günlerinde kargo günlerini güncelleyin.</p>
               </CardContent>
             </Card>
 

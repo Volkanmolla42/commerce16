@@ -7,6 +7,7 @@ import { ShoppingBag01Icon, Tick01Icon, ArrowRight01Icon } from "hugeicons-react
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
+import { getVariantImages } from "@/lib/catalog/product-images";
 
 export function AddToCart({
   product,
@@ -31,7 +32,7 @@ export function AddToCart({
   const handleAdd = () => {
     if (!isAvailable) return;
     const selectedProduct = selectedVariant
-      ? { ...product, price: selectedVariant.price?.amount ?? product.price, title: getProductVariantTitle(product.title, selectedVariant) }
+      ? { ...product, price: selectedVariant.price.amount, images: getVariantImages(product, selectedVariant), title: getProductVariantTitle(product.title, selectedVariant) }
       : product;
     if (replaceCartItem) {
       replaceItem(replaceCartItem.productId, replaceCartItem.variantId, selectedProduct, replaceCartItem.quantity, selectedVariant?.id);
@@ -54,7 +55,7 @@ export function AddToCart({
         onClick={handleAdd}
         disabled={!isAvailable}
         aria-label="Sepete Ekle"
-        className="h-14 w-full rounded-full text-base font-semibold shadow-md gap-2"
+        className="h-12 w-full rounded-xl text-sm font-semibold shadow-none gap-2"
       >
         {added ? (
           <>
@@ -62,7 +63,7 @@ export function AddToCart({
             <span>{replaced ? "Sepet güncellendi" : "Sepete Eklendi"}</span>
           </>
         ) : needsSelection ? (
-          <span>Seçenekleri seç</span>
+          <span>Seçenekleri seçin</span>
         ) : !isAvailable ? (
           <span>Tükendi</span>
         ) : (
@@ -78,7 +79,7 @@ export function AddToCart({
           asChild
           variant="outline"
           size="lg"
-          className="h-12 w-full rounded-full font-semibold gap-2 border-border animate-in fade-in duration-200"
+          className="h-12 w-full rounded-xl font-semibold gap-2 border-border animate-fade-in"
         >
           <Link href="/cart">
             <span>Sepeti Görüntüle</span>

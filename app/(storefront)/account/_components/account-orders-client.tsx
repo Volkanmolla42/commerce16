@@ -77,7 +77,7 @@ export default function AccountOrdersPage() {
           Henüz kayıtlı bir siparişiniz yok
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sipariş ve kargo bilgileri, sipariş oluşturduğunuzda burada görünür.
+          Sipariş bilgileriniz, sipariş oluşturduğunuzda burada görünür.
         </p>
         <Button asChild size="lg" className="mt-6 rounded-2xl font-semibold shadow-md">
           <Link href="/search">

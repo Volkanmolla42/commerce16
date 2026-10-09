@@ -10,4 +10,11 @@ crons.daily(
   {},
 );
 
+crons.daily(
+  "purge expired active carts",
+  { hourUTC: 0, minuteUTC: 20 },
+  internal.activeCarts.purgeExpired,
+  {},
+);
+
 export default crons;

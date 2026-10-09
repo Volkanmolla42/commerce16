@@ -71,38 +71,44 @@ export async function GET(request: NextRequest) {
       const products = await getAdminProductPage(Object.fromEntries(request.nextUrl.searchParams));
       return NextResponse.json(products, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "inventory") {
+      const inventory = await client.query(api.products.listStockAdmin, {
+        adminSecret,
+        query: request.nextUrl.searchParams.get("q") ?? "",
+        paginationOpts: {
+          numItems: 24,
+          cursor: request.nextUrl.searchParams.get("cursor") || null,
+          maximumRowsRead: 256,
+          maximumBytesRead: 2 * 1024 * 1024,
+        },
+      });
+      return NextResponse.json(inventory, { headers: { "Cache-Control": "no-store" } });
+    }
     if (resource === "product") {
       const id = request.nextUrl.searchParams.get("id");
       const product = id ? await client.query(api.products.getByIdAdmin, { adminSecret, id: id as Id<"products"> }) : null;
       return NextResponse.json({ product }, { headers: { "Cache-Control": "no-store" } });
     }
-    if (resource === "inventory-movements") {
-      const movements = await client.query(api.inventory.listMovements, { adminSecret, limit: 100 });
-      return NextResponse.json(movements, { headers: { "Cache-Control": "no-store" } });
+    if (resource === "abandoned-carts") {
+      const carts = await client.query(api.abandonedCartRecovery.listAllAdmin, { adminSecret });
+      return NextResponse.json(carts, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (resource === "active-carts") {
+      const carts = await client.query(api.activeCarts.listAdmin, { adminSecret, now: Date.now() });
+      return NextResponse.json(carts, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "orders") {
       const orders = await client.query(api.orders.listAllAdmin, { adminSecret });
-      const [invoices, shippingShipments, orderEmailEvents] = await Promise.all([
-        client.query(api.invoices.listAllAdmin, { adminSecret }),
-        client.query(api.shipping.listAllAdmin, { adminSecret }),
-        client.query(api.notifications.listForOrdersAdmin, {
-          adminSecret,
-          orderIds: orders.map((order) => order._id),
-        }),
-      ]);
-      const invoiceByOrder = new Map(invoices.map((invoice) => [invoice.orderId, invoice]));
+      const orderEmailEvents = await client.query(api.notifications.listForOrdersAdmin, {
+        adminSecret,
+        orderIds: orders.map((order) => order._id),
+      });
       const emailsByOrder = new Map<string, typeof orderEmailEvents>();
       for (const event of orderEmailEvents) {
         emailsByOrder.set(event.orderId, [...(emailsByOrder.get(event.orderId) ?? []), event]);
       }
-      const shippingByOrder = new Map<string, (typeof shippingShipments)[number]>();
-      for (const shipment of shippingShipments) {
-        if (!shippingByOrder.has(shipment.orderId)) shippingByOrder.set(shipment.orderId, shipment);
-      }
       const enrichedOrders = orders.map((order) => ({
         ...order,
-        invoice: invoiceByOrder.get(order._id) ?? null,
-        shippingShipment: shippingByOrder.get(order._id) ?? null,
         emailEvents: emailsByOrder.get(order._id) ?? [],
       }));
       return NextResponse.json(enrichedOrders, { headers: { "Cache-Control": "no-store" } });
@@ -216,6 +222,13 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ success: true, result });
       }
+      case "cart.delete": {
+        await client.mutation(api.abandonedCartRecovery.deleteAdmin, {
+          adminSecret,
+          id: stringValue(body.id, "Sepet") as Id<"abandonedCarts">,
+        });
+        return NextResponse.json({ success: true });
+      }
       case "settings.update": {
         const storeName = stringValue(input.storeName, "Mağaza adı");
         if (storeName.length < 2 || storeName.length > 80) {
@@ -224,20 +237,6 @@ export async function POST(request: NextRequest) {
         const text = (value: unknown) =>
           typeof value === "string" ? value : "";
         const logoStorageId = text(input.logoStorageId);
-        const shippingCutoffMinutes = input.shippingCutoffMinutes;
-        if (shippingCutoffMinutes !== null && typeof shippingCutoffMinutes !== "number") {
-          throw new Error("Kargo kesim saati geçersiz.");
-        }
-        const shippingDays = input.shippingDays;
-        if (!Array.isArray(shippingDays) || shippingDays.some((day) => typeof day !== "number")) {
-          throw new Error("Kargo günleri geçersiz.");
-        }
-        const shippingFeeKurus = input.shippingFeeKurus;
-        const freeShippingThresholdKurus = input.freeShippingThresholdKurus;
-        if (typeof shippingFeeKurus !== "number" ||
-          (freeShippingThresholdKurus !== null && typeof freeShippingThresholdKurus !== "number")) {
-          throw new Error("Kargo ücretlerini kontrol edin.");
-        }
         const result = await client.mutation(api.settings.updateStoreSettings, {
           adminSecret,
           storeName,
@@ -247,10 +246,6 @@ export async function POST(request: NextRequest) {
           email: text(input.email),
           address: text(input.address),
           announcement: text(input.announcement),
-          shippingCutoffMinutes,
-          shippingDays,
-          shippingFeeKurus,
-          freeShippingThresholdKurus,
           isOpen: input.isOpen !== false,
         });
         revalidateTag("store-settings", { expire: 0 });
@@ -352,8 +347,6 @@ export async function POST(request: NextRequest) {
         if (
           status !== "pending" &&
           status !== "paid" &&
-          status !== "shipped" &&
-          status !== "delivered" &&
           status !== "cancelled"
         ) {
           throw new Error("Sipariş durumu geçersiz.");
@@ -366,59 +359,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, result });
       }
 
-      case "shipping.create": {
-        const result = await client.action(api.shipping.createForPaidOrderAdmin, {
-          adminSecret,
-          orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-        });
-        return NextResponse.json(result);
-      }
-      case "shipping.refresh-offers": {
-        const result = await client.action(api.shipping.refreshOffersAdmin, {
-          adminSecret,
-          orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-        });
-        return NextResponse.json(result);
-      }
-      case "shipping.purchase-label": {
-        const result = await client.action(api.shipping.purchaseLabelAdmin, {
-          adminSecret,
-          orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-          offerId: stringValue(input.offerId, "Kargo teklifi"),
-        });
-        return NextResponse.json(result);
-      }
-      case "analytics.spend.upsert": {
-        const month = stringValue(input.month, "Ay");
-        const source = stringValue(input.source, "Kanal").trim();
-        const campaign = typeof input.campaign === "string" ? input.campaign.trim() : "";
-        const amount = input.amount;
-        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Ay bilgisi geçersiz.");
-        if (source.length < 2 || source.length > 100 || campaign.length > 120) {
-          throw new Error("Kanal veya kampanya bilgisi geçersiz.");
-        }
-        if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0 || amount > 100_000_000) {
-          throw new Error("Harcama tutarı geçersiz.");
-        }
-        const result = await client.mutation(api.analytics.upsertMarketingSpend, {
-          adminSecret,
-          month,
-          source,
-          campaign,
-          amountCents: Math.round(amount * 100),
-        });
-        return NextResponse.json({ success: true, result });
-      }
-      case "invoice.retry": {
-        const result = await client.mutation(api.invoices.retry, {
-          adminSecret,
-          orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-        });
-        return NextResponse.json({ success: true, result });
-      }
       case "email.retry": {
         const event = stringValue(input.event, "E-posta türü");
-        if (event !== "payment_confirmation" && event !== "shipping_update") throw new Error("E-posta türü geçersiz.");
+        if (event !== "payment_confirmation") throw new Error("E-posta türü geçersiz.");
         const result = await client.mutation(api.notifications.retry, {
           adminSecret,
           orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,

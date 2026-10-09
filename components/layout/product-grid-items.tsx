@@ -8,6 +8,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Image from "next/image";
 import Price from "@/components/price";
 import { getProductPriceRange } from "@/lib/catalog/variants";
+import { getProductImages } from "@/lib/catalog/product-images";
 
 export default function ProductGridItems({
   products,
@@ -26,6 +27,7 @@ export default function ProductGridItems({
     <>
       {products.map((product, index) => {
         const priceRange = getProductPriceRange(product);
+        const imageUrl = getProductImages(product)[0]?.url;
         const shouldLoadEagerly = prioritizeFirst && (
           index === 0 || (cardLayout === "stacked" && index < 3)
         );
@@ -35,19 +37,19 @@ export default function ProductGridItems({
 
         if (cardLayout === "stacked") {
           return (
-            <Grid.Item key={product.slug} square={false} className="animate-fadeIn">
-              <article className="group relative h-full overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-blue-500/40">
+              <Grid.Item key={product.slug} square={false} className="animate-fade-in">
+              <article className="relative h-full overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-blue-500/40">
                 <Link href={`/product/${product.slug}`} className="block h-full">
                   <div className="relative aspect-square overflow-hidden bg-neutral-100 dark:bg-neutral-950">
-                    {product.images[0] ? (
+                    {imageUrl ? (
                       <Image
-                        src={product.images[0]}
+                        src={imageUrl}
                         alt={product.title}
                         fill
                         sizes={imageSizes}
                         loading={shouldLoadEagerly ? "eager" : "lazy"}
                         fetchPriority={shouldPrioritizeImage ? "high" : undefined}
-                        className={`${imageFit === "cover" ? "object-cover" : "object-contain p-3 sm:p-4"} transition-transform duration-300 ease-out group-hover:scale-[1.03]`}
+                        className={`${imageFit === "cover" ? "object-cover" : "object-contain p-3 sm:p-4"}`}
                       />
                     ) : null}
                   </div>
@@ -74,7 +76,7 @@ export default function ProductGridItems({
         }
 
         return (
-          <Grid.Item key={product.slug} className="animate-fadeIn">
+          <Grid.Item key={product.slug} className="animate-fade-in">
             <div className="relative h-full w-full">
               <Link
                 className="relative block h-full w-full"
@@ -88,7 +90,7 @@ export default function ProductGridItems({
                     maxAmount: priceRange.max,
                     currencyCode: "TRY",
                   }}
-                  src={product.images[0]}
+                  src={imageUrl}
                   fill
                   sizes={imageSizes}
                   loading={shouldLoadEagerly ? "eager" : "lazy"}

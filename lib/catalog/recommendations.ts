@@ -31,15 +31,9 @@ export function recordRecentProduct(slug: string) {
   window.dispatchEvent(new Event(RECENT_PRODUCTS_EVENT));
 }
 
-function normalize(value?: string) {
-  return value?.trim().toLocaleLowerCase("tr-TR") ?? "";
-}
-
 function similarity(source: Product, candidate: Product) {
   let score = 0;
   if (source.categorySlug && source.categorySlug === candidate.categorySlug) score += 8;
-  if (normalize(source.brand) && normalize(source.brand) === normalize(candidate.brand)) score += 4;
-  if (normalize(source.material) && normalize(source.material) === normalize(candidate.material)) score += 3;
 
   const sourcePrice = Number(source.price);
   const candidatePrice = Number(candidate.price);
@@ -50,6 +44,7 @@ function similarity(source: Product, candidate: Product) {
   }
 
   if (source.options?.length && candidate.options?.length) {
+    const normalize = (value: string) => value.trim().toLocaleLowerCase("tr-TR");
     const sourceValues = new Set(source.options.flatMap((option) => option.values.map(normalize)));
     if (candidate.options.some((option) => option.values.some((value) => sourceValues.has(normalize(value))))) score += 1;
   }

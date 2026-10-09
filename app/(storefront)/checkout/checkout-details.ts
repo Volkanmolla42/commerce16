@@ -11,7 +11,6 @@ type Address = {
   provinceId?: string;
   districtId?: string;
   addressLine1: string;
-  addressLine2?: string;
 };
 
 export type CheckoutDraft = Partial<Record<
@@ -43,8 +42,6 @@ export function getCheckoutDetails({ profile, addresses, selection, draft }: {
     districtId,
     city: cityName,
     district: districtName,
-    addressLine: draft.addressLine ?? (selectedAddress
-      ? [selectedAddress.addressLine1, selectedAddress.addressLine2].filter(Boolean).join(", ")
-      : ""),
+    addressLine: draft.addressLine ?? (selectedAddress?.addressLine1 ?? ""),
   };
 }

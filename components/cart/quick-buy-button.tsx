@@ -7,6 +7,7 @@ import { ArrowRight01Icon } from "hugeicons-react";
 import { Button } from "@/components/ui";
 import { setQuickBuyItem } from "./quick-buy-store";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
+import { getVariantImages } from "@/lib/catalog/product-images";
 
 export function QuickBuyButton({ product, variant }: { product: Product; variant?: ProductVariant }) {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function QuickBuyButton({ product, variant }: { product: Product; variant
 
     setQuickBuyItem({
       product: selectedVariant
-        ? { ...product, price: selectedVariant.price?.amount ?? product.price, title: getProductVariantTitle(product.title, selectedVariant) }
+        ? { ...product, price: selectedVariant.price.amount, images: getVariantImages(product, selectedVariant), title: getProductVariantTitle(product.title, selectedVariant) }
         : product,
       quantity: 1,
       variantId: selectedVariant?.id,
@@ -36,7 +37,7 @@ export function QuickBuyButton({ product, variant }: { product: Product; variant
       onClick={handleQuickBuy}
       disabled={!isAvailable || isNavigating}
       aria-label="Hemen Satın Al"
-      className="h-14 w-full rounded-full text-base font-semibold shadow-md gap-2"
+      className="h-12 w-full rounded-xl text-sm font-semibold shadow-none gap-2"
     >
       {isNavigating ? (
         <>

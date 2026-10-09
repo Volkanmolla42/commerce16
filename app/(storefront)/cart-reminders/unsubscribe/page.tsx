@@ -35,9 +35,9 @@ function UnsubscribeContent() {
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
           {isDone
-            ? "Bu sepet için e-posta ve WhatsApp hatırlatmaları gönderilmeyecek."
+            ? "Bu sepet için e-posta hatırlatmaları gönderilmeyecek."
             : token
-              ? "Onayladığınızda bu sepet için tüm hatırlatma kanalları kapatılır."
+              ? "Onayladığınızda bu sepet için e-posta hatırlatması kapatılır."
               : "Bağlantı geçersiz veya eksik."}
         </p>
         {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}

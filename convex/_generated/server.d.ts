@@ -33,32 +33,8 @@ type Env = {
   readonly ADMIN_API_SECRET: string | undefined;
   readonly CART_RECOVERY_FROM_EMAIL: string | undefined;
   readonly CART_RECOVERY_SITE_URL: string | undefined;
-  readonly EINVOICE_ADAPTER_TOKEN: string | undefined;
-  readonly EINVOICE_ADAPTER_URL: string | undefined;
-  readonly EINVOICE_PROVIDER: string | undefined;
-  readonly GELIVER_PACKAGE_HEIGHT_CM: string | undefined;
-  readonly GELIVER_PACKAGE_LENGTH_CM: string | undefined;
-  readonly GELIVER_PACKAGE_WEIGHT_KG: string | undefined;
-  readonly GELIVER_PACKAGE_WIDTH_CM: string | undefined;
-  readonly GELIVER_SENDER_ADDRESS_ID: string | undefined;
-  readonly GELIVER_SOURCE_IDENTIFIER: string | undefined;
-  readonly GELIVER_TEST_MODE: string | undefined;
-  readonly GELIVER_TOKEN: string | undefined;
   readonly ORDER_FROM_EMAIL: string | undefined;
-  readonly PARASUT_CLIENT_ID: string | undefined;
-  readonly PARASUT_CLIENT_SECRET: string | undefined;
-  readonly PARASUT_COMPANY_ID: string | undefined;
-  readonly PARASUT_INITIAL_REFRESH_TOKEN: string | undefined;
-  readonly PARASUT_SHIPPING_VAT_RATE: string | undefined;
-  readonly PARASUT_TOKEN_ENCRYPTION_KEY: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
-  readonly RESTOCK_FROM_EMAIL: string | undefined;
-  readonly RESTOCK_SITE_URL: string | undefined;
-  readonly TWILIO_ACCOUNT_SID: string | undefined;
-  readonly TWILIO_AUTH_TOKEN: string | undefined;
-  readonly TWILIO_FROM_NUMBER: string | undefined;
-  readonly TWILIO_WHATSAPP_CONTENT_SID: string | undefined;
-  readonly TWILIO_WHATSAPP_FROM: string | undefined;
 };
 
 /**

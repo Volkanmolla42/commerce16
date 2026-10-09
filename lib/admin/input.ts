@@ -42,11 +42,14 @@ function productAttributesValue(value: unknown) {
   return attributes;
 }
 
-function storageImagesValue(value: unknown) {
+function productImagesValue(value: unknown) {
   if (!Array.isArray(value)) throw new Error("Yüklenen görseller geçersiz.");
   if (value.length > 20) throw new Error("Bir üründe en fazla 20 görsel olabilir.");
   return value.map((item) => {
     if (!isRecord(item)) throw new Error("Yüklenen görsel kaydı geçersiz.");
+    if (item.selectedOptions !== undefined && !Array.isArray(item.selectedOptions)) {
+      throw new Error("Görsel varyant seçimi geçersiz.");
+    }
     const fileName = stringValue(item.fileName, "Görsel adı");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.webp$/.test(fileName)) {
       throw new Error("Görsel adı SEO uyumlu WebP dosya adı olmalı.");
@@ -54,6 +57,12 @@ function storageImagesValue(value: unknown) {
     return {
       storageId: stringValue(item.storageId, "Görsel kimliği") as Id<"_storage">,
       fileName,
+      ...(Array.isArray(item.selectedOptions) && item.selectedOptions.length > 0
+        ? { selectedOptions: item.selectedOptions.map((selected) => {
+            if (!isRecord(selected)) throw new Error("Görsel varyant seçimi geçersiz.");
+            return { name: stringValue(selected.name, "Seçenek adı"), value: stringValue(selected.value, "Seçenek değeri") };
+          }) }
+        : {}),
     };
   });
 }
@@ -67,36 +76,12 @@ function priceValue(value: unknown, label: string) {
   return amount.toFixed(2);
 }
 
-function productMetadataText(value: unknown, label: string) {
-  const text = optionalString(value, label) ?? "";
-  if (text.length > 80) throw new Error(`${label} 80 karakteri aşamaz.`);
-  return text;
-}
-
-function productVatRateValue(value: unknown) {
-  if (value === undefined || value === null || value === "") return undefined;
-  const rate = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100 || Math.round(rate * 100) !== rate * 100) {
-    throw new Error("KDV oranı 0 ile 100 arasında, en fazla iki ondalık basamaklı olmalı.");
-  }
-  return rate;
-}
-
 function productSkuValue(value: unknown) {
   const sku = optionalString(value, "SKU");
   if (sku && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(sku)) {
     throw new Error("SKU 64 karakteri aşmamalı ve harf, rakam, nokta, alt çizgi veya tire içermeli.");
   }
   return sku;
-}
-
-function productStockQuantityValue(value: unknown) {
-  if (value === null || value === "") return null;
-  const quantity = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-  if (!Number.isSafeInteger(quantity) || quantity < 0) {
-    throw new Error("Stok adedi sıfır veya daha büyük bir tam sayı olmalı.");
-  }
-  return quantity;
 }
 
 function productOptionsValue(value: unknown) {
@@ -128,6 +113,9 @@ function productVariantsValue(value: unknown) {
   return value.map((item) => {
     if (!isRecord(item)) throw new Error("Ürün varyantı geçersiz.");
     if (typeof item.availableForSale !== "boolean") throw new Error("Varyant satış durumu geçersiz.");
+    if (typeof item.stockQuantity !== "number" || !Number.isSafeInteger(item.stockQuantity) || item.stockQuantity < 0) {
+      throw new Error("Varyant stok adedi sıfır veya daha büyük bir tam sayı olmalı.");
+    }
     if (!Array.isArray(item.selectedOptions)) throw new Error("Varyant seçenekleri geçersiz.");
     const selectedOptions = item.selectedOptions.map((selected) => {
       if (!isRecord(selected)) throw new Error("Varyant seçimi geçersiz.");
@@ -137,18 +125,14 @@ function productVariantsValue(value: unknown) {
         value: stringValue(selected.value, "Seçenek değeri"),
       };
     });
-    const vatRate = productVatRateValue(item.vatRate);
     return {
       id: stringValue(item.id, "Varyant kimliği"),
       title: stringValue(item.title, "Varyant başlığı"),
       availableForSale: item.availableForSale,
-      stockQuantity: productStockQuantityValue(item.stockQuantity),
       selectedOptions,
-      ...(item.price === undefined || item.price === null || item.price === ""
-        ? {}
-        : { price: priceValue(item.price, "Varyant fiyatı") }),
+      price: priceValue(item.price, "Varyant fiyatı"),
+      stockQuantity: item.stockQuantity,
       sku: productSkuValue(item.sku),
-      ...(vatRate === undefined ? {} : { vatRate }),
     };
   });
 }
@@ -164,9 +148,9 @@ function validateProductVariants(
   const combinations = new Set<string>();
   const skus = new Set<string>();
   for (const variant of variants) {
+    priceValue(variant.price, "Varyant fiyatı");
     const sku = productSkuValue(variant.sku);
     if (!sku) throw new Error("Her varyant için ayrı bir SKU girin.");
-    if (variant.stockQuantity == null) throw new Error("Her varyant için stok adedi girin.");
     const normalizedSku = sku.toLocaleUpperCase("en-US");
     if (skus.has(normalizedSku)) throw new Error("Her varyantın SKU kodu birbirinden farklı olmalı.");
     skus.add(normalizedSku);
@@ -184,21 +168,23 @@ function validateProductVariants(
 export function parseProductInput(input: Record<string, unknown>) {
   const options = productOptionsValue(input.options);
   const variants = productVariantsValue(input.variants);
-  const price = priceValue(input.price, "Fiyat");
-  const images = stringArray(input.images, "Görsel adresleri");
-  const storageImages = storageImagesValue(input.storageImages);
+  const images = productImagesValue(input.images);
   const attributes = Object.hasOwn(input, "attributes") ? productAttributesValue(input.attributes) : undefined;
-  if (images.length + storageImages.length > 20) throw new Error("Bir üründe en fazla 20 görsel olabilir.");
   validateProductVariants(options, variants);
+  for (const image of images) {
+    const scope = image.selectedOptions ?? [];
+    if (new Set(scope.map(({ name }) => name.toLocaleLowerCase("tr-TR"))).size !== scope.length ||
+      scope.some(({ name, value }) => !options.some((option) => option.name.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR") && option.values.includes(value))) ||
+      !variants.some((variant) => scope.every(({ name, value }) => variant.selectedOptions.some((selected) => selected.name.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR") && selected.value === value)))) {
+      throw new Error("Görsel kapsamı geçerli bir varyant seçeneğiyle eşleşmiyor.");
+    }
+  }
   return {
     title: stringValue(input.title, "Ürün adı"),
     slug: stringValue(input.slug, "Ürün adresi"),
-    price,
     availableForSale: input.availableForSale === true,
-    images, storageImages, options, variants,
+    images, options, variants,
     ...(attributes ? { attributes } : {}),
-    ...(Object.hasOwn(input, "brand") ? { brand: productMetadataText(input.brand, "Marka") } : {}),
-    ...(Object.hasOwn(input, "material") ? { material: productMetadataText(input.material, "Materyal") } : {}),
     categorySlug: optionalString(input.categorySlug, "Kategori") || "",
   };
 }

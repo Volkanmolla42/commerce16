@@ -1,11 +1,11 @@
 import type { Product, ProductVariant } from "./types";
 
 type ProductPriceSource = {
-  price: string;
+  price?: string;
   priceRange?: { min: string; max: string };
   options?: { name: string; values: string[] }[];
   variants?: {
-    price?: string | { amount: string };
+    price: string | { amount: string };
     selectedOptions: { name: string; value: string }[];
   }[];
 };
@@ -19,7 +19,7 @@ export function getProductPriceRange(
   params?: Pick<URLSearchParams, "get">,
 ): { min: string; max: string } {
   if (!params && product.priceRange) return product.priceRange;
-  const optionVariants = product.variants?.filter((variant) => variant.selectedOptions.length > 0) ?? [];
+  const optionVariants = product.variants ?? [];
   const matchingVariants = params && optionVariants.length > 0
     ? optionVariants.filter((variant) => variant.selectedOptions.every(({ name, value }) => {
         const selected = params.get(optionQueryKey(name));
@@ -28,10 +28,13 @@ export function getProductPriceRange(
     : optionVariants;
   const candidates = matchingVariants.length > 0 ? matchingVariants : optionVariants;
   const prices = candidates
-    .map((variant) => typeof variant.price === "string" ? variant.price : variant.price?.amount ?? product.price)
+    .map((variant) => typeof variant.price === "string" ? variant.price : variant.price.amount)
     .map((amount) => ({ amount, value: Number(amount) }))
     .filter(({ value }) => Number.isFinite(value));
-  if (prices.length === 0) return { min: product.price, max: product.price };
+  if (prices.length === 0) {
+    const amount = product.price ?? "0.00";
+    return { min: amount, max: amount };
+  }
   prices.sort((left, right) => left.value - right.value);
   return { min: prices[0]!.amount, max: prices[prices.length - 1]!.amount };
 }
@@ -51,7 +54,7 @@ export function getSelectedVariant(product: Product, params: Pick<URLSearchParam
 export function getProductUnitPrice(product: Product, variantId?: string): string {
   const variant = product.variants?.find((candidate) => candidate.id === variantId) ??
     (!variantId && product.variants?.length === 1 ? product.variants[0] : undefined);
-  return variant?.price?.amount ?? product.price;
+  return variant?.price.amount ?? product.price;
 }
 
 export function getProductVariantTitle(productTitle: string, variant?: ProductVariant): string {

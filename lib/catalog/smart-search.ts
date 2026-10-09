@@ -161,13 +161,11 @@ export function rankSearchItems<T>(items: T[], query: string, getFields: (item: 
 }
 
 export function getProductSearchFields(product: Pick<Product, "title" | "slug" | "categorySlug"> & {
-  sku?: string;
   variants?: Array<{ sku?: string; barcode?: string; title: string; selectedOptions: Array<{ name: string; value: string }> }>;
   options?: Array<{ name: string; values: string[] }>;
 }): Array<string | undefined> {
   return [
     product.title,
-    product.sku,
     product.slug,
     product.categorySlug,
     ...(product.variants ?? []).flatMap((variant) => [
@@ -180,28 +178,29 @@ export function getProductSearchFields(product: Pick<Product, "title" | "slug" |
   ];
 }
 
-/** Index normalized catalog text and the existing synonym vocabulary once on write. */
-export function getProductSearchText(product: Parameters<typeof getProductSearchFields>[0]) {
-  const text = normalizeSearchText(getProductSearchFields(product).filter(Boolean).join(" "));
-  const synonyms = text.split(" ").flatMap((token) => SYNONYMS.get(stemToken(token)) ?? []);
-  return [...new Set([text, ...synonyms])].join(" ");
-}
-
 export function catalogSearchQuery(query: string) {
-  return normalizeSearchText(query.trim().slice(0, 200)).split(" ").filter(Boolean)
-    .filter((token) => token.length <= 32).slice(0, 16).join(" ");
+  const trimmed = query.trim().slice(0, 200);
+  if (!normalizeSearchText(trimmed)) return "";
+  return trimmed.replace(/[^\p{L}\p{N}-]+/gu, " ").trim().split(/\s+/)
+    .filter((token) => normalizeSearchText(token).length <= 32).slice(0, 16).join(" ");
 }
 
-/** Match normalized index text when a numeric/date index supplies the order.
+/** Match product fields when an ordered index supplies the result order.
  * Like Convex typeahead, only the final query term permits a prefix match.
  */
 export function createCatalogSearchMatcher(search: string) {
-  const terms = search.split(" ").filter(Boolean);
-  return (text: string) => {
-    const words = text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 0 && word.length <= 32);
-    const exactWords = new Set(words);
-    return terms.some((term, index) => index === terms.length - 1
-      ? words.some((word) => word.startsWith(term))
-      : exactWords.has(term));
+  const terms = normalizeSearchText(search).split(" ").filter(Boolean);
+  return (rawFields: string | Array<string | undefined>) => {
+    const fields = (Array.isArray(rawFields) ? rawFields : [rawFields])
+      .filter((field): field is string => Boolean(field))
+      .map(normalizeSearchText);
+    return terms.some((term, index) => {
+      const isFinalTerm = index === terms.length - 1;
+      const synonyms = getSynonyms(term).map(normalizeSearchText);
+      return fields.some((field) => field.split(" ").some((word) =>
+        word === term || (isFinalTerm && word.startsWith(term)) ||
+        synonyms.some((synonym) => word === synonym || (isFinalTerm && synonym.startsWith(term))),
+      ));
+    });
   };
 }

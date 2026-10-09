@@ -77,7 +77,7 @@ function AdminCategoriesContent() {
                   <div className="min-w-0">
                     <h3 className="font-semibold text-foreground">{category.title}</h3>
                     <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                      {category.path} · {category.slug}
+                      /search/{category.slug}
                     </p>
                     {category.description && (
                       <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">

@@ -88,7 +88,6 @@ function FacetControls({
   filters,
   inputSuffix,
   onPriceChange,
-  onStockChange,
 }: {
   facetOptions: CatalogFacetOptions;
   categoryAttributes: CategoryAttributeDefinition[];
@@ -97,11 +96,7 @@ function FacetControls({
   filters: CatalogFilters;
   inputSuffix: string;
   onPriceChange: (key: "minPrice" | "maxPrice", value: string) => void;
-  onStockChange: (value: CatalogFilters["stock"]) => void;
 }) {
-  const hasInStockProducts = facetOptions.inStock;
-  const hasOutOfStockProducts = facetOptions.outOfStock;
-
   return (
     <div>
       <fieldset className="space-y-2 border-b border-border py-3">
@@ -147,53 +142,6 @@ function FacetControls({
           onChange={(patch) => onCategoryAttributeChange(definition.key, patch)}
         />
       ))}
-
-      <details className="group border-b border-border py-3">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
-          <span>Stok durumu</span>
-          <ChevronDownIcon aria-hidden="true" className="size-4" />
-        </summary>
-        <fieldset className="mt-2 space-y-1">
-          <legend className="sr-only">Stok durumu</legend>
-          <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-md px-1 text-sm hover:bg-muted">
-            <input
-              type="radio"
-              name={`stock-${inputSuffix}`}
-              checked={filters.stock === ""}
-              onChange={() => onStockChange("")}
-              className="size-4 accent-blue-500"
-            />
-            Tümü
-          </label>
-          {hasInStockProducts ? (
-            <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-md px-1 text-sm hover:bg-muted">
-              <input
-                type="radio"
-                name={`stock-${inputSuffix}`}
-                checked={filters.stock === "in"}
-                onChange={() => onStockChange("in")}
-                className="size-4 accent-blue-500"
-              />
-              Stokta
-            </label>
-          ) : null}
-          {hasOutOfStockProducts ? (
-            <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-md px-1 text-sm hover:bg-muted">
-              <input
-                type="radio"
-                name={`stock-${inputSuffix}`}
-                checked={filters.stock === "out"}
-                onChange={() => onStockChange("out")}
-                className="size-4 accent-blue-500"
-              />
-              Tükendi
-            </label>
-          ) : null}
-          {!hasInStockProducts && !hasOutOfStockProducts ? (
-            <p className="py-2 text-xs text-muted-foreground">Ürün bulunmuyor.</p>
-          ) : null}
-        </fieldset>
-      </details>
 
     </div>
   );
@@ -375,12 +323,10 @@ export function FacetedProductGrid({
     onCategoryAttributeChange: updateCategoryAttribute,
     filters,
     onPriceChange: updatePrice,
-    onStockChange: (stock: CatalogFilters["stock"]) =>
-      setFilters((current) => ({ ...current, stock })),
   };
 
   const pageTitle = title ?? (query ? `“${query}” sonuçları` : "Tüm ürünler");
-  const showFilters = facets.inStock || facets.outOfStock || activeFilterCount > 0;
+  const showFilters = activeFilterCount > 0;
 
   return (
     <div className="min-w-0">

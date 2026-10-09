@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { env, internalAction, internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { assertAdminApiSecret } from "./adminAuth";
+import { getImagesForVariant } from "../lib/catalog/product-images";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   cartRecoveryConsent: { kind: "fixed window", rate: 5, period: 60 * 60 * 1000 },
@@ -35,28 +37,8 @@ function cleanEmail(value: string) {
   return email;
 }
 
-function cleanPhone(value: string) {
-  const trimmed = value.trim();
-  const digits = trimmed.replace(/\D/g, "");
-  const phone = trimmed.startsWith("+")
-    ? `+${digits}`
-    : digits.startsWith("00")
-      ? `+${digits.slice(2)}`
-      : digits.startsWith("90") && digits.length === 12
-        ? `+${digits}`
-        : digits.startsWith("0") && digits.length === 11
-          ? `+90${digits.slice(1)}`
-          : digits.startsWith("5") && digits.length === 10
-            ? `+90${digits}`
-            : "";
-  if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-    throw new Error("Telefon numarasını +90 5xx xxx xx xx biçiminde girin.");
-  }
-  return phone;
-}
-
 function siteUrl() {
-  const value = env.CART_RECOVERY_SITE_URL ?? env.RESTOCK_SITE_URL;
+  const value = env.CART_RECOVERY_SITE_URL;
   if (!value) return null;
   try {
     const parsed = new URL(value);
@@ -67,27 +49,11 @@ function siteUrl() {
 }
 
 function emailFrom() {
-  return env.CART_RECOVERY_FROM_EMAIL ?? env.RESTOCK_FROM_EMAIL;
+  return env.CART_RECOVERY_FROM_EMAIL;
 }
 
 function emailEnabled() {
   return Boolean(siteUrl() && env.RESEND_API_KEY && emailFrom());
-}
-
-function whatsappFrom() {
-  if (!env.TWILIO_WHATSAPP_FROM) return null;
-  const sender = env.TWILIO_WHATSAPP_FROM.trim();
-  return sender.startsWith("whatsapp:") ? sender : `whatsapp:${sender}`;
-}
-
-function whatsappEnabled() {
-  return Boolean(
-    siteUrl() &&
-    env.TWILIO_ACCOUNT_SID &&
-    env.TWILIO_AUTH_TOKEN &&
-    env.TWILIO_WHATSAPP_CONTENT_SID &&
-    whatsappFrom(),
-  );
 }
 
 function escapeHtml(value: string) {
@@ -102,17 +68,15 @@ function escapeHtml(value: string) {
 
 export const getAvailability = query({
   args: {},
-  returns: v.object({ email: v.boolean(), whatsapp: v.boolean() }),
-  handler: async () => ({ email: emailEnabled(), whatsapp: whatsappEnabled() }),
+  returns: v.object({ email: v.boolean() }),
+  handler: async () => ({ email: emailEnabled() }),
 });
 
 export const capture = mutation({
   args: {
     sessionKey: v.string(),
     email: v.optional(v.string()),
-    phone: v.optional(v.string()),
     emailConsent: v.boolean(),
-    whatsappConsent: v.boolean(),
     items: v.array(itemInputValidator),
   },
   returns: v.union(v.id("abandonedCarts"), v.null()),
@@ -120,27 +84,22 @@ export const capture = mutation({
     if (!/^[a-f0-9-]{32,64}$/i.test(args.sessionKey)) throw new Error("Sepet oturumu geçersiz.");
     if (args.items.length > 100) throw new Error("Sepet en fazla 100 ürün içerebilir.");
     if (args.emailConsent && !emailEnabled()) throw new Error("E-posta hatırlatması şu anda etkin değil.");
-    if (args.whatsappConsent && !whatsappEnabled()) throw new Error("WhatsApp hatırlatması şu anda etkin değil.");
 
     const email = args.emailConsent ? cleanEmail(args.email ?? "") : undefined;
-    const whatsapp = args.whatsappConsent ? cleanPhone(args.phone ?? "") : undefined;
     const existing = await ctx.db
       .query("abandonedCarts")
       .withIndex("by_session_key", (q) => q.eq("sessionKey", args.sessionKey))
       .first();
 
-    if (!args.emailConsent && !args.whatsappConsent) {
+    if (!args.emailConsent) {
       if (!existing) return null;
       const now = Date.now();
       await ctx.db.patch(existing._id, {
         items: [],
         orderId: undefined,
         email: undefined,
-        whatsapp: undefined,
         emailConsent: false,
-        whatsappConsent: false,
         emailOptedOutAt: existing.emailConsent ? now : existing.emailOptedOutAt,
-        whatsappOptedOutAt: existing.whatsappConsent ? now : existing.whatsappOptedOutAt,
         status: "unsubscribed",
         reminderScheduled: false,
       });
@@ -174,18 +133,14 @@ export const capture = mutation({
     if (lines.size === 0) throw new Error("Hatırlatma için sepetinizde ürün olmalı.");
 
     const newEmailConsent = args.emailConsent && (!existing?.emailConsent || existing.email !== email);
-    const newWhatsappConsent = args.whatsappConsent && (!existing?.whatsappConsent || existing.whatsapp !== whatsapp);
     if (newEmailConsent && email) {
       await rateLimiter.limit(ctx, "cartRecoveryConsent", { key: await hash(`email:${email}`), throws: true });
-    }
-    if (newWhatsappConsent && whatsapp) {
-      await rateLimiter.limit(ctx, "cartRecoveryConsent", { key: await hash(`whatsapp:${whatsapp}`), throws: true });
     }
 
     const now = Date.now();
     const needsNewReminder = !existing ||
       existing.status === "sent" || existing.status === "converted" || existing.status === "unsubscribed" ||
-      existing.status === "failed" || existing.status === "expired" || newEmailConsent || newWhatsappConsent;
+      existing.status === "failed" || existing.status === "expired" || newEmailConsent;
     const notificationId = needsNewReminder ? randomHex(16) : existing.notificationId;
     const restoreToken = needsNewReminder ? randomHex(32) : existing.restoreToken;
     const unsubscribeToken = needsNewReminder ? randomHex(32) : existing.unsubscribeToken;
@@ -198,20 +153,11 @@ export const capture = mutation({
           ...(existing?.emailConsentedAt !== undefined ? { emailConsentedAt: existing.emailConsentedAt } : {}),
           ...(existing?.emailConsent ? { emailOptedOutAt: now } : existing?.emailOptedOutAt !== undefined ? { emailOptedOutAt: existing.emailOptedOutAt } : {}),
         };
-    const whatsappConsentFields = args.whatsappConsent
-      ? { whatsappConsentedAt: newWhatsappConsent ? now : existing?.whatsappConsentedAt ?? now }
-      : {
-          ...(existing?.whatsappConsentedAt !== undefined ? { whatsappConsentedAt: existing.whatsappConsentedAt } : {}),
-          ...(existing?.whatsappConsent ? { whatsappOptedOutAt: now } : existing?.whatsappOptedOutAt !== undefined ? { whatsappOptedOutAt: existing.whatsappOptedOutAt } : {}),
-        };
     const base = {
       items: itemList,
       email,
-      whatsapp,
       emailConsent: args.emailConsent,
-      whatsappConsent: args.whatsappConsent,
       ...emailConsentFields,
-      ...whatsappConsentFields,
       consentCopyVersion,
       status,
       ...(existing ? { orderId: needsNewReminder ? undefined : existing.orderId } : {}),
@@ -221,7 +167,7 @@ export const capture = mutation({
       reminderScheduled,
       lastActivityAt: now,
       expiresAt: now + retentionMs,
-      ...(existing && needsNewReminder ? { emailSentAt: undefined, whatsappSentAt: undefined } : {}),
+      ...(existing && needsNewReminder ? { emailSentAt: undefined } : {}),
     };
 
     let cartId: Id<"abandonedCarts">;
@@ -253,15 +199,7 @@ export const linkOrder = mutation({
     const order = await ctx.db.get(orderId);
     if (!cart || !order || cart.status === "unsubscribed") return null;
     const emailMatches = cart.email && cart.email.toLowerCase() === order.customerEmail.toLowerCase();
-    let phoneMatches = false;
-    if (cart.whatsapp && order.customerPhone) {
-      try {
-        phoneMatches = cleanPhone(order.customerPhone) === cart.whatsapp;
-      } catch {
-        phoneMatches = false;
-      }
-    }
-    if (!emailMatches && !phoneMatches) return null;
+    if (!emailMatches) return null;
     await ctx.db.patch(cart._id, { orderId });
     return null;
   },
@@ -280,7 +218,6 @@ export const markConvertedForOrder = internalMutation({
         items: [],
         status: "converted",
         email: undefined,
-        whatsapp: undefined,
         reminderScheduled: false,
       });
     }
@@ -302,11 +239,8 @@ export const unsubscribe = mutation({
         items: [],
         orderId: undefined,
         email: undefined,
-        whatsapp: undefined,
         emailConsent: false,
-        whatsappConsent: false,
         emailOptedOutAt: cart.emailConsent ? now : cart.emailOptedOutAt,
-        whatsappOptedOutAt: cart.whatsappConsent ? now : cart.whatsappOptedOutAt,
         status: "unsubscribed",
         reminderScheduled: false,
       });
@@ -335,8 +269,7 @@ export const claimReminder = internalMutation({
     v.object({
       cartId: v.id("abandonedCarts"),
       notificationId: v.string(),
-      email: v.union(v.string(), v.null()),
-      whatsapp: v.union(v.string(), v.null()),
+      email: v.string(),
       unsubscribeToken: v.string(),
       restoreToken: v.string(),
       items: v.array(v.object({ title: v.string(), slug: v.string() })),
@@ -348,7 +281,7 @@ export const claimReminder = internalMutation({
     if (!cart || cart.notificationId !== notificationId || cart.status !== "active") return null;
     const now = Date.now();
     if (cart.expiresAt <= now) {
-      await ctx.db.patch(cartId, { items: [], status: "expired", email: undefined, whatsapp: undefined, reminderScheduled: false });
+      await ctx.db.patch(cartId, { items: [], status: "expired", email: undefined, reminderScheduled: false });
       return null;
     }
     if (cart.lastActivityAt + reminderDelayMs > now) {
@@ -361,7 +294,7 @@ export const claimReminder = internalMutation({
     if (cart.orderId) {
       const order = await ctx.db.get(cart.orderId);
       if (order && order.status !== "cancelled") {
-        await ctx.db.patch(cartId, { items: [], status: "converted", email: undefined, whatsapp: undefined, reminderScheduled: false });
+        await ctx.db.patch(cartId, { items: [], status: "converted", email: undefined, reminderScheduled: false });
         return null;
       }
     }
@@ -377,19 +310,16 @@ export const claimReminder = internalMutation({
       if (variants.length && !variantId) continue;
       if (variantId && !variant) continue;
       if (variant && !variant.availableForSale) continue;
-      const stock = variant?.stockQuantity ?? product.stockQuantity;
-      if (stock != null && stock <= 0) continue;
       items.push({ title: product.title, slug: product.slug });
     }
-    if (items.length === 0 || (!cart.emailConsent && !cart.whatsappConsent)) {
-      await ctx.db.patch(cartId, { status: "failed", email: undefined, whatsapp: undefined, reminderScheduled: false });
+    if (items.length === 0 || !cart.emailConsent) {
+      await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
       return null;
     }
 
     const email = cart.emailConsent && cart.email && emailEnabled() ? cart.email : null;
-    const whatsapp = cart.whatsappConsent && cart.whatsapp && whatsappEnabled() ? cart.whatsapp : null;
-    if (!email && !whatsapp) {
-      await ctx.db.patch(cartId, { status: "failed", email: undefined, whatsapp: undefined, reminderScheduled: false });
+    if (!email) {
+      await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
       return null;
     }
     await ctx.db.patch(cartId, { status: "sending" });
@@ -397,7 +327,6 @@ export const claimReminder = internalMutation({
       cartId,
       notificationId,
       email,
-      whatsapp,
       unsubscribeToken: cart.unsubscribeToken,
       restoreToken: cart.restoreToken,
       items,
@@ -410,19 +339,15 @@ export const finishReminder = internalMutation({
     cartId: v.id("abandonedCarts"),
     notificationId: v.string(),
     emailSent: v.boolean(),
-    whatsappSent: v.boolean(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const cart = await ctx.db.get(args.cartId);
     if (!cart || cart.status !== "sending" || cart.notificationId !== args.notificationId) return null;
-    const sent = args.emailSent || args.whatsappSent;
     await ctx.db.patch(args.cartId, {
-      status: sent ? "sent" : "failed",
+      status: args.emailSent ? "sent" : "failed",
       email: undefined,
-      whatsapp: undefined,
       emailSentAt: args.emailSent ? Date.now() : cart.emailSentAt,
-      whatsappSentAt: args.whatsappSent ? Date.now() : cart.whatsappSentAt,
       reminderScheduled: false,
     });
     return null;
@@ -440,7 +365,6 @@ export const processReminder = internalAction({
       await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
         ...args,
         emailSent: false,
-        whatsappSent: false,
       });
       return null;
     }
@@ -449,9 +373,7 @@ export const processReminder = internalAction({
     cartUrl.searchParams.set("recover", reminder.restoreToken);
     const unsubscribeUrl = new URL("/cart-reminders/unsubscribe", base);
     unsubscribeUrl.searchParams.set("token", reminder.unsubscribeToken);
-    const productList = reminder.items.map((item) => item.title).join(", ");
     let emailSent = false;
-    let whatsappSent = false;
 
     if (reminder.email && env.RESEND_API_KEY && emailFrom()) {
       try {
@@ -480,43 +402,113 @@ export const processReminder = internalAction({
       }
     }
 
-    const sender = whatsappFrom();
-    if (reminder.whatsapp && sender && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_CONTENT_SID) {
-      try {
-        const body = new URLSearchParams({
-          To: `whatsapp:${reminder.whatsapp}`,
-          From: sender,
-          ContentSid: env.TWILIO_WHATSAPP_CONTENT_SID,
-          ContentVariables: JSON.stringify({
-            "1": productList,
-            "2": cartUrl.toString(),
-            "3": unsubscribeUrl.toString(),
-          }),
-        });
-        const credentials = btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`);
-        const response = await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${credentials}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: body.toString(),
-            signal: AbortSignal.timeout(15_000),
-          },
-        );
-        whatsappSent = response.ok;
-      } catch {
-        whatsappSent = false;
-      }
-    }
-
     await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
       ...args,
       emailSent,
-      whatsappSent,
     });
     return null;
   },
 });
+
+export const listAllAdmin = query({
+  args: {
+    adminSecret: v.string(),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("abandonedCarts"),
+      _creationTime: v.number(),
+      sessionKey: v.string(),
+      email: v.optional(v.string()),
+      emailConsent: v.boolean(),
+      emailConsentedAt: v.optional(v.number()),
+      status: v.string(),
+      orderId: v.optional(v.id("orders")),
+      restoreToken: v.string(),
+      reminderScheduled: v.boolean(),
+      lastActivityAt: v.number(),
+      expiresAt: v.number(),
+      emailSentAt: v.optional(v.number()),
+      itemCount: v.number(),
+      estimatedTotal: v.string(),
+      items: v.array(
+        v.object({
+          productId: v.string(),
+          variantId: v.optional(v.string()),
+          quantity: v.number(),
+          title: v.string(),
+          variantTitle: v.optional(v.string()),
+          price: v.string(),
+          image: v.optional(v.string()),
+        }),
+      ),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    const carts = await ctx.db.query("abandonedCarts").order("desc").take(100);
+    const results = [];
+    for (const cart of carts) {
+      let total = 0;
+      let count = 0;
+      const items = [];
+      for (const item of cart.items) {
+        count += item.quantity;
+        const productId = ctx.db.normalizeId("products", item.productId);
+        const product = productId ? await ctx.db.get(productId) : null;
+        const variants = product?.variants ?? [];
+        const variant = item.variantId ? variants.find((v) => v.id === item.variantId) : undefined;
+        const priceStr = variant?.price ?? "0.00";
+        const priceNum = parseFloat(priceStr) || 0;
+        total += priceNum * item.quantity;
+        const imageRecord = product ? getImagesForVariant(product.images, variant?.selectedOptions ?? [])[0] : undefined;
+        const image = imageRecord ? await ctx.storage.getUrl(imageRecord.storageId) : null;
+        items.push({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          title: product?.title ?? "Silinmiş ürün",
+          variantTitle: variant?.title,
+          price: priceStr,
+          image: image ?? undefined,
+        });
+      }
+      results.push({
+        _id: cart._id,
+        _creationTime: cart._creationTime,
+        sessionKey: cart.sessionKey,
+        email: cart.email,
+        emailConsent: cart.emailConsent,
+        emailConsentedAt: cart.emailConsentedAt,
+        status: cart.status,
+        orderId: cart.orderId,
+        restoreToken: cart.restoreToken,
+        reminderScheduled: cart.reminderScheduled,
+        lastActivityAt: cart.lastActivityAt,
+        expiresAt: cart.expiresAt,
+        emailSentAt: cart.emailSentAt,
+        itemCount: count,
+        estimatedTotal: total.toFixed(2),
+        items,
+      });
+    }
+    return results;
+  },
+});
+
+export const deleteAdmin = mutation({
+  args: {
+    adminSecret: v.string(),
+    id: v.id("abandonedCarts"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    const cart = await ctx.db.get(args.id);
+    if (cart) {
+      await ctx.db.delete(args.id);
+    }
+    return null;
+  },
+});
+

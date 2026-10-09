@@ -11,10 +11,11 @@ const modules = import.meta.glob("./**/*.ts");
 const secret = "catalog-test-secret";
 const args = {
   paginationOpts: { numItems: 24, cursor: null as string | null, maximumRowsRead: 128 },
-  query: "", sort: "price-asc", filters: { minPrice: "", maxPrice: "", stock: "" as const }, attributes: {},
+  query: "", sort: "price-asc", filters: { minPrice: "", maxPrice: "" }, attributes: {},
 };
-const product = (index: number, availableForSale = true) => ({
-  title: `Test ürün ${index}`, slug: `test-${index}`, price: String(index + 1), images: [],
+const product = (index: number, availableForSale = true, price = String(index + 1)) => ({
+  title: `Test ürün ${index}`, slug: `test-${index}`, images: [], options: [],
+  variants: [{ id: `v-${index}`, title: "Ürünün kendisi", selectedOptions: [], price, stockQuantity: 0, availableForSale }],
   availableForSale, updatedAt: "2026-01-01T00:00:00.000Z",
 });
 
@@ -44,7 +45,7 @@ describe("indexed catalog pages", () => {
   it("sorts numeric prices globally and narrows category and price ranges", async () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
-      for (const price of ["100", "9", "20", "11"]) await insertCatalogProduct(ctx, { ...product(Number(price)), price, categorySlug: "shoes" });
+      for (const price of ["100", "9", "20", "11"]) await insertCatalogProduct(ctx, { ...product(Number(price), true, price), categorySlug: "shoes" });
       await insertCatalogProduct(ctx, { ...product(12), categorySlug: "other" });
     });
     const result = await t.query(api.catalog.page, { ...args, categorySlug: "shoes", sort: "price-desc", filters: { ...args.filters, minPrice: "10", maxPrice: "30" } });
@@ -54,12 +55,12 @@ describe("indexed catalog pages", () => {
   it("sorts and filters by the displayed variant minimum and updates it on edit", async () => {
     const t = convexTest(schema, modules);
     const variants = [
-      { id: "a", title: "A", selectedOptions: [{ name: "Size", value: "A" }], price: "100", availableForSale: true, stockQuantity: 1 },
-      { id: "b", title: "B", selectedOptions: [{ name: "Size", value: "B" }], price: "10", availableForSale: true, stockQuantity: 1 },
+      { id: "a", title: "A", selectedOptions: [{ name: "Size", value: "A" }], price: "100", stockQuantity: 0, availableForSale: true },
+      { id: "b", title: "B", selectedOptions: [{ name: "Size", value: "B" }], price: "10", stockQuantity: 0, availableForSale: true },
     ];
     const id = await t.run(async (ctx) => {
-      const id = await insertCatalogProduct(ctx, { ...product(0), price: "100", variants });
-      await insertCatalogProduct(ctx, { ...product(1), price: "50" });
+      const id = await insertCatalogProduct(ctx, { ...product(0), options: [{ id: "size", name: "Size", values: ["A", "B"] }], variants });
+      await insertCatalogProduct(ctx, product(1, true, "50"));
       return id;
     });
     expect((await t.query(api.catalog.page, args)).page.map((item) => item.priceRange.min)).toEqual(["10", "50"]);
@@ -77,7 +78,7 @@ describe("indexed catalog pages", () => {
   it("keeps a continuation even when an attribute filter removes a whole page", async () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
-      await ctx.db.insert("categories", { slug: "shoes", title: "Shoes", description: "", path: "/search/shoes", updatedAt: "2026-01-01", attributes: [{ key: "color", label: "Color", type: "select", required: false, options: ["Red", "Blue"] }] });
+      await ctx.db.insert("categories", { slug: "shoes", title: "Shoes", description: "", updatedAt: "2026-01-01", attributes: [{ key: "color", label: "Color", type: "select", required: false, options: ["Red", "Blue"] }] });
       for (let index = 0; index < 25; index++) await insertCatalogProduct(ctx, { ...product(index), categorySlug: "shoes", attributes: [{ key: "color", value: index === 24 ? "Red" : "Blue" }] });
     });
     const query = { ...args, categorySlug: "shoes", attributes: { color: { values: ["Red"], min: "", max: "" } } };
@@ -91,7 +92,7 @@ describe("indexed catalog pages", () => {
   it("searches normalized SKU and synonyms through the full text index", async () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
-      await insertCatalogProduct(ctx, { ...product(0), title: "Deri Ayakkabı", variants: [{ id: "v1", title: "40", selectedOptions: [{ name: "Numara", value: "40" }], sku: "SNK-40", availableForSale: true, stockQuantity: 3 }] });
+      await insertCatalogProduct(ctx, { ...product(0), title: "Deri Ayakkabı", options: [{ id: "numara", name: "Numara", values: ["40"] }], variants: [{ id: "v1", title: "40", selectedOptions: [{ name: "Numara", value: "40" }], price: "1", stockQuantity: 0, sku: "SNK-40", availableForSale: true }] });
       await insertCatalogProduct(ctx, product(1, false));
     });
     for (const query of ["ayakkabi", "shoe", "SNK-40"]) {
@@ -115,11 +116,11 @@ describe("indexed catalog pages", () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
       for (let index = 0; index < 35; index++) {
-        await insertCatalogProduct(ctx, { ...product(index), title: "Deri Ayakkabı", price: String(35 - index) });
+        await insertCatalogProduct(ctx, { ...product(index, true, String(35 - index)), title: "Deri Ayakkabı" });
       }
-      await insertCatalogProduct(ctx, { ...product(40), title: "Kupa", price: "0" });
-      await insertCatalogProduct(ctx, { ...product(41, false), title: "Deri Ayakkabı", price: "0" });
-      await insertCatalogProduct(ctx, { ...product(42), title: "Deri Ayakkabı", price: "0", categorySlug: "other" });
+      await insertCatalogProduct(ctx, { ...product(40, true, "0"), title: "Kupa" });
+      await insertCatalogProduct(ctx, { ...product(41, false, "0"), title: "Deri Ayakkabı" });
+      await insertCatalogProduct(ctx, { ...product(42, true, "0"), title: "Deri Ayakkabı", categorySlug: "other" });
     });
     for (const sort of ["price-asc", "price-desc", "latest-desc"]) {
       const items: FunctionReturnType<typeof api.catalog.page>["page"] = [];
@@ -186,11 +187,11 @@ describe("atomic catalog read models", () => {
   it("keeps the read model consistent through the actual admin product mutations", async () => {
     const t = convexTest(schema, modules);
     const id = await t.mutation(api.products.create, {
-      title: "Test ürün", slug: "test-0", price: "1", images: [], availableForSale: true, adminSecret: secret,
-      variants: [{ id: "v1", title: "Ürünün kendisi", selectedOptions: [], sku: "TEST-1", stockQuantity: 10, availableForSale: true }],
+      title: "Test ürün", slug: "test-0", images: [], options: [], availableForSale: true, adminSecret: secret,
+      variants: [{ id: "v1", title: "Ürünün kendisi", selectedOptions: [], price: "1", stockQuantity: 0, sku: "TEST-1", availableForSale: true }],
     });
     expect(await t.query(api.catalog.stats, { adminSecret: secret })).toEqual({ total: 1, active: 1 });
-    await t.mutation(api.products.update, { id, adminSecret: secret, availableForSale: false, title: "Yeni kupa", price: "12" });
+    await t.mutation(api.products.update, { id, adminSecret: secret, availableForSale: false, title: "Yeni kupa", variants: [{ id: "v1", title: "Ürünün kendisi", selectedOptions: [], price: "12", stockQuantity: 0, sku: "TEST-1", availableForSale: true }] });
     expect(await t.query(api.catalog.stats, { adminSecret: secret })).toEqual({ total: 1, active: 0 });
     expect((await t.query(api.catalog.page, { ...args, query: "kupa", adminSecret: secret })).page[0]?.price).toBe("12");
     await t.mutation(api.products.remove, { id, adminSecret: secret });
@@ -201,7 +202,7 @@ describe("atomic catalog read models", () => {
   it("updates counts, search text and facets on edit, unpublish and delete", async () => {
     const t = convexTest(schema, modules);
     const id = await t.run(async (ctx) => {
-      await ctx.db.insert("categories", { slug: "shoes", title: "Shoes", description: "", path: "/search/shoes", updatedAt: "2026-01-01", attributes: [{ key: "size", label: "Size", type: "number", required: false }] });
+      await ctx.db.insert("categories", { slug: "shoes", title: "Shoes", description: "", updatedAt: "2026-01-01", attributes: [{ key: "size", label: "Size", type: "number", required: false }] });
       return insertCatalogProduct(ctx, { ...product(0), categorySlug: "shoes", attributes: [{ key: "size", value: -2 }] });
     });
     expect(await t.query(api.catalog.facets, { categorySlug: "shoes" })).toEqual({ size: ["-2", "-2"] });

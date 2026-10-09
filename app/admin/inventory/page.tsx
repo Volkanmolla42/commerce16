@@ -1,74 +1,115 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { Doc } from "@/convex/_generated/dataModel";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Input } from "@/components/ui";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 
-const reasons: Record<string, string> = {
-  initial_stock: "İlk stok",
-  manual_adjustment: "Manuel değişiklik",
-  order_reservation: "Sipariş rezervasyonu",
-  reservation_release: "Rezervasyon iadesi",
-  product_removed: "Ürün kaldırıldı",
+type StockProduct = {
+  productId: string;
+  title: string;
+  slug: string;
+  variants: Array<{
+    id: string;
+    title: string;
+    sku?: string;
+    stockQuantity: number;
+  }>;
+};
+
+type StockPage = {
+  page: StockProduct[];
+  continueCursor: string;
+  isDone: boolean;
 };
 
 export default function InventoryPage() {
-  const { data, error, loading, refresh } = useAdminResource<Doc<"inventoryMovements">[]>("inventory-movements");
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [cursors, setCursors] = useState<Array<string | null>>([null]);
+  const cursor = cursors[cursors.length - 1] ?? "";
 
-  if (loading) return <AdminLoading label="Stok hareketleri" />;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setCursors([null]);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const requestParams = { q: debouncedQuery, cursor };
+  const { data, error, loading } = useAdminResource<StockPage>("inventory", requestParams);
+  const pending = loading || debouncedQuery !== query.trim();
+  const products = data?.page ?? [];
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Stok hareketleri</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Stok adetlerini ürünler bölümünden düzenle.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => void refresh()}>Yenile</Button>
-          <Button asChild size="sm"><Link href={adminPath("products")}>Ürünlere git</Link></Button>
-        </div>
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Stok</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Ürün ve varyant stok adetleri.</p>
       </div>
 
       {error && <div className="mb-4"><AdminNotice kind="error">{error}</AdminNotice></div>}
 
-      {!data || data.length === 0 ? (
-        <AdminEmpty title="Henüz stok hareketi yok" description="Ürün stoğu değiştiğinde hareketler burada görünür." />
-      ) : (
-        <Card className="overflow-hidden rounded-lg">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Ürün / SKU</th>
-                  <th className="px-4 py-3 font-medium">Değişim</th>
-                  <th className="px-4 py-3 font-medium">Neden</th>
-                  <th className="px-4 py-3 font-medium">Tarih</th>
-                  <th className="px-4 py-3 font-medium">Sipariş</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {data.map((movement) => (
-                  <tr key={movement._id}>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{movement.productTitle}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{movement.sku}{movement.variantId ? ` · ${movement.variantId}` : ""}</p>
-                    </td>
-                    <td className="px-4 py-3 font-semibold tabular-nums">{movement.quantityDelta > 0 ? "+" : ""}{movement.quantityDelta}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{reasons[movement.reason] ?? movement.reason}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(movement.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      {movement.orderId ? <Link className="text-primary hover:underline" href={`${adminPath("orders")}?order=${encodeURIComponent(movement.orderId)}`}>#{movement.orderId.slice(-8).toUpperCase()}</Link> : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <Card className="mb-4 p-3 sm:p-4">
+        <Input
+          aria-label="Ürün veya SKU ara"
+          type="search"
+          placeholder="Ürün veya SKU ara"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </Card>
+
+      {loading && !data ? <AdminLoading label="Stok bilgileri" /> : products.length === 0 ? (
+        <Card className="p-5">
+          <AdminEmpty
+            title={query ? "Eşleşen ürün yok" : "Stok kaydı yok"}
+            description={query ? "Ürün adını veya SKU kodunu değiştirip tekrar ara." : "Ürün eklediğinde varyant stokları burada görünür."}
+          />
         </Card>
+      ) : (
+        <div className="space-y-3" aria-busy={pending}>
+          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(8rem,0.7fr)_6rem] px-5 text-xs font-medium text-muted-foreground sm:grid">
+            <span>Kombinasyon</span>
+            <span>SKU</span>
+            <span className="text-right">Stok</span>
+          </div>
+          {products.map((product) => (
+            <Card key={product.productId} className="overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold text-foreground">{product.title}</h2>
+                  <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">/product/{product.slug}</p>
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={adminPath(`products/${product.productId}/edit`)}>Ürünü düzenle</Link>
+                </Button>
+              </div>
+              <div className="divide-y divide-border">
+                {product.variants.map((variant) => (
+                  <div key={variant.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(8rem,0.7fr)_6rem] sm:items-center sm:px-5">
+                    <p className="text-sm text-foreground">{variant.title || "Tek ürün"}</p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">{variant.sku || "SKU yok"}</p>
+                    <p className={`text-sm font-semibold tabular-nums sm:text-right ${variant.stockQuantity === 0 ? "text-destructive" : "text-foreground"}`}>
+                      {variant.stockQuantity.toLocaleString("tr-TR")} adet
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {data && (cursors.length > 1 || !data.isDone) && (
+        <nav aria-label="Stok sayfaları" className="mt-4 flex items-center justify-between gap-3">
+          <Button variant="outline" disabled={pending || cursors.length <= 1} onClick={() => setCursors((current) => current.slice(0, -1))}>Önceki</Button>
+          <span className="text-sm text-muted-foreground">Sayfa {cursors.length}</span>
+          <Button variant="outline" disabled={pending || data.isDone} onClick={() => setCursors((current) => [...current, data.continueCursor])}>Sonraki</Button>
+        </nav>
       )}
     </>
   );
