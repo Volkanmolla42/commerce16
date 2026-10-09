@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import schema from "./schema";
+import { insertCatalogProduct, patchCatalogProduct, deleteCatalogProduct, withoutCatalogMetadata } from "./catalogModel";
 import { assertAdminApiSecret } from "./adminAuth";
 import { internal } from "./_generated/api";
 import {
@@ -16,44 +17,19 @@ import {
 
 const productDocumentValidator = schema.doc("products");
 const productInputValidator = productDocumentValidator.omit(
-  "_id", "_creationTime", "updatedAt", "compareAtPriceKurus", "seo", "rating", "complementaryProductIds", "upsellProductIds",
+  "_id", "_creationTime", "updatedAt", "priceValue", "searchText",
 );
 const adminStoredImageValidator = v.object({
   storageId: v.id("_storage"), fileName: v.string(), url: v.union(v.string(), v.null()),
 });
 const productValidator = productDocumentValidator.omit(
-  "storageImages", "compareAtPriceKurus", "seo", "rating", "complementaryProductIds", "upsellProductIds",
+  "storageImages", "priceValue", "searchText",
 );
 const sitemapProductValidator = v.object({ slug: v.string(), updatedAt: v.string() });
 
 const adminProductValidator = productValidator.extend({
   storageImages: v.array(adminStoredImageValidator),
 });
-
-function withoutLegacyCompareAtPrices<T extends {
-  compareAtPriceKurus?: unknown;
-  variants?: { compareAtPriceKurus?: unknown }[];
-}>(product: T) {
-  const result = { ...product };
-  delete result.compareAtPriceKurus;
-  if (result.variants) {
-    result.variants = result.variants.map((variant) => {
-      const cleanVariant = { ...variant };
-      delete cleanVariant.compareAtPriceKurus;
-      return cleanVariant;
-    });
-  }
-  return result;
-}
-
-function productWithoutLegacySeo(product: Doc<"products">) {
-  const result = withoutLegacyCompareAtPrices(product);
-  delete result.seo;
-  delete result.rating;
-  delete result.complementaryProductIds;
-  delete result.upsellProductIds;
-  return result;
-}
 
 function productHasAvailableStock(product: Pick<Doc<"products">, "availableForSale" | "stockQuantity" | "variants">) {
   if (!product.availableForSale) return false;
@@ -248,7 +224,6 @@ function getRestockTargets(previous: Doc<"products">, next: Doc<"products">) {
 }
 
 async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
-  const cleanProduct = withoutLegacyCompareAtPrices(product);
   const storageImages = product.storageImages ?? [];
   const storageUrls = await Promise.all(
     storageImages.map(({ storageId }) => ctx.storage.getUrl(storageId)),
@@ -256,23 +231,23 @@ async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
   return {
     _id: product._id,
     _creationTime: product._creationTime,
-    slug: cleanProduct.slug,
-    title: cleanProduct.title,
-    price: cleanProduct.price,
-    sku: cleanProduct.sku,
+    slug: product.slug,
+    title: product.title,
+    price: product.price,
+    sku: product.sku,
     availableForSale: productHasAvailableStock(product),
-    stockQuantity: cleanProduct.stockQuantity ?? null,
-    brand: cleanProduct.brand,
-    material: cleanProduct.material,
+    stockQuantity: product.stockQuantity ?? null,
+    brand: product.brand,
+    material: product.material,
     attributes: product.attributes,
-    categorySlug: cleanProduct.categorySlug,
+    categorySlug: product.categorySlug,
     images: [...product.images, ...storageUrls.filter((url): url is string => Boolean(url))],
-    options: cleanProduct.options,
-    variants: cleanProduct.variants?.map((variant) => {
+    options: product.options,
+    variants: product.variants?.map((variant) => {
       const stockQuantity = variant.stockQuantity ?? product.stockQuantity ?? null;
       return {
         ...variant,
-        availableForSale: cleanProduct.availableForSale && variant.availableForSale && (stockQuantity == null || stockQuantity > 0),
+        availableForSale: product.availableForSale && variant.availableForSale && (stockQuantity == null || stockQuantity > 0),
         stockQuantity,
       };
     }),
@@ -366,6 +341,19 @@ async function validateStoredImages(
   }
 }
 
+export const getByIdAdmin = query({
+  args: { adminSecret: v.string(), id: v.id("products") },
+  returns: v.union(adminProductValidator, v.null()),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    const product = await ctx.db.get("products", args.id);
+    if (!product) return null;
+    return { ...withoutCatalogMetadata(product), storageImages: await Promise.all((product.storageImages ?? []).map(async (image) => ({
+      ...image, url: await ctx.storage.getUrl(image.storageId),
+    }))) };
+  },
+});
+
 export const list = query({
   args: {
     limit: v.optional(v.number()),
@@ -377,8 +365,8 @@ export const list = query({
     const limit = args.limit === undefined ? 50 : Math.max(1, Math.min(100, Math.trunc(args.limit)));
     const items = args.categorySlug === undefined
       ? await ctx.db.query("products").withIndex("by_available", (q) => q.eq("availableForSale", true)).take(limit)
-      : await ctx.db.query("products").withIndex("by_category", (q) => q.eq("categorySlug", args.categorySlug))
-          .filter((q) => q.eq(q.field("availableForSale"), true)).take(limit);
+      : await ctx.db.query("products").withIndex("by_available_and_category", (q) =>
+          q.eq("availableForSale", true).eq("categorySlug", args.categorySlug)).take(limit);
     return await Promise.all(items.map((item) => withPublicImageUrls(ctx, item)));
   },
 });
@@ -407,7 +395,7 @@ export const listAllAdmin = query({
     assertAdminApiSecret(args.adminSecret);
     const items = await ctx.db.query("products").order("desc").take(100);
     return await Promise.all(items.map(async (item) => ({
-        ...productWithoutLegacySeo(item),
+        ...withoutCatalogMetadata(item),
         storageImages: await Promise.all((item.storageImages ?? []).map(async (image) => ({
           ...image,
           url: await ctx.storage.getUrl(image.storageId),
@@ -510,7 +498,7 @@ export const create = mutation({
     delete product.sku;
     delete product.stockQuantity;
     assertAdminApiSecret(adminSecret);
-    const normalizedProduct = withoutLegacyCompareAtPrices(normalizeProductSkus(product));
+    const normalizedProduct = normalizeProductSkus(product);
     validateProductInventoryAndVariants(normalizedProduct);
     await validateProductAttributes(ctx, normalizedProduct);
     const storageImages = normalizedProduct.storageImages ?? [];
@@ -522,7 +510,7 @@ export const create = mutation({
     if (existing) throw new Error("Bu ürün adresi zaten kullanılıyor.");
 
     const updatedAt = new Date().toISOString();
-    const productId = await ctx.db.insert("products", { ...normalizedProduct, storageImages, updatedAt });
+    const productId = await insertCatalogProduct(ctx, { ...normalizedProduct, storageImages, updatedAt });
     await syncSkuRegistry(ctx, productId, normalizedProduct);
     await recordInitialInventory(ctx, productId, normalizedProduct);
     return productId;
@@ -541,7 +529,7 @@ export const update = mutation({
     assertAdminApiSecret(adminSecret);
     const current = await ctx.db.get(id);
     if (!current) throw new Error("Ürün bulunamadı");
-    const next = withoutLegacyCompareAtPrices(normalizeProductSkus({ ...current, ...rest, sku: undefined, stockQuantity: undefined }));
+    const next = normalizeProductSkus({ ...current, ...rest, sku: undefined, stockQuantity: undefined });
     validateProductInventoryAndVariants(next);
     await validateProductAttributes(ctx, next);
 
@@ -557,14 +545,9 @@ export const update = mutation({
     }
 
     await syncSkuRegistry(ctx, id, next);
-    await ctx.db.patch(id, {
+    await patchCatalogProduct(ctx, current, {
       ...rest,
-      compareAtPriceKurus: undefined,
       vatRate: undefined,
-      seo: undefined,
-      rating: undefined,
-      complementaryProductIds: undefined,
-      upsellProductIds: undefined,
       sku: undefined,
       stockQuantity: undefined,
       variants: next.variants,
@@ -612,7 +595,7 @@ export const remove = mutation({
         .take(101);
       for (const entry of registry) await ctx.db.delete(entry._id);
     }
-    await ctx.db.delete(args.id);
+    if (product) await deleteCatalogProduct(ctx, product);
     await ctx.scheduler.runAfter(0, internal.restockNotifications.deleteForProduct, { productId: args.id });
     return null;
   },

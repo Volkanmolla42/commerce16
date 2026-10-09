@@ -3,12 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, Suspense, useState } from "react";
 import {
   Cog6ToothIcon,
   ChartBarIcon,
   CubeIcon,
   FolderIcon,
+  ArrowsRightLeftIcon,
   ShoppingBagIcon,
   Squares2X2Icon,
   TagIcon,
@@ -22,6 +23,7 @@ import { adminPath } from "@/lib/admin/routes";
 const navigation = [
   { label: "Genel Bakış", href: adminPath(), icon: Squares2X2Icon },
   { label: "Ürünler", href: adminPath("products"), icon: CubeIcon },
+  { label: "Stok hareketleri", href: adminPath("inventory"), icon: ArrowsRightLeftIcon },
   { label: "Kategoriler", href: adminPath("categories"), icon: FolderIcon },
   { label: "Kuponlar", href: adminPath("coupons"), icon: TagIcon },
   { label: "Siparişler", href: adminPath("orders"), icon: ShoppingBagIcon },
@@ -33,28 +35,14 @@ function isActive(pathname: string, href: string) {
   return href === adminPath() ? pathname === href : pathname.startsWith(href);
 }
 
-export function AdminShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const [logoutError, setLogoutError] = useState<string | null>(null);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const storeSettings = useQuery(api.settings.getStoreSettings, {});
-  const storeName = storeSettings?.storeName || "Mağaza";
-  const logoUrl = storeSettings?.logoUrl || "";
-
-  const logout = async () => {
-    setLoggingOut(true);
-    setLogoutError(null);
-    try {
-      const response = await fetch("/api/admin-auth", { method: "DELETE" });
-      if (!response.ok) throw new Error("Çıkış yapılamadı. Tekrar dene.");
-      window.location.replace(adminPath());
-    } catch {
-      setLogoutError("Çıkış yapılamadı. Tekrar dene.");
-      setLoggingOut(false);
-    }
-  };
-
-  const nav = (compact = false) => (
+function AdminNavLinks({
+  compact = false,
+  pathname,
+}: {
+  compact?: boolean;
+  pathname: string;
+}) {
+  return (
     <nav aria-label="Yönetim alanları" className={compact ? "flex gap-1 overflow-x-auto px-3 pb-3" : "space-y-0.5"}>
       {navigation.map((item) => {
         const active = isActive(pathname, item.href);
@@ -75,6 +63,40 @@ export function AdminShell({ children }: { children: ReactNode }) {
       })}
     </nav>
   );
+}
+
+function AdminNavigation({ compact = false }: { compact?: boolean }) {
+  const pathname = usePathname();
+  return <AdminNavLinks compact={compact} pathname={pathname} />;
+}
+
+function AdminNavigationBoundary({ compact = false }: { compact?: boolean }) {
+  return (
+    <Suspense fallback={<AdminNavLinks compact={compact} pathname="" />}>
+      <AdminNavigation compact={compact} />
+    </Suspense>
+  );
+}
+
+export function AdminShell({ children }: { children: ReactNode }) {
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const storeSettings = useQuery(api.settings.getStoreSettings, {});
+  const storeName = storeSettings?.storeName || "Mağaza";
+  const logoUrl = storeSettings?.logoUrl || "";
+
+  const logout = async () => {
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      const response = await fetch("/api/admin-auth", { method: "DELETE" });
+      if (!response.ok) throw new Error("Çıkış yapılamadı. Tekrar dene.");
+      window.location.replace(adminPath());
+    } catch {
+      setLogoutError("Çıkış yapılamadı. Tekrar dene.");
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
@@ -91,7 +113,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <span className="mt-0.5 block text-xs text-muted-foreground">Yönetim paneli</span>
           </span>
         </div>
-        {nav()}
+        <AdminNavigationBoundary />
         <div className="mt-auto border-t border-border pt-4">
           <Button disabled={loggingOut} onClick={() => void logout()} variant="ghost" size="sm" className="w-full justify-start">
             {loggingOut ? "Çıkılıyor…" : "Çıkış"}
@@ -110,7 +132,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <ArrowUpRight01Icon className="size-3.5 shrink-0" aria-hidden="true" />
             </Link>
           </div>
-          <div className="border-t border-border">{nav(true)}</div>
+          <div className="border-t border-border">
+            <AdminNavigationBoundary compact />
+          </div>
           <div className="border-t border-border px-3 py-3">
             <Button disabled={loggingOut} onClick={() => void logout()} variant="ghost" size="sm" className="w-full">
               {loggingOut ? "Çıkılıyor…" : "Çıkış"}

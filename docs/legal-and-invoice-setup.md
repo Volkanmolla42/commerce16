@@ -11,8 +11,6 @@ Replace every bracketed placeholder with the store's actual legal identity, cont
 
 The templates are drafting aids, not legal advice. Product-specific prices, quantities, and delivery costs are shown in the checkout summary; keep those values consistent with the published documents and actual order.
 
-The verified checkout IP is stored on the order as AES-GCM ciphertext using a key derived from the server-only `CHECKOUT_RISK_CONTEXT_SECRET` and a per-order nonce. Customer order queries omit this field; the admin order view reports whether an encrypted IP was captured without exposing the address. IP capture depends on the signed checkout risk context being configured and valid. Set the merchant's retention period and access policy for this evidence with qualified counsel.
-
 ## Paraşüt v4 or an authorized adapter
 
 Paid orders can be sent directly to Paraşüt v4 or to a merchant adapter connected to a GİB-authorized integrator. Set `EINVOICE_PROVIDER=parasut` or `EINVOICE_PROVIDER=adapter` in the Convex deployment. The admin order view shows the provider result and supports retries for failed or incomplete setup.

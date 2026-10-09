@@ -1,6 +1,6 @@
 import { FacetedProductGrid } from "@/components/layout/faceted-product-grid";
-import { defaultSort, sorting } from "@/lib/constants";
-import { getProducts } from "@/lib/catalog";
+import { getCategories } from "@/lib/catalog";
+import { getCatalogPage } from "@/lib/catalog/pages";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
@@ -16,21 +16,21 @@ async function SearchContent(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const searchParams = await props.searchParams;
-  const sort = (searchParams?.sort as string) || undefined;
-  const searchValue = (searchParams?.q as string) || undefined;
-  const { sortKey, reverse } =
-    sorting.find((item) => item.slug === sort) || defaultSort;
+  const searchValue = typeof searchParams?.q === "string" ? searchParams.q : undefined;
+  const [catalog, categories] = await Promise.all([
+    getCatalogPage(searchParams ?? {}), getCategories(),
+  ]);
+  return <FacetedProductGrid {...catalog}
+    initialFilters={catalog.filters} initialAttributeFilters={catalog.attributeFilters}
+    categories={categories} query={searchValue} />;
 
-  const products = await getProducts({ sortKey, reverse, query: searchValue });
-
-  return <FacetedProductGrid products={products} query={searchValue} />;
 }
 
 export default function SearchPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<p role="status" className="text-sm text-muted-foreground">Ürünler yükleniyor…</p>}>
       <SearchContent searchParams={props.searchParams} />
     </Suspense>
   );

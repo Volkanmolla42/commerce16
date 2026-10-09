@@ -9,7 +9,7 @@ import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
 
 type AdminOverview = {
-  products: Doc<"products">[];
+  productStats: { total: number; active: number };
   categories: Doc<"categories">[];
   orders: Doc<"orders">[];
 };
@@ -41,7 +41,7 @@ function AdminOverviewContent() {
       ) : (
         <>
           <section aria-label="Mağaza ölçümleri" className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-lg border border-border bg-card sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Ürün" value={data.products.length} note={`${data.products.filter((product) => product.availableForSale).length} satışta`} />
+            <StatCard label="Ürün" value={data.productStats.total} note={`${data.productStats.active} satışta`} />
             <StatCard label="Kategori" value={data.categories.length} note="Mağaza menüsünde gösteriliyor" />
             <StatCard label="Sipariş" value={data.orders.length} note={`${data.orders.filter((order) => order.status === "pending").length} işlem bekliyor`} />
             <StatCard label="Toplam ciro" value={formatMoney(data.orders.reduce((sum, order) => sum + (Number.parseFloat(order.total) || 0), 0))} note="Kayıtlı sipariş toplamı" />

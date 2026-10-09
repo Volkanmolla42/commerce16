@@ -33,8 +33,6 @@ type Env = {
   readonly ADMIN_API_SECRET: string | undefined;
   readonly CART_RECOVERY_FROM_EMAIL: string | undefined;
   readonly CART_RECOVERY_SITE_URL: string | undefined;
-  readonly CHECKOUT_RISK_CONTEXT_REQUIRED: string | undefined;
-  readonly CHECKOUT_RISK_CONTEXT_SECRET: string | undefined;
   readonly EINVOICE_ADAPTER_TOKEN: string | undefined;
   readonly EINVOICE_ADAPTER_URL: string | undefined;
   readonly EINVOICE_PROVIDER: string | undefined;
@@ -46,9 +44,6 @@ type Env = {
   readonly GELIVER_SOURCE_IDENTIFIER: string | undefined;
   readonly GELIVER_TEST_MODE: string | undefined;
   readonly GELIVER_TOKEN: string | undefined;
-  readonly IYZICO_API_KEY: string | undefined;
-  readonly IYZICO_BASE_URL: string | undefined;
-  readonly IYZICO_SECRET_KEY: string | undefined;
   readonly ORDER_FROM_EMAIL: string | undefined;
   readonly PARASUT_CLIENT_ID: string | undefined;
   readonly PARASUT_CLIENT_SECRET: string | undefined;
@@ -56,12 +51,6 @@ type Env = {
   readonly PARASUT_INITIAL_REFRESH_TOKEN: string | undefined;
   readonly PARASUT_SHIPPING_VAT_RATE: string | undefined;
   readonly PARASUT_TOKEN_ENCRYPTION_KEY: string | undefined;
-  readonly PAYMENT_PROVIDER: string | undefined;
-  readonly PAYMENT_RETURN_URL: string | undefined;
-  readonly PAYTR_MERCHANT_ID: string | undefined;
-  readonly PAYTR_MERCHANT_KEY: string | undefined;
-  readonly PAYTR_MERCHANT_SALT: string | undefined;
-  readonly PAYTR_TEST_MODE: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly RESTOCK_FROM_EMAIL: string | undefined;
   readonly RESTOCK_SITE_URL: string | undefined;

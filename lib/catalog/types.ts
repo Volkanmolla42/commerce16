@@ -58,14 +58,14 @@ export type Product = {
   slug: string;
   title: string;
   price: string;
+  /** Precomputed card prices avoid transferring every SKU to product lists. */
+  priceRange?: { min: string; max: string };
   sku?: string;
   availableForSale: boolean;
   stockQuantity?: number | null;
   brand?: string;
   material?: string;
   attributes?: ProductAttribute[];
-  /** Average from verified customer reviews, never a manually assigned catalog value. */
-  rating?: number;
   categorySlug?: string;
   images: string[];
   options?: ProductOption[];

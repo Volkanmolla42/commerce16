@@ -63,10 +63,12 @@ export function HomeProductShelf({ title, products }: { title: string; products:
       : products.length === 3
         ? "grid-cols-2 lg:grid-cols-3"
         : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
-  const shelfWidth = fitsRow ? "mx-auto max-w-5xl" : "";
+  const shelfWidth = products.length === 1
+    ? "mx-auto max-w-sm"
+    : fitsRow ? "mx-auto max-w-5xl" : "";
 
   return (
-    <section className="border-b border-border py-7 sm:py-9" aria-label={title}>
+    <section className="py-7 sm:py-9" aria-label={title}>
       <div className={`${shelfWidth} mb-4 flex items-center justify-between gap-4 sm:mb-5`}>
         <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">{title}</h2>
         <Link
@@ -81,7 +83,9 @@ export function HomeProductShelf({ title, products }: { title: string; products:
         : "grid-flow-col auto-cols-[minmax(11rem,72vw)] gap-3 overflow-x-auto pb-3 [scroll-snap-type:x_mandatory] [scrollbar-width:thin] [&>*]:[scroll-snap-align:start] sm:auto-cols-[14rem] sm:gap-4 lg:auto-cols-[16rem]"}>
         <ProductGridItems
           products={products}
-          imageSizes={fitsRow ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
+          imageSizes={products.length === 1
+            ? "(min-width: 640px) 384px, calc(100vw - 2rem)"
+            : fitsRow ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
           prioritizeFirst
           cardLayout="stacked"
           imageFit="cover"

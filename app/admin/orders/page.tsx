@@ -17,39 +17,29 @@ import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "../_com
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 import { orderStatusLabels } from "@/lib/orders";
-import { allocateCouponDiscount, refundAmountForQuantity } from "@/lib/commerce/coupon-discount";
 import { adminPath } from "@/lib/admin/routes";
 
-type PaymentRisk = {
-  status: "initializing" | "pending" | "review" | "paid" | "failed";
-  provider: "iyzico" | "paytr";
-  riskScore: number | null;
-  riskDecision: "allow" | "review" | "blocked" | null;
-  riskReasons: string[];
-  fraudStatus: -1 | 0 | 1 | null;
-  reviewApprovable: boolean;
-};
 type Order = Doc<"orders"> & {
   invoice?: Doc<"invoiceRecords"> | null;
   emailEvents?: Doc<"orderEmailEvents">[];
-  paymentRisk?: PaymentRisk | null;
   shippingShipment?: Doc<"shippingShipments"> | null;
 };
 type OrderStatus = Order["status"];
 type OrderEmailEvent = Doc<"orderEmailEvents">["event"];
 const statuses: OrderStatus[] = ["pending", "paid", "shipped", "delivered", "cancelled"];
+
 function availableStatusOptions(order: Order) {
   const options: OrderStatus[] = [order.status];
   if (order.status === "pending") {
-    if (order.paymentRisk?.status === "paid") options.push("paid");
-    if (!order.paymentRisk || order.paymentRisk.status === "failed") options.push("cancelled");
+    options.push("paid", "cancelled");
   } else if (order.status === "paid") {
-    options.push("shipped");
+    options.push("shipped", "cancelled");
   } else if (order.status === "shipped") {
     options.push("delivered");
   }
   return options;
 }
+
 const invoiceStatusLabels: Record<Doc<"invoiceRecords">["status"], string> = {
   queued: "Sırada",
   processing: "Düzenleniyor",
@@ -68,34 +58,6 @@ const emailStatusLabels: Record<Doc<"orderEmailEvents">["status"], string> = {
   failed: "Gönderilemedi",
   not_configured: "Resend ayarlı değil",
   review: "Gönderim sonucu kontrol edilmeli",
-};
-const paymentStatusLabels: Record<PaymentRisk["status"], string> = {
-  initializing: "Başlatılıyor",
-  pending: "Ödeme bekleniyor",
-  review: "İncelemede",
-  paid: "Onaylandı",
-  failed: "Başarısız",
-};
-const riskDecisionLabels: Record<Exclude<PaymentRisk["riskDecision"], null>, string> = {
-  allow: "Düşük risk",
-  review: "İnsan incelemesi gerekli",
-  blocked: "Sağlayıcı tarafından engellendi",
-};
-const riskReasonLabels: Record<string, string> = {
-  guest_checkout: "Misafir ödeme",
-  new_account: "Yeni hesap",
-  repeat_attempts: "Kısa sürede tekrarlanan denemeler",
-  previous_payment_failures: "Yakın zamanda başarısız ödemeler",
-  previous_provider_rejection: "Önceki işlem sağlayıcı tarafından reddedilmiş",
-  high_order_value: "Yüksek sipariş tutarı sinyali",
-  local_risk_hold: "Mağaza risk puanı nedeniyle ödeme beklemede",
-  manual_review_approved: "Yönetici incelemesiyle onaylandı",
-  provider_fraud_review: "Ödeme sağlayıcısı ek inceleme istiyor",
-  provider_rejected: "Ödeme sağlayıcısı fraud nedeniyle reddetti",
-  provider_risk_status_unknown: "Ödeme sağlayıcısı risk sonucu belirsiz",
-  provider_payment_failed: "Ödeme sağlayıcısı işlemi tamamlamadı",
-  basket_or_amount_mismatch: "Sipariş tutarı veya sepet doğrulaması uyuşmadı",
-  provider_verification_error: "Ödeme sonucu doğrulanamadı",
 };
 const shippingStatusLabels: Record<Doc<"shippingShipments">["status"], string> = {
   creating: "Gönderi oluşturuluyor",
@@ -119,72 +81,28 @@ const shippingErrorLabels: Record<string, string> = {
   transaction_reference_missing: "Satın alma yanıtında gönderi referansı bulunamadı.",
 };
 
-function OrderDetails({ order, onClose, onRetryInvoice, retryingInvoice, onRetryEmail, retryingEmailKey, onRefundSuccess, onShippingUpdate }: {
+function OrderDetails({
+  order,
+  onClose,
+  onRetryInvoice,
+  retryingInvoice,
+  onRetryEmail,
+  retryingEmailKey,
+  onActionSuccess,
+  onShippingUpdate,
+}: {
   order: Order;
   onClose: () => void;
   onRetryInvoice: () => void;
   retryingInvoice: boolean;
   onRetryEmail: (event: OrderEmailEvent) => void;
   retryingEmailKey: string | null;
-  onRefundSuccess: (message: string) => void;
+  onActionSuccess: (message: string) => void;
   onShippingUpdate: (record: Doc<"shippingShipments"> | null) => void;
 }) {
-  const [refundQuantities, setRefundQuantities] = useState<Record<number, string>>({});
-  const [refundMessage, setRefundMessage] = useState<string | null>(null);
-  const [refundError, setRefundError] = useState<string | null>(null);
-  const [refunding, setRefunding] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
-  const [approvingReview, setApprovingReview] = useState(false);
   const [shippingBusy, setShippingBusy] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [shippingMessage, setShippingMessage] = useState<string | null>(null);
-  const discountedLines = allocateCouponDiscount(order.items, order.couponDiscountKurus ?? 0);
-  const refundSelection = order.items.flatMap((item, itemIndex) => {
-    const quantity = Number(refundQuantities[itemIndex] ?? 0);
-    const refunded = order.refundedItems?.find((entry) => entry.itemIndex === itemIndex)?.quantity ?? 0;
-    const amountKurus = refundAmountForQuantity(discountedLines[itemIndex].payableKurus, item.quantity, refunded, quantity);
-    return quantity > 0 && amountKurus > 0 ? [{ itemIndex, quantity, amountKurus }] : [];
-  });
-  const refundEstimateKurus = refundSelection.reduce((sum, item) => sum + item.amountKurus, 0);
-
-  const approveRiskReview = async () => {
-    if (!order.paymentRisk?.reviewApprovable || approvingReview) return;
-    if (!window.confirm("Ödeme sağlayıcısı bu ödemeyi onayladı. Risk incelemesini tamamlayıp sipariş hazırlığını başlatalım mı?")) return;
-    setApprovingReview(true);
-    setReviewError(null);
-    try {
-      await runAdminAction("payment.approve-risk-review", { orderId: order._id });
-      onRefundSuccess("Ödeme onaylandı; sipariş hazırlık akışına alındı.");
-    } catch (cause) {
-      setReviewError(cause instanceof Error ? cause.message : "Ödeme incelemesi onaylanamadı.");
-    } finally {
-      setApprovingReview(false);
-    }
-  };
-
-  const submitRefund = async () => {
-    if (!refundSelection.length || refunding) return;
-    const amountLabel = formatMoney(refundEstimateKurus / 100);
-    if (!window.confirm(`${refundSelection.length} sipariş kalemi için yaklaşık ${amountLabel} iade isteği gönderilsin mi?`)) return;
-    setRefunding(true);
-    setRefundError(null);
-    setRefundMessage(null);
-    try {
-      const result = await runAdminAction<{ status: "pending" | "succeeded" | "failed" | "review"; amountKurus: number; message: string }>(
-        "order.refund",
-        {
-          orderId: order._id,
-          items: refundSelection.map(({ itemIndex, quantity }) => ({ itemIndex, quantity })),
-          idempotencyKey: crypto.randomUUID(),
-        },
-      );
-      onRefundSuccess(`${result.message} Tutar: ${formatMoney(result.amountKurus / 100)}.`);
-    } catch (cause) {
-      setRefundError(cause instanceof Error ? cause.message : "İade isteği gönderilemedi.");
-    } finally {
-      setRefunding(false);
-    }
-  };
 
   const runShippingAction = async (action: string, input: Record<string, string>) => {
     if (shippingBusy) return;
@@ -297,82 +215,6 @@ function OrderDetails({ order, onClose, onRetryInvoice, retryingInvoice, onRetry
               {shippingMessage && <AdminNotice kind="success">{shippingMessage}</AdminNotice>}
             </section>
           )}
-          {order.paymentRisk && (
-            <section className="space-y-2 border-t border-border pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Ödeme risk değerlendirmesi</h3>
-                <span className={`text-xs font-semibold ${order.paymentRisk.riskDecision === "review" || order.paymentRisk.riskDecision === "blocked" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
-                  {order.paymentRisk.riskDecision ? riskDecisionLabels[order.paymentRisk.riskDecision] : paymentStatusLabels[order.paymentRisk.status]}
-                </span>
-              </div>
-              <p className="text-sm text-foreground">
-                Risk puanı: {order.paymentRisk.riskScore === null ? "—" : `${order.paymentRisk.riskScore}/100`} · Ödeme: {paymentStatusLabels[order.paymentRisk.status]}
-              </p>
-              {order.paymentRisk.fraudStatus !== null && (
-                <p className="text-xs text-muted-foreground">iyzico fraudStatus: {order.paymentRisk.fraudStatus}</p>
-              )}
-              {order.paymentRisk.riskReasons.length > 0 && (
-                <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
-                  {order.paymentRisk.riskReasons.map((reason) => <li key={reason}>{riskReasonLabels[reason] ?? "Ödeme sağlayıcısı ek risk sinyali"}</li>)}
-                </ul>
-              )}
-              {order.paymentRisk.reviewApprovable && order.status === "pending" && (
-                <div className="space-y-2">
-                  {reviewError && <AdminNotice kind="error">{reviewError}</AdminNotice>}
-                  <Button type="button" size="sm" disabled={approvingReview} onClick={() => void approveRiskReview()}>
-                    {approvingReview ? "Ödeme onaylanıyor…" : "Ödemeyi onayla ve siparişi başlat"}
-                  </Button>
-                </div>
-              )}
-            </section>
-          )}
-          {(order.status === "paid" || order.status === "shipped" || order.status === "delivered") && (
-            <section className="space-y-3 border-t border-border pt-4">
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Ürün kalemlerinden iade</h3>
-                  <span className="text-xs tabular-nums text-muted-foreground">İade edilen/ayrılan {formatMoney((order.refundedKurus ?? 0) / 100)} / {formatMoney(order.total)}</span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">Her kalem için iade edilecek adedi seç. Kupon indirimi kalemlere dağıtılarak tutar sunucuda yeniden hesaplanır.</p>
-              </div>
-              <div className="divide-y divide-border rounded-md border border-border">
-                {order.items.map((item, itemIndex) => {
-                  const refunded = order.refundedItems?.find((entry) => entry.itemIndex === itemIndex)?.quantity ?? 0;
-                  const remaining = Math.max(0, item.quantity - refunded);
-                  const net = discountedLines[itemIndex].payableKurus;
-                  return (
-                    <div key={`${item.productId}-${itemIndex}`} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{remaining} adet iade edilebilir · net kalem {formatMoney(net / 100)}</p>
-                      </div>
-                      <div className="w-24">
-                        <Label htmlFor={`refund-quantity-${itemIndex}`} className="sr-only">{item.title} için iade adedi</Label>
-                        <Input
-                          id={`refund-quantity-${itemIndex}`}
-                          type="number"
-                          min={0}
-                          max={remaining}
-                          step={1}
-                          value={refundQuantities[itemIndex] ?? "0"}
-                          disabled={remaining === 0 || net === 0 || refunding}
-                          onChange={(event) => setRefundQuantities((current) => ({ ...current, [itemIndex]: event.target.value }))}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold tabular-nums text-foreground">Tahmini iade {formatMoney(refundEstimateKurus / 100)}</p>
-                <Button type="button" variant="outline" disabled={refunding || refundEstimateKurus <= 0} onClick={() => void submitRefund()}>
-                  {refunding ? "İade gönderiliyor…" : "Seçili kalemleri iade et"}
-                </Button>
-              </div>
-              {refundMessage && <AdminNotice kind="success">{refundMessage}</AdminNotice>}
-              {refundError && <AdminNotice kind="error">{refundError}</AdminNotice>}
-            </section>
-          )}
           <section className="space-y-2 border-t border-border pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">e-Fatura / e-Arşiv</h3>
@@ -417,7 +259,6 @@ function OrderDetails({ order, onClose, onRetryInvoice, retryingInvoice, onRetry
               <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Sipariş onay kayıtları</h3>
               <p className="text-xs text-muted-foreground">{order.legalAcceptance.distanceSalesAgreement.title} ve {order.legalAcceptance.preInformationForm.title}</p>
               <p className="text-xs text-muted-foreground">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(order.legalAcceptance.acceptedAt))} · belge sürümleri {order.legalAcceptance.distanceSalesAgreement.version} / {order.legalAcceptance.preInformationForm.version}</p>
-              <p className="text-xs text-muted-foreground">IP kaydı: {order.checkoutIpEncrypted ? "şifreli saklanıyor" : "bu sipariş için alınmadı"}</p>
             </section>
           )}
           <div className="space-y-2 border-t border-border pt-4">
@@ -549,11 +390,6 @@ function AdminOrdersContent() {
                   <p className="font-mono text-xs font-bold text-muted-foreground">#{order._id.slice(-8).toUpperCase()}</p>
                   <p className="mt-1 truncate text-sm font-semibold text-foreground">{order.customerName}</p>
                   <p className="truncate text-xs text-muted-foreground">{order.customerEmail}</p>
-                  {order.paymentRisk && (order.paymentRisk.riskDecision === "review" || order.paymentRisk.riskDecision === "blocked") && (
-                    <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                      Ödeme riski · {order.paymentRisk.riskScore ?? "—"}/100
-                    </p>
-                  )}
                 </div>
                 <p className="text-xs text-muted-foreground"><span className="mr-2 font-medium lg:hidden">Tarih</span>{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(order._creationTime))}</p>
                 <p className="text-sm font-semibold tabular-nums text-foreground">{formatMoney(order.total)}</p>
@@ -568,7 +404,26 @@ function AdminOrdersContent() {
         )}
       </Card>
 
-      {selectedOrder && <OrderDetails order={selectedOrder} onClose={closeOrder} onRetryInvoice={() => void retryInvoice(selectedOrder)} retryingInvoice={retryingInvoiceId === selectedOrder._id} onRetryEmail={(event) => void retryEmail(selectedOrder, event)} retryingEmailKey={retryingEmailKey} onRefundSuccess={(text) => { setMessage(text); setActionError(null); closeOrder(); void refresh(); }} onShippingUpdate={(record) => { setSelectedOrderOverride((current) => current?._id === selectedOrder._id ? { ...current, shippingShipment: record ?? undefined } : current); void refresh(); }} />}
+      {selectedOrder && (
+        <OrderDetails
+          order={selectedOrder}
+          onClose={closeOrder}
+          onRetryInvoice={() => void retryInvoice(selectedOrder)}
+          retryingInvoice={retryingInvoiceId === selectedOrder._id}
+          onRetryEmail={(event) => void retryEmail(selectedOrder, event)}
+          retryingEmailKey={retryingEmailKey}
+          onActionSuccess={(text) => {
+            setMessage(text);
+            setActionError(null);
+            closeOrder();
+            void refresh();
+          }}
+          onShippingUpdate={(record) => {
+            setSelectedOrderOverride((current) => current?._id === selectedOrder._id ? { ...current, shippingShipment: record ?? undefined } : current);
+            void refresh();
+          }}
+        />
+      )}
     </>
   );
 }

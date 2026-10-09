@@ -17,5 +17,5 @@
 - Katalog/yönetim listeleri 100, müşteri siparişleri 20, CMS listesi 50 kayıttır; daha büyük veri için sayfalama gerekir.
 - Müşteri başına en fazla 100 adres ve sepet satırı başına en fazla 999 adet vardır.
 - Örnek verileri sıfırlama, herhangi bir örnek veri tablosu 100 kaydı aşıyorsa silme başlamadan reddedilir. Daha büyük tablolar için toplu bakım gerekir.
-- Çevrim içi ödeme iyzico veya PayTR ile yapılandırılabilir. Bülten kaydı ve şifre değiştirme akışları henüz yoktur. Ödeme başlamadan `pending` sipariş kaydı oluşturulur; kart bilgileri uygulamada saklanmaz.
+- Bülten kaydı ve şifre değiştirme akışları henüz yoktur. Sipariş oluşturulduğunda `pending` durumunda kaydedilir.
 - Yerel kod değişiklikleri Convex dağıtımına kendiliğinden uygulanmaz. Convex ve Next.js uygulamaları aynı ortam için dağıtılmalıdır.

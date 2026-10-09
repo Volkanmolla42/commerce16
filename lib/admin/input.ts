@@ -1,5 +1,5 @@
 import type { Id } from "../../convex/_generated/dataModel";
-import type { CategoryAttributeDefinition } from "../catalog/attributes";
+import { parseCategoryAttributes } from "../catalog/attributes";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -23,47 +23,6 @@ function stringArray(value: unknown, label: string) {
     throw new Error(`${label} alanı geçersiz.`);
   }
   return value.map((item) => item.trim()).filter(Boolean);
-}
-
-function categoryAttributesValue(value: unknown): CategoryAttributeDefinition[] {
-  if (!Array.isArray(value) || value.length > 30) throw new Error("Kategoriye en fazla 30 özellik eklenebilir.");
-  const attributes = value.map((item): CategoryAttributeDefinition => {
-    if (!isRecord(item)) throw new Error("Kategori özelliği geçersiz.");
-    const type = item.type;
-    if (type !== "text" && type !== "number" && type !== "select" && type !== "boolean") {
-      throw new Error("Kategori özellik türü geçersiz.");
-    }
-    const key = stringValue(item.key, "Özellik anahtarı");
-    const label = stringValue(item.label, "Özellik adı");
-    const scope = item.scope === undefined ? undefined : item.scope;
-    if (scope !== undefined && scope !== "product" && scope !== "variant") throw new Error("Özelliğin kullanım alanı geçersiz.");
-    if (!/^[a-z][a-z0-9-]{0,39}$/.test(key)) throw new Error("Özellik anahtarı küçük harf, rakam ve tire içerebilir.");
-    if (!label || label.length > 80) throw new Error("Özellik adı 1-80 karakter olmalı.");
-    const options = item.options === undefined ? [] : stringArray(item.options, "Özellik seçenekleri");
-    if (options.length > 100) throw new Error("Kategori özelliğine en fazla 100 seçenek eklenebilir.");
-    if (new Set(options.map((option) => option.toLocaleLowerCase("tr-TR"))).size !== options.length) {
-      throw new Error("Özellik seçenekleri birbirinden farklı olmalı.");
-    }
-    const unit = item.unit === undefined || item.unit === "" ? undefined : stringValue(item.unit, "Ölçü birimi");
-    if (unit && (type !== "number" || unit.length > 20)) throw new Error("Ölçü birimi yalnızca sayısal özelliklerde, en fazla 20 karakter olabilir.");
-    if (type !== "select" && options.length > 0) throw new Error("Seçenekler yalnızca seçim listelerinde kullanılabilir.");
-    return {
-      key,
-      label,
-      type,
-      ...(scope ? { scope } : {}),
-      ...(unit ? { unit } : {}),
-      ...(type === "select" && options.length > 0 ? { options } : {}),
-      required: item.required === true,
-    };
-  });
-  if (new Set(attributes.map((attribute) => attribute.key)).size !== attributes.length) {
-    throw new Error("Özellik anahtarları birbirinden farklı olmalı.");
-  }
-  if (new Set(attributes.map((attribute) => attribute.label.toLocaleLowerCase("tr-TR"))).size !== attributes.length) {
-    throw new Error("Özellik adları birbirinden farklı olmalı.");
-  }
-  return attributes;
 }
 
 function productAttributesValue(value: unknown) {
@@ -253,7 +212,7 @@ export function parseCategoryInput(input: Record<string, unknown>) {
     title: stringValue(input.title, "Kategori adı"),
     slug,
     description: input.description === undefined ? "" : stringValue(input.description, "Açıklama"),
-    ...(Object.hasOwn(input, "attributes") ? { attributes: categoryAttributesValue(input.attributes) } : {}),
+    ...(Object.hasOwn(input, "attributes") ? { attributes: parseCategoryAttributes(input.attributes) } : {}),
     ...(Object.hasOwn(input, "imageStorageId")
       ? {
           imageStorageId: input.imageStorageId === null

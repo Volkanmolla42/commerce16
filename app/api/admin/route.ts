@@ -1,4 +1,6 @@
+import { parseAttributeTemplate } from "@/lib/catalog/attributes";
 import { getAdminBackend } from "@/lib/admin/backend";
+import { getAdminProductPage, getAdminProductStats } from "@/lib/catalog/pages";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -12,12 +14,26 @@ function invalidateCatalog(tag: "products" | "categories") {
   revalidatePath("/sitemap.xml");
 }
 
+function getAdminErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) return "İşlem tamamlanamadı.";
+
+  const rawMessage = error.message.trim();
+  const stackStart = rawMessage.search(/\s+at\s+[^()\r\n]+\([^\r\n)]*:\d+:\d+\)?/);
+  const message = (stackStart >= 0 ? rawMessage.slice(0, stackStart) : rawMessage.split(/\r?\n\s*at\s+/)[0])
+    .replace(/^\s*Server Error\s*/i, "")
+    .replace(/^\s*Uncaught Error:\s*/i, "")
+    .trim();
+
+  return message || "İşlem tamamlanamadı.";
+}
+
 function errorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : "İşlem tamamlanamadı.";
+  const rawMessage = error instanceof Error ? error.message : "";
+  const message = getAdminErrorMessage(error);
   const unavailable =
-    message.includes("ADMIN_API_SECRET") ||
-    message.includes("NEXT_PUBLIC_CONVEX_URL") ||
-    message.includes("Yönetici işlemi doğrulanamadı");
+    rawMessage.includes("ADMIN_API_SECRET") ||
+    rawMessage.includes("NEXT_PUBLIC_CONVEX_URL") ||
+    rawMessage.includes("Yönetici işlemi doğrulanamadı");
   const status = unavailable ? 503 : 400;
   return NextResponse.json({ error: message }, { status });
 }
@@ -35,6 +51,13 @@ export async function GET(request: NextRequest) {
       const categories = await client.mutation(api.categories.listAdmin, { adminSecret });
       return NextResponse.json(categories, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "category-attribute-presets") {
+      const presets = await client.query(api.categoryAttributePresets.listAdmin, {
+        adminSecret, search: request.nextUrl.searchParams.get("q") ?? "",
+        paginationOpts: { numItems: 8, cursor: request.nextUrl.searchParams.get("cursor") || null, maximumRowsRead: 128, maximumBytesRead: 2 * 1024 * 1024 },
+      });
+      return NextResponse.json(presets, { headers: { "Cache-Control": "no-store" } });
+    }
     if (resource === "settings") {
       const settings = await client.query(api.settings.getStoreSettings, {});
       return NextResponse.json(settings, { headers: { "Cache-Control": "no-store" } });
@@ -45,17 +68,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (resource === "products") {
-      const products = await client.query(api.products.listAllAdmin, { adminSecret });
+      const products = await getAdminProductPage(Object.fromEntries(request.nextUrl.searchParams));
       return NextResponse.json(products, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (resource === "product") {
+      const id = request.nextUrl.searchParams.get("id");
+      const product = id ? await client.query(api.products.getByIdAdmin, { adminSecret, id: id as Id<"products"> }) : null;
+      return NextResponse.json({ product }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (resource === "inventory-movements") {
+      const movements = await client.query(api.inventory.listMovements, { adminSecret, limit: 100 });
+      return NextResponse.json(movements, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "orders") {
       const orders = await client.query(api.orders.listAllAdmin, { adminSecret });
-      const [invoices, paymentRisks, shippingShipments, orderEmailEvents] = await Promise.all([
+      const [invoices, shippingShipments, orderEmailEvents] = await Promise.all([
         client.query(api.invoices.listAllAdmin, { adminSecret }),
-        client.query(api.checkoutPayments.listRiskForOrders, {
-          adminSecret,
-          orderIds: orders.map((order) => order._id),
-        }),
         client.query(api.shipping.listAllAdmin, { adminSecret }),
         client.query(api.notifications.listForOrdersAdmin, {
           adminSecret,
@@ -63,7 +91,6 @@ export async function GET(request: NextRequest) {
         }),
       ]);
       const invoiceByOrder = new Map(invoices.map((invoice) => [invoice.orderId, invoice]));
-      const riskByOrder = new Map(paymentRisks.map((risk) => [risk.orderId, risk]));
       const emailsByOrder = new Map<string, typeof orderEmailEvents>();
       for (const event of orderEmailEvents) {
         emailsByOrder.set(event.orderId, [...(emailsByOrder.get(event.orderId) ?? []), event]);
@@ -75,20 +102,19 @@ export async function GET(request: NextRequest) {
       const enrichedOrders = orders.map((order) => ({
         ...order,
         invoice: invoiceByOrder.get(order._id) ?? null,
-        paymentRisk: riskByOrder.get(order._id) ?? null,
         shippingShipment: shippingByOrder.get(order._id) ?? null,
         emailEvents: emailsByOrder.get(order._id) ?? [],
       }));
       return NextResponse.json(enrichedOrders, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "overview") {
-      const [products, categories, orders] = await Promise.all([
-        client.query(api.products.listAllAdmin, { adminSecret }),
+      const [productStats, categories, orders] = await Promise.all([
+        getAdminProductStats(),
         client.query(api.categories.list, {}),
         client.query(api.orders.listAllAdmin, { adminSecret }),
       ]);
       return NextResponse.json(
-        { products, categories, orders },
+        { productStats, categories, orders },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -275,6 +301,23 @@ export async function POST(request: NextRequest) {
         invalidateCatalog("categories");
         return NextResponse.json({ success: true, result });
       }
+      case "category-attribute-preset.create":
+      case "category-attribute-preset.update": {
+        const template = parseAttributeTemplate(input);
+        const result = body.action === "category-attribute-preset.update"
+          ? await client.mutation(api.categoryAttributePresets.update, {
+            adminSecret, id: stringValue(input.id, "Özellik") as Id<"categoryAttributePresets">, ...template,
+          })
+          : await client.mutation(api.categoryAttributePresets.create, { adminSecret, ...template });
+        return NextResponse.json({ success: true, result });
+      }
+      case "category-attribute-preset.delete": {
+        const result = await client.mutation(api.categoryAttributePresets.remove, {
+          adminSecret,
+          id: stringValue(input.id, "Özellik") as Id<"categoryAttributePresets">,
+        });
+        return NextResponse.json({ success: true, result });
+      }
       case "category.image-upload-url": {
         const uploadUrl = await client.mutation(api.categories.generateImageUploadUrl, { adminSecret });
         return NextResponse.json({ uploadUrl });
@@ -322,33 +365,7 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ success: true, result });
       }
-      case "payment.approve-risk-review": {
-        const result = await client.mutation(api.checkoutPayments.approveRiskHeldPayment, {
-          adminSecret,
-          orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-        });
-        return NextResponse.json({ success: true, result });
-      }
-      case "order.refund": {
-        const rawItems = input.items;
-        if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 100) {
-          throw new Error("İade kalemlerini seçin.");
-        }
-        const items = rawItems.map((value) => {
-          if (!isRecord(value) || typeof value.itemIndex !== "number" || typeof value.quantity !== "number") {
-            throw new Error("İade kalemi geçersiz.");
-          }
-          return { itemIndex: value.itemIndex, quantity: value.quantity };
-        });
-        const idempotencyKey = stringValue(input.idempotencyKey, "İade istek kimliği");
-        const result = await client.action(api.refunds.refundOrder, {
-          adminSecret,
-          orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-          items,
-          idempotencyKey,
-        });
-        return NextResponse.json(result);
-      }
+
       case "shipping.create": {
         const result = await client.action(api.shipping.createForPaidOrderAdmin, {
           adminSecret,

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useQuery } from "convex/react";
+import { useEffect, useId, useRef, useState } from "react";
 import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,10 +11,8 @@ import {
   MagnifyingGlassIcon,
   Squares2X2Icon,
 } from "@heroicons/react/24/outline";
-import { api } from "@/convex/_generated/api";
 import { formatMoney } from "@/lib/format-money";
-import { getProductSearchFields, normalizeSearchText, rankSearchItems } from "@/lib/catalog/smart-search";
-import { getProductPriceRange } from "@/lib/catalog/variants";
+import { normalizeSearchText } from "@/lib/catalog/smart-search";
 
 type SearchOption = {
   key: string;
@@ -44,11 +41,26 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
   const normalizedQuery = normalizeSearchText(query);
   const normalizedDebouncedQuery = normalizeSearchText(debouncedQuery);
   const shouldLoadSuggestions = isOpen && normalizedDebouncedQuery.length >= 2;
-  const productsData = useQuery(api.products.list, shouldLoadSuggestions ? { limit: 100 } : "skip");
-  const categoriesData = useQuery(api.categories.list, shouldLoadSuggestions ? {} : "skip");
+  const [options, setOptions] = useState<SearchOption[]>([]);
+  const [suggestionError, setSuggestionError] = useState(false);
+  const [completedQuery, setCompletedQuery] = useState("");
 
   useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedQuery(query), 140);
+    if (!shouldLoadSuggestions) return;
+    const controller = new AbortController();
+    fetch(`/api/catalog/search?q=${encodeURIComponent(debouncedQuery)}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Arama yüklenemedi");
+        const result: SearchOption[] = await response.json();
+        if (!controller.signal.aborted) { setOptions(result); setSuggestionError(false); setCompletedQuery(debouncedQuery); }
+      }).catch(() => {
+        if (!controller.signal.aborted) { setOptions([]); setSuggestionError(true); setCompletedQuery(debouncedQuery); }
+      });
+    return () => controller.abort();
+  }, [shouldLoadSuggestions, debouncedQuery]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedQuery(query), 250);
     return () => clearTimeout(timeout);
   }, [query]);
 
@@ -61,41 +73,7 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [isOpen]);
 
-  const options = useMemo<SearchOption[]>(() => {
-    if (!productsData || !categoriesData || normalizedDebouncedQuery.length < 2) return [];
-
-    const categoryMatches = rankSearchItems(
-      categoriesData,
-      debouncedQuery,
-      (category) => [category.title, category.slug, category.description, category.seo?.title, category.seo?.description],
-    ).slice(0, 3).map((category) => ({
-      key: `category-${category.slug}`,
-      kind: "category" as const,
-      title: category.title,
-      href: `/search/${encodeURIComponent(category.slug)}`,
-    }));
-
-    const productMatches = rankSearchItems(
-      productsData,
-      debouncedQuery,
-      getProductSearchFields,
-    ).slice(0, 5).map((product) => {
-      const priceRange = getProductPriceRange(product);
-      return {
-        key: `product-${product.slug}`,
-        kind: "product" as const,
-        title: product.title,
-        href: `/product/${encodeURIComponent(product.slug)}`,
-        image: product.images[0] ?? null,
-        price: priceRange.min,
-        maxPrice: priceRange.max,
-      };
-    });
-
-    return [...categoryMatches, ...productMatches];
-  }, [productsData, categoriesData, debouncedQuery, normalizedDebouncedQuery]);
-
-  const isQuerySettled = normalizedQuery === normalizedDebouncedQuery;
+  const isQuerySettled = normalizedQuery === normalizedDebouncedQuery && normalizeSearchText(completedQuery) === normalizedDebouncedQuery;
   const visibleOptions = isQuerySettled ? options : [];
   const panelIsVisible = isOpen && normalizedQuery.length >= 2;
 
@@ -226,13 +204,13 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
           aria-label="Arama önerileri"
           className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[min(70vh,28rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
         >
-          {!isQuerySettled || productsData === undefined || categoriesData === undefined ? (
+          {!isQuerySettled ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
               Öneriler hazırlanıyor...
             </p>
           ) : visibleOptions.length === 0 ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
-              Bu aramayla eşleşen ürün veya kategori bulunamadı.
+              {suggestionError ? "Arama önerileri yüklenemedi. Tüm sonuçları açabilirsiniz." : "Bu aramayla eşleşen ürün veya kategori bulunamadı."}
             </p>
           ) : (
             <>

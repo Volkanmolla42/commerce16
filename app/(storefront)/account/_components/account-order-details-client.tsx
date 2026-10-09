@@ -4,7 +4,6 @@ import { useQuery } from "convex/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -64,7 +63,7 @@ function OrderDetailsPrintButton() {
   );
 }
 
-function AccountOrderDetailsSkeleton() {
+export function AccountOrderDetailsSkeleton() {
   const stepLabels = [
     "Sipariş Alındı",
     orderStatusLabels.paid,
@@ -198,9 +197,11 @@ function AccountOrderDetailsSkeleton() {
   );
 }
 
-export default function OrderDetailPage() {
-  const { id: orderId } = useParams<{ id: string }>();
-
+export default function AccountOrderDetailsClient({
+  orderId,
+}: {
+  orderId: string;
+}) {
   const order = useQuery(
     api.orders.getOrderById,
     orderId ? { id: orderId as Id<"orders"> } : "skip"

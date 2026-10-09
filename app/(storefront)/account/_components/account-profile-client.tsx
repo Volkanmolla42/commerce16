@@ -30,7 +30,7 @@ function ProfileCardHeader({
   title: string;
 }) {
   return (
-    <CardHeader className="border-b border-border bg-muted/20 px-6 py-4">
+    <CardHeader className="border-b border-border px-6 py-4">
       <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
         <Icon className="h-5 w-5 text-primary" />
         <span>{title}</span>

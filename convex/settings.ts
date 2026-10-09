@@ -204,21 +204,11 @@ export const updateStoreSettings = mutation({
       if (existing.logoStorageId && existing.logoStorageId !== args.logoStorageId) {
         await ctx.storage.delete(existing.logoStorageId);
       }
-      if ("logoUrl" in existing) {
-        await ctx.db.replace(existing._id, {
-          key: "store",
-          ...next,
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        await ctx.db.patch(existing._id, {
-          ...next,
-          seoTitle: undefined,
-          seoDescription: undefined,
-          brandColor: undefined,
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      await ctx.db.replace(existing._id, {
+        key: "store",
+        ...next,
+        updatedAt: new Date().toISOString(),
+      });
     } else {
       await ctx.db.insert("storeSettings", {
         key: "store",

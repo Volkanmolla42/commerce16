@@ -33,7 +33,7 @@ import { VariantOptionValuesInput } from "./variant-option-values-input";
 type StoredImage = NonNullable<Doc<"products">["storageImages"]>[number] & {
   url: string | null;
 };
-export type Product = Omit<Doc<"products">, "seo" | "rating" | "complementaryProductIds" | "upsellProductIds"> & { storageImages?: StoredImage[] };
+export type Product = Omit<Doc<"products">, "priceValue" | "searchText"> & { storageImages?: StoredImage[] };
 export type Category = Doc<"categories">;
 type PendingImage = { id: string; blob: Blob; fileName: string; previewUrl: string };
 type VariantOptionDraft = { id: string; name: string; values: string[] };
@@ -224,6 +224,10 @@ function ProductEditor({
       name: option.name.trim(),
       values: option.values.map((v) => v.trim()).filter(Boolean),
     }));
+    if (options.length === 0) {
+      setError("Varyant kombinasyonlarını oluşturmak için en az bir seçenek ekleyin.");
+      return;
+    }
     if (options.some((option) => !option.name || option.values.length === 0)) {
       setError("Her seçenek için bir ad ve en az bir değer gir.");
       return;
@@ -387,7 +391,7 @@ function ProductEditor({
       return;
     }
     if (variantOptions.length === 0) {
-      setVariantOptions([{ id: createEditorId(), name: "Renk", values: [] }]);
+      setVariantOptions([{ id: createEditorId(), name: "", values: [] }]);
     }
     setIsVariantProduct(true);
   };
@@ -541,11 +545,11 @@ function ProductEditor({
       return;
     }
     if (activeVariantRows.length > 100) {
-      setError("Bir üründe en fazla 100 varyant olabilir.");
+      setError("Bir üründe en fazla 100 kombinasyon olabilir.");
       return;
     }
     if (isVariantProduct && (activeOptions.length === 0 || activeOptions.some((option) => !option.name || option.values.length === 0))) {
-      setError("Varyant seçeneklerine ad ve en az bir değer gir.");
+      setError("Kombinasyon seçeneklerine ad ve en az bir değer gir.");
       return;
     }
     if (isVariantProduct && variantOptionSignature(activeOptions) !== generatedOptionSignature) {
@@ -573,7 +577,7 @@ function ProductEditor({
       variant.selectedOptions.length !== activeOptions.length ||
       activeOptions.some((option) => !variant.selectedOptions.some((selected) => normalizeOptionKey(selected.name) === normalizeOptionKey(option.name) && option.values.includes(selected.value))),
     )) {
-      setError("Varyant tablosunu güncel seçeneklerle yeniden oluştur.");
+      setError("Kombinasyon tablosunu güncel seçeneklerle yeniden oluştur.");
       return;
     }
     if (!baseVatRate.trim() || !/^\d+(?:[.,]\d{1,2})?$/.test(baseVatRate.trim()) || Number(baseVatRate.replace(",", ".")) > 100) {
@@ -581,7 +585,7 @@ function ProductEditor({
       return;
     }
     if (new Set(activeVariantRows.map((variant) => selectionKey(variant.selectedOptions))).size !== activeVariantRows.length) {
-      setError("Varyant kombinasyonları birbirinden farklı olmalı.");
+      setError("Kombinasyonlar birbirinden farklı olmalı.");
       return;
     }
     if (!/^\d+(?:[.,]\d{1,2})?$/.test(basePrice) || !Number.isSafeInteger(Math.round(Number(basePrice.replace(",", ".")) * 100))) {
@@ -591,12 +595,12 @@ function ProductEditor({
     for (const draft of activeVariantRows) {
       const variantStock = draft.stockQuantity.trim();
       if (!variantStock || !/^\d+$/.test(variantStock) || !Number.isSafeInteger(Number(variantStock))) {
-        setError("Her varyant için sıfır veya daha büyük bir stok adedi girin.");
+        setError("Her kombinasyon için sıfır veya daha büyük bir stok adedi girin.");
         return;
       }
       const variantSku = draft.sku.trim();
       if (!variantSku) {
-        setError("Her varyant için ayrı bir SKU girin.");
+        setError("Her kombinasyon için ayrı bir SKU girin.");
         return;
       }
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(variantSku)) {
@@ -604,12 +608,12 @@ function ProductEditor({
         return;
       }
       if (!/^\d+(?:[.,]\d{1,2})?$/.test(draft.price.trim()) || !Number.isSafeInteger(Math.round(Number(draft.price.replace(",", ".")) * 100))) {
-        setError("Her varyant için geçerli bir satış fiyatı gir.");
+      setError("Her kombinasyon için geçerli bir satış fiyatı gir.");
         return;
       }
     }
     if (new Set(activeVariantRows.map((variant) => variant.sku.trim().toLocaleUpperCase("en-US"))).size !== activeVariantRows.length) {
-      setError("Her varyantın SKU kodu birbirinden farklı olmalı.");
+      setError("Her kombinasyonun SKU kodu birbirinden farklı olmalı.");
       return;
     }
     if (storageImages.length + pendingImages.length > 20) {
@@ -689,7 +693,8 @@ function ProductEditor({
 
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
-          <section aria-label="Görseller" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-5">
+          <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-5">
+            <h2 className="text-sm font-semibold text-neutral-100">Görseller</h2>
             <label htmlFor="product-image-upload" className={`flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-950 p-4 text-center transition hover:border-neutral-500 hover:bg-neutral-800/70 ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
               <span className="grid size-9 place-items-center rounded-full bg-neutral-800 text-neutral-300"><PlusCircleIcon className="size-5" /></span>
               <strong className="text-xs font-medium text-neutral-200">
@@ -714,8 +719,9 @@ function ProductEditor({
               </div>)}
             </div>}
           </section>
-          <section aria-label="Ürün detayları" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
+          <section aria-label="Ürün Bilgileri" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
             <div className="space-y-5">
+              <h2 className="text-sm font-semibold text-neutral-100">Ürün Bilgileri</h2>
               <div className="grid gap-4 sm:grid-cols-[1fr_10rem] sm:items-start">
                 <div className="space-y-2">
                   <Label htmlFor="product-title" className="text-xs font-medium text-neutral-300">Ürün adı <span className="text-red-400">*</span></Label>
@@ -743,7 +749,7 @@ function ProductEditor({
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div className="grid gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="product-category" className="text-xs font-medium text-neutral-300">Kategori <span className="text-red-400">*</span></Label>
                   <select id="product-category" name="categorySlug" required value={categorySlug} onChange={(event) => changeCategory(event.target.value)} className="h-11 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 text-sm text-neutral-100 outline-none focus:ring-2 focus:ring-neutral-400/30">
@@ -751,11 +757,6 @@ function ProductEditor({
                     {categories.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
                   </select>
                 </div>
-                <label className="flex h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-950/60 px-4 text-xs font-medium text-neutral-200 hover:border-neutral-700">
-                  <input type="checkbox" checked={isVariantProduct} onChange={toggleVariantProduct} className="size-4 accent-neutral-200" />
-                  <Squares2X2Icon className="size-4 text-neutral-400" />
-                  <span>Varyantlı ürün</span>
-                </label>
               </div>
 
               {categoryAttributes.length > 0 ? (
@@ -866,38 +867,56 @@ function ProductEditor({
                   Bu kategori için özellik tanımlanmamış.
                 </div>
               ) : null}
+            </div>
+          </section>
 
+          <section aria-label="Varyantlar" className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:p-6">
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-neutral-100">Varyantlar</h2>
+                <label className="flex h-10 cursor-pointer items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-950/60 px-4 text-xs font-medium text-neutral-200 hover:border-neutral-700">
+                  <input type="checkbox" checked={isVariantProduct} onChange={toggleVariantProduct} className="size-4 accent-neutral-200" />
+                  <Squares2X2Icon className="size-4 text-neutral-400" />
+                  <span>Varyantlı ürün</span>
+                </label>
+              </div>
               {isVariantProduct ? (
                 <>
                   <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h4 className="text-xs font-semibold text-neutral-200">Kombinasyon Seçenekleri</h4>
+                      <h4 className="text-xs font-semibold text-neutral-200">Varyant seçenekleri</h4>
                       <Button type="button" variant="outline" className="min-h-9 rounded-lg border-neutral-700 bg-neutral-950 px-3 text-xs text-neutral-200 hover:bg-neutral-800" disabled={variantOptions.length >= 3} onClick={addVariantOption}>
                         <PlusCircleIcon className="mr-2 size-4" /> Seçenek ekle
                       </Button>
                     </div>
-                    {variantOptions.map((option, index) => (
-                      <div key={option.id} className="grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
-                        <div className="space-y-1.5">
-                          <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-neutral-400">Seçenek adı</Label>
-                          <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-sm text-neutral-100" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-neutral-400">Değerler</Label>
-                          <VariantOptionValuesInput
-                            values={option.values}
-                            onChange={(nextValues) =>
-                              setVariantOptions((current) =>
-                                current.map((item) => (item.id === option.id ? { ...item, values: nextValues } : item))
-                              )
-                            }
-                          />
-                        </div>
-                        <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} disabled={variantOptions.length <= 1} onClick={() => setVariantOptions((current) => current.filter((item) => item.id !== option.id))}>
-                          <TrashIcon className="size-4" />
-                        </Button>
+                    {variantOptions.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-neutral-800 p-4 text-center text-xs text-neutral-400">
+                        Henüz seçenek eklenmedi. Başlamak için yukarıdaki &quot;Seçenek ekle&quot; butonuna tıklayın.
                       </div>
-                    ))}
+                    ) : (
+                      variantOptions.map((option, index) => (
+                        <div key={option.id} className="grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-neutral-400">Seçenek adı</Label>
+                            <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-sm text-neutral-100" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-neutral-400">Değerler</Label>
+                            <VariantOptionValuesInput
+                              values={option.values}
+                              onChange={(nextValues) =>
+                                setVariantOptions((current) =>
+                                  current.map((item) => (item.id === option.id ? { ...item, values: nextValues } : item))
+                                )
+                              }
+                            />
+                          </div>
+                          <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} onClick={() => setVariantOptions((current) => current.filter((item) => item.id !== option.id))}>
+                            <TrashIcon className="size-4" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
                     <div className="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-800 pt-3">
                       <Button type="button" variant="secondary" className="min-h-9 rounded-lg px-3 text-xs" onClick={generateVariantRows}>
                         <ArrowPathIcon className="mr-1.5 size-3.5" />
@@ -923,22 +942,22 @@ function ProductEditor({
                         <tbody className="divide-y divide-neutral-800">
                           {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)}>
                             <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-neutral-200">{variant.selectedOptions.map(({ value }) => value).join(" / ")}</td>
-                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Varyant ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Varyant ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
-                            <td className="w-20 px-2 py-3"><Input aria-label={`Varyant ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                            <td className="w-28 px-2 py-3"><Input aria-label={`Varyant ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
-                            <td className="px-3 py-3"><input aria-label={`Varyant ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" /></td>
-                            <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Varyant ${index + 1} kombinasyonunu kaldır`} className="min-h-9 px-2 text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
+                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
+                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 font-mono text-xs text-neutral-100" /></td>
+                            <td className="w-20 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
+                            <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-neutral-700 bg-neutral-950 text-xs text-neutral-100" /></td>
+                            <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-neutral-200" /></td>
+                            <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-9 px-2 text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
                           </tr>)}
                         </tbody>
                       </table>
                     </div>
 
                     <div className="space-y-3 md:hidden">
-                      {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Varyant ${index + 1}`} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
+                      {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Kombinasyon ${index + 1}`} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200">{selected.name}: {selected.value}</span>)}</div>
-                          <Button type="button" variant="ghost" aria-label={`Varyant ${index + 1} kombinasyonunu kaldır`} className="min-h-8 px-2 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
+                          <Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-8 px-2 text-xs text-neutral-400 hover:bg-rose-950 hover:text-rose-300" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
                         </div>
                         <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-neutral-400">SKU <span className="text-red-400">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
                         <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-neutral-400">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-neutral-700 bg-neutral-900 font-mono text-sm text-neutral-100" /></div>
@@ -1065,9 +1084,9 @@ export function ProductEditorRoute({ productId }: { productId?: string }) {
 
 function ProductEditorData({ productId }: { productId?: string }) {
   const router = useRouter();
-  const { data: products, loading: productsLoading, error: productsError } = useAdminResource<Product[]>("products");
+  const { data: productData, loading: productsLoading, error: productsError } = useAdminResource<{ product: Product | null }>("product", productId ? { id: productId } : {});
   const { data: categories, loading: categoriesLoading, error: categoriesError } = useAdminResource<Category[]>("categories");
-  const product = productId ? products?.find((candidate) => candidate._id === productId) ?? null : null;
+  const product = productData?.product ?? null;
   const loading = categoriesLoading || (Boolean(productId) && productsLoading);
   const error = categoriesError || (productId && productsError) || null;
 

@@ -4,8 +4,7 @@ import { HeartIcon } from "@heroicons/react/24/outline";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import Grid from "@/components/grid";
-import { GridTileImage } from "@/components/grid/tile";
-import { FavoriteButton } from "./favorite-button";
+import ProductGridItems from "@/components/layout/product-grid-items";
 import { useFavorites } from "./favorites-context";
 import Link from "next/link";
 import { Button, Card } from "@/components/ui";
@@ -26,50 +25,27 @@ export function FavoriteProducts() {
   }
 
   const favoriteProducts = products ?? [];
+  const displayProducts = favoriteProducts.map((product) =>
+    product.images[0] ? product : { ...product, images: [EMPTY_PRODUCT_IMAGE] },
+  );
 
   return (
     <section className="space-y-6">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            {favoriteProducts.length} ürün kaydedildi
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">
-            Favorilerim
-          </h1>
-        </div>
-      </header>
-
       {favoriteProducts.length ? (
         <Grid className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          {favoriteProducts.map((product) => (
-            <Grid.Item key={product.slug} className="relative animate-fadeIn">
-              <Link
-                className="relative block h-full w-full"
-                href={`/product/${product.slug}`}
-                prefetch={true}
-              >
-                <GridTileImage
-                  alt={product.title}
-                  label={{ title: product.title, amount: product.price, currencyCode: "TRY" }}
-                  src={product.images[0] || EMPTY_PRODUCT_IMAGE}
-                  fill
-                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-                />
-              </Link>
-              <FavoriteButton
-                product={product}
-                className="absolute right-3 top-3 z-10 h-11 w-11"
-              />
-            </Grid.Item>
-          ))}
+          <ProductGridItems
+            products={displayProducts}
+            imageSizes="(min-width: 1280px) 18vw, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, 50vw"
+            cardLayout="stacked"
+            imageFit="cover"
+          />
         </Grid>
       ) : (
-        <Card className="mx-auto flex max-w-lg flex-col items-center rounded-3xl p-8 text-center shadow-xs sm:p-12">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <HeartIcon aria-hidden="true" className="h-7 w-7" />
-          </span>
-          <h2 className="mt-4 text-lg font-semibold">Henüz favori ürününüz yok</h2>
+        <Card className="rounded-3xl border-border bg-card p-12 text-center shadow-xs">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <HeartIcon aria-hidden="true" className="h-8 w-8" />
+          </div>
+          <h2 className="mt-4 text-lg font-bold text-foreground">Henüz favori ürününüz yok</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Beğendiğiniz ürünleri kalp simgesine dokunarak burada saklayabilirsiniz.
           </p>

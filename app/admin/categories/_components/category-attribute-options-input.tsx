@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { ATTRIBUTE_OPTION_LIMIT, normalizeAttributeLabel } from "@/lib/catalog/attributes";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 export function CategoryAttributeOptionsInput({
@@ -14,24 +15,32 @@ export function CategoryAttributeOptionsInput({
   disabled?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addValues = (raw: string) => {
+    if (disabled) return;
     const candidates = raw
       .split(/[,;\n]/)
       .map((item) => item.trim())
       .filter(Boolean);
     if (candidates.length === 0) return;
 
-    const existingLower = new Set(options.map((o) => o.toLocaleLowerCase("tr-TR")));
+    const existingLower = new Set(options.map(normalizeAttributeLabel));
     const added: string[] = [];
     for (const cand of candidates) {
-      const lower = cand.toLocaleLowerCase("tr-TR");
+      const lower = normalizeAttributeLabel(cand);
       if (!existingLower.has(lower)) {
         existingLower.add(lower);
         added.push(cand);
       }
     }
+    if (options.length + added.length > ATTRIBUTE_OPTION_LIMIT) {
+      setError(`En fazla ${ATTRIBUTE_OPTION_LIMIT} seçenek eklenebilir.`);
+      return;
+    }
+    setError(null);
     if (added.length > 0) {
       onChange([...options, ...added]);
     }
@@ -39,13 +48,14 @@ export function CategoryAttributeOptionsInput({
   };
 
   const removeAt = (index: number) => {
+    setError(null);
     onChange(options.filter((_, i) => i !== index));
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing) return;
 
-    if (event.key === "Enter" || event.key === ",") {
+    if (event.key === "Enter" || event.key === "," || event.key === ";") {
       event.preventDefault();
       addValues(draft);
     } else if (event.key === "Backspace" && !draft && options.length > 0) {
@@ -65,12 +75,12 @@ export function CategoryAttributeOptionsInput({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-foreground">
+        <label htmlFor={id} className="font-medium text-foreground">
           Seçenekler <span className="text-destructive">*</span>
-        </span>
+        </label>
         {options.length > 0 && (
           <span className="text-muted-foreground text-[11px]" aria-live="polite">
-            {options.length} seçenek
+            {options.length} / {ATTRIBUTE_OPTION_LIMIT} seçenek
           </span>
         )}
       </div>
@@ -107,6 +117,7 @@ export function CategoryAttributeOptionsInput({
 
         <div className="flex flex-1 items-center min-w-[100px]">
           <input
+            id={id}
             ref={inputRef}
             type="text"
             disabled={disabled}
@@ -116,7 +127,9 @@ export function CategoryAttributeOptionsInput({
             autoCorrect="off"
             spellCheck={false}
             aria-label="Yeni seçenek ekle"
-            onChange={(e) => setDraft(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${id}-error` : undefined}
+            onChange={(e) => { setDraft(e.target.value); setError(null); }}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onBlur={() => {
@@ -139,6 +152,7 @@ export function CategoryAttributeOptionsInput({
           </Button>
         )}
       </div>
+      {error && <p id={`${id}-error`} role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

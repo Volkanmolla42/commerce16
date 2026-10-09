@@ -1,6 +1,7 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
+import { insertCatalogProduct, deleteCatalogProduct } from "./catalogModel";
 
 const initialProducts = [
   {
@@ -73,7 +74,8 @@ export const seedDatabase = mutation({
       if ([products, categories].some((rows) => rows.length > 100)) {
         throw new Error("Örnek veri sıfırlama tablo başına en fazla 100 kayıt destekler. Daha büyük veri için ayrı toplu bakım kullanın.");
       }
-      for (const row of [...products, ...categories]) await ctx.db.delete(row._id);
+      for (const product of products) await deleteCatalogProduct(ctx, product);
+      for (const category of categories) await ctx.db.delete(category._id);
     } else {
       const existing = await Promise.all([
         ctx.db.query("products").first(),
@@ -84,7 +86,7 @@ export const seedDatabase = mutation({
     const updatedAt = new Date().toISOString();
 
     for (const prod of initialProducts) {
-      await ctx.db.insert("products", { ...prod, updatedAt });
+      await insertCatalogProduct(ctx, { ...prod, updatedAt });
     }
 
     for (const cat of initialCategories) {

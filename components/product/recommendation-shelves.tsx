@@ -199,7 +199,7 @@ export function BoughtTogetherShelf({
   );
 }
 
-function mapRecommendationProduct(product: Doc<"products">): Product {
+function mapRecommendationProduct(product: Omit<Doc<"products">, "priceValue" | "searchText">): Product {
   return {
     id: product._id,
     slug: product.slug,

@@ -17,7 +17,7 @@ const Price = ({
 } & React.ComponentProps<"p">) => (
   <p className={className} {...props}>
     <span>{formatMoney(amount, currencyCode)}</span>
-    {maxAmount && Number(maxAmount) !== Number(amount) && <><span aria-hidden="true"> ile </span><span>{formatMoney(maxAmount, currencyCode)}</span></>}
+    {maxAmount && Number(maxAmount) !== Number(amount) && <><span aria-hidden="true" className="mx-1">ile</span><span>{formatMoney(maxAmount, currencyCode)}</span></>}
     <span
       className={clsx("ml-1 inline", currencyCodeClassName)}
     >{`${currencyCode}`}</span>

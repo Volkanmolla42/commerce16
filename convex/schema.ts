@@ -2,6 +2,12 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
+const attributeTemplateFields = {
+  label: v.string(),
+  type: v.union(v.literal("text"), v.literal("number"), v.literal("select"), v.literal("multiselect"), v.literal("boolean")),
+  unit: v.optional(v.string()), options: v.optional(v.array(v.string())), required: v.boolean(),
+};
+
 export default defineSchema({
   ...authTables,
 
@@ -9,9 +15,10 @@ export default defineSchema({
     slug: v.string(),
     title: v.string(),
     price: v.string(),
+    priceValue: v.number(),
+    searchText: v.string(),
     sku: v.optional(v.string()),
     vatRate: v.optional(v.number()),
-    compareAtPriceKurus: v.optional(v.union(v.number(), v.null())),
     availableForSale: v.boolean(),
     stockQuantity: v.optional(v.union(v.number(), v.null())),
     brand: v.optional(v.string()),
@@ -20,12 +27,7 @@ export default defineSchema({
       key: v.string(),
       value: v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
     }))),
-    // Legacy catalog rating. New code derives ratings from verified reviews.
-    rating: v.optional(v.number()),
     categorySlug: v.optional(v.string()),
-    // Legacy curated recommendations. New code derives recommendations from catalog and order data.
-    complementaryProductIds: v.optional(v.array(v.id("products"))),
-    upsellProductIds: v.optional(v.array(v.id("products"))),
     images: v.array(v.string()),
     storageImages: v.optional(
       v.array(
@@ -61,57 +63,53 @@ export default defineSchema({
           sku: v.optional(v.string()),
           barcode: v.optional(v.string()),
           vatRate: v.optional(v.number()),
-          compareAtPriceKurus: v.optional(v.union(v.number(), v.null())),
           stockQuantity: v.optional(v.union(v.number(), v.null())),
           storageImageId: v.optional(v.union(v.id("_storage"), v.null())),
         })
       )
     ),
-    // Legacy field stays optional while the admin product list removes it from existing rows.
-    seo: v.optional(
-      v.object({
-        title: v.string(),
-        description: v.string(),
-      })
-    ),
     updatedAt: v.string(),
   })
     .index("by_slug", ["slug"])
     .index("by_available", ["availableForSale"])
-    .index("by_category", ["categorySlug"]),
+    .index("by_category", ["categorySlug"])
+    .index("by_available_and_category", ["availableForSale", "categorySlug"])
+    .index("by_priceValue", ["priceValue"])
+    .index("by_category_and_priceValue", ["categorySlug", "priceValue"])
+    .index("by_available_and_priceValue", ["availableForSale", "priceValue"])
+    .index("by_available_and_category_and_priceValue", ["availableForSale", "categorySlug", "priceValue"])
+    .searchIndex("search_catalog", { searchField: "searchText", filterFields: ["availableForSale", "categorySlug"] }),
+
+  catalogStats: defineTable({
+    key: v.string(), total: v.number(), active: v.number(),
+  }).index("by_key", ["key"]),
+
+  catalogFacetValues: defineTable({
+    categorySlug: v.string(), key: v.string(), value: v.string(),
+    numericValue: v.optional(v.number()), count: v.number(),
+  }).index("by_category_and_key_and_value", ["categorySlug", "key", "value"])
+    .index("by_category_and_key_and_numericValue", ["categorySlug", "key", "numericValue"]),
 
   categories: defineTable({
     slug: v.string(),
     title: v.string(),
     description: v.string(),
     path: v.string(),
-    parentId: v.optional(v.union(v.id("categories"), v.null())),
     imageStorageId: v.optional(v.union(v.id("_storage"), v.null())),
     attributes: v.optional(v.array(v.object({
       key: v.string(),
-      label: v.string(),
-      type: v.union(
-        v.literal("text"),
-        v.literal("number"),
-        v.literal("select"),
-        v.literal("multiselect"),
-        v.literal("boolean")
-      ),
-      unit: v.optional(v.string()),
-      options: v.optional(v.array(v.string())),
-      required: v.boolean(),
-      filterable: v.optional(v.boolean()),
+      ...attributeTemplateFields,
     }))),
-    // Legacy field stays optional while admin listing removes it from existing rows.
-    seo: v.optional(v.object({
-      title: v.string(),
-      description: v.string(),
-    })),
     updatedAt: v.string(),
   })
     .index("by_slug", ["slug"])
-    .index("by_parent", ["parentId"])
     .index("by_image_storage", ["imageStorageId"]),
+
+  categoryAttributePresets: defineTable({
+    ...attributeTemplateFields,
+    normalizedLabel: v.string(),
+  }).index("by_normalized_label", ["normalizedLabel"])
+    .searchIndex("search_label", { searchField: "normalizedLabel" }),
 
   coupons: defineTable({
     code: v.string(),
@@ -153,8 +151,6 @@ export default defineSchema({
     couponDiscountKurus: v.optional(v.number()),
     couponReserved: v.optional(v.boolean()),
     couponRedeemed: v.optional(v.boolean()),
-    refundedKurus: v.optional(v.number()),
-    refundedItems: v.optional(v.array(v.object({ itemIndex: v.number(), quantity: v.number(), amountKurus: v.number() }))),
     status: v.union(
       v.literal("pending"),
       v.literal("paid"),
@@ -166,7 +162,6 @@ export default defineSchema({
     inventoryReserved: v.optional(v.boolean()),
     reservationExpiresAt: v.optional(v.number()),
     analyticsSessionId: v.optional(v.string()),
-    checkoutIpEncrypted: v.optional(v.string()),
     shippingAddress: v.optional(v.string()),
     city: v.optional(v.string()),
     district: v.optional(v.string()),
@@ -194,7 +189,6 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
-    .index("by_user_and_status", ["userId", "status"])
     .index("by_analytics_session_id", ["analyticsSessionId"]),
 
   analyticsSessions: defineTable({
@@ -228,8 +222,7 @@ export default defineSchema({
   })
     .index("by_order_id", ["orderId"])
     .index("by_paid_at", ["paidAt"])
-    .index("by_visitor_id", ["visitorId"])
-    .index("by_source_and_paid_at", ["source", "paidAt"]),
+    .index("by_visitor_id", ["visitorId"]),
 
   analyticsMarketingSpend: defineTable({
     month: v.string(),
@@ -261,8 +254,7 @@ export default defineSchema({
     attempts: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_order", ["orderId"])
-    .index("by_status", ["status"]),
+    .index("by_order", ["orderId"]),
 
   orderEmailEvents: defineTable({
     orderId: v.id("orders"),
@@ -282,8 +274,7 @@ export default defineSchema({
     sentAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
-    .index("by_order_and_event", ["orderId", "event"])
-    .index("by_status", ["status"]),
+    .index("by_order_and_event", ["orderId", "event"]),
 
   providerTokens: defineTable({
     provider: v.literal("parasut"),
@@ -314,9 +305,7 @@ export default defineSchema({
     expiresAt: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_order", ["orderId"])
-    .index("by_status_and_expiry", ["status", "expiresAt"]),
+  }).index("by_order", ["orderId"]),
 
   inventoryMovements: defineTable({
     productId: v.id("products"),
@@ -334,53 +323,9 @@ export default defineSchema({
     orderId: v.optional(v.id("orders")),
     createdAt: v.number(),
   })
-    .index("by_product", ["productId", "createdAt"])
-    .index("by_order", ["orderId"])
-    .index("by_created_at", ["createdAt"]),
+    .index("by_product", ["productId", "createdAt"]),
 
-  checkoutPayments: defineTable({
-    orderId: v.id("orders"),
-    provider: v.union(v.literal("iyzico"), v.literal("paytr")),
-    status: v.union(
-      v.literal("initializing"),
-      v.literal("pending"),
-      v.literal("review"),
-      v.literal("paid"),
-      v.literal("failed"),
-    ),
-    conversationId: v.string(),
-    token: v.optional(v.string()),
-    merchantOid: v.optional(v.string()),
-    paymentId: v.optional(v.string()),
-    paymentPageUrl: v.optional(v.string()),
-    emailHash: v.optional(v.string()),
-    riskScore: v.optional(v.number()),
-    riskDecision: v.optional(v.union(v.literal("allow"), v.literal("review"), v.literal("blocked"))),
-    riskReasons: v.optional(v.array(v.string())),
-    fraudStatus: v.optional(v.union(v.literal(-1), v.literal(0), v.literal(1))),
-    expiresAt: v.number(),
-  })
-    .index("by_order", ["orderId"])
-    .index("by_token", ["token"])
-    .index("by_merchant_oid", ["merchantOid"])
-    .index("by_email_hash", ["emailHash"])
-    .index("by_status_and_expiry", ["status", "expiresAt"]),
 
-  refunds: defineTable({
-    orderId: v.id("orders"),
-    paymentId: v.id("checkoutPayments"),
-    provider: v.union(v.literal("iyzico"), v.literal("paytr")),
-    idempotencyKey: v.string(),
-    status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed"), v.literal("review")),
-    amountKurus: v.number(),
-    items: v.array(v.object({ itemIndex: v.number(), quantity: v.number(), amountKurus: v.number() })),
-    providerReference: v.optional(v.string()),
-    errorMessage: v.optional(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_order_and_created_at", ["orderId", "createdAt"])
-    .index("by_idempotency_key", ["idempotencyKey"]),
 
   shippingShipments: defineTable({
     orderId: v.id("orders"),
@@ -411,9 +356,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
     purchasedAt: v.optional(v.number()),
-  })
-    .index("by_order_and_created_at", ["orderId", "createdAt"])
-    .index("by_geliver_shipment_id", ["geliverShipmentId"]),
+  }).index("by_order_and_created_at", ["orderId", "createdAt"]),
 
   abandonedCarts: defineTable({
     sessionKey: v.string(),
@@ -455,48 +398,6 @@ export default defineSchema({
     .index("by_unsubscribe_token", ["unsubscribeToken"])
     .index("by_restore_token", ["restoreToken"]),
 
-  reviewUploads: defineTable({
-    userId: v.id("users"),
-    productId: v.id("products"),
-    storageId: v.id("_storage"),
-    mediaType: v.union(v.literal("image"), v.literal("video")),
-    size: v.number(),
-    createdAt: v.string(),
-    reviewId: v.optional(v.id("reviews")),
-  })
-    .index("by_user_and_product", ["userId", "productId"])
-    .index("by_review", ["reviewId"]),
-
-  reviews: defineTable({
-    productId: v.id("products"),
-    userId: v.id("users"),
-    authorName: v.string(),
-    rating: v.number(),
-    title: v.string(),
-    body: v.string(),
-    media: v.array(v.object({
-      storageId: v.id("_storage"),
-      mediaType: v.union(v.literal("image"), v.literal("video")),
-    })),
-    createdAt: v.string(),
-  })
-    .index("by_product", ["productId"])
-    .index("by_user_and_product", ["userId", "productId"]),
-
-  pages: defineTable({
-    title: v.string(),
-    slug: v.string(),
-    body: v.string(),
-    bodySummary: v.string(),
-    seo: v.optional(
-      v.object({
-        title: v.string(),
-        description: v.string(),
-      })
-    ),
-    updatedAt: v.string(),
-  }).index("by_slug", ["slug"]),
-
   storeSettings: defineTable({
     key: v.literal("store"),
     storeName: v.string(),
@@ -506,15 +407,10 @@ export default defineSchema({
     email: v.optional(v.string()),
     address: v.optional(v.string()),
     announcement: v.optional(v.string()),
-    // Legacy value ignored; storefront colors now come from the static theme.
-    brandColor: v.optional(v.string()),
     shippingCutoffMinutes: v.optional(v.union(v.number(), v.null())),
     shippingDays: v.optional(v.array(v.number())),
     shippingFeeKurus: v.optional(v.number()),
     freeShippingThresholdKurus: v.optional(v.union(v.number(), v.null())),
-    // Legacy fields are ignored; storefront metadata is generated from store content.
-    seoTitle: v.optional(v.string()),
-    seoDescription: v.optional(v.string()),
     isOpen: v.optional(v.boolean()),
     updatedAt: v.string(),
   }).index("by_key", ["key"]),

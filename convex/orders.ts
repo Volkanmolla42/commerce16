@@ -7,7 +7,6 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertAdminApiSecret } from "./adminAuth";
 import { components, internal } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
-import { hashRiskIdentifier, signedRiskContextValidator, verifyCheckoutRiskContext } from "./paymentRisk";
 import type { Id } from "./_generated/dataModel";
 import { commitOrderInventory, recordInventoryMovement, releaseOrderInventory, reserveOrderInventory } from "./inventory";
 import { getDistrictById, getProvinceById } from "../lib/turkey-provinces";
@@ -22,33 +21,9 @@ const orderRateLimiter = new RateLimiter(components.rateLimiter, {
 });
 
 const orderValidator = schema.doc("orders");
-const customerOrderValidator = orderValidator.omit("checkoutIpEncrypted");
+const customerOrderValidator = orderValidator;
 const orderItemValidator = orderValidator.fields.items.element;
 const orderStatusValidator = orderValidator.fields.status;
-
-function omitCheckoutIp<T extends { checkoutIpEncrypted?: string }>(order: T) {
-  const safeOrder = { ...order };
-  delete safeOrder.checkoutIpEncrypted;
-  return safeOrder;
-}
-
-function toHex(bytes: Uint8Array) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function encryptCheckoutIp(ip: string, orderId: Id<"orders">, secret: string) {
-  const encoder = new TextEncoder();
-  const keyBytes = await crypto.subtle.digest("SHA-256", encoder.encode(`commerce-checkout-ip:v1:${secret}`));
-  const nonceBytes = await crypto.subtle.digest("SHA-256", encoder.encode(`commerce-checkout-ip-nonce:v1:${orderId}`));
-  const iv = new Uint8Array(nonceBytes).slice(0, 12);
-  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv, additionalData: encoder.encode(`checkout-ip:${orderId}`) },
-    key,
-    encoder.encode(ip.slice(0, 64)),
-  );
-  return `v1.${toHex(iv)}.${toHex(new Uint8Array(ciphertext))}`;
-}
 
 export const getMyOrders = query({
   args: {},
@@ -65,7 +40,7 @@ export const getMyOrders = query({
       .order("desc")
       .take(20);
 
-    return orders.map(omitCheckoutIp);
+    return orders;
   },
 });
 
@@ -158,26 +133,8 @@ export const getOrderById = query({
       return null;
     }
 
-    return omitCheckoutIp(order);
+    return order;
   },
-});
-
-export const getOrderForPayment = internalQuery({
-  args: { id: v.id("orders"), customerEmail: v.string() },
-  returns: v.union(customerOrderValidator, v.null()),
-  handler: async (ctx, { id, customerEmail }) => {
-    const order = await ctx.db.get(id);
-    if (!order) return null;
-    const userId = await getAuthUserId(ctx);
-    if (order.userId) return userId === order.userId ? omitCheckoutIp(order) : null;
-    return order.customerEmail.toLowerCase() === customerEmail.trim().toLowerCase() ? omitCheckoutIp(order) : null;
-  },
-});
-
-export const getOrderForPaymentInternal = internalQuery({
-  args: { id: v.id("orders") },
-  returns: v.union(orderValidator, v.null()),
-  handler: async (ctx, { id }) => await ctx.db.get(id),
 });
 
 export const createOrder = mutation({
@@ -203,7 +160,6 @@ export const createOrder = mutation({
       taxNumber: v.optional(v.string()),
       taxOffice: v.optional(v.string()),
     })),
-    riskContext: v.optional(signedRiskContextValidator),
     saveAddress: v.optional(
       schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1", "addressLine2", "postalCode")
         .extend({ isDefault: v.optional(v.boolean()) })
@@ -231,27 +187,11 @@ export const createOrder = mutation({
       (!args.invoiceRecipient.businessTitle?.trim() || !/^\d{10}$/.test(args.invoiceRecipient.taxNumber ?? "") || !args.invoiceRecipient.taxOffice?.trim())) {
       throw new Error("Kurumsal fatura için şirket unvanı, 10 haneli vergi numarası ve vergi dairesi gereklidir.");
     }
-    const trustedIp = await verifyCheckoutRiskContext(args.riskContext, env.CHECKOUT_RISK_CONTEXT_SECRET);
-    if (args.riskContext && !trustedIp) {
-      throw new Error("Güvenlik doğrulaması geçersiz veya süresi doldu. Sayfayı yenileyip tekrar deneyin.");
-    }
-    if (env.CHECKOUT_RISK_CONTEXT_REQUIRED === "true" && !trustedIp) {
-      throw new Error("Güvenlik doğrulaması eksik. Sayfayı yenileyip tekrar deneyin.");
-    }
-    const emailHash = await hashRiskIdentifier(`email:${args.customerEmail.trim().toLowerCase()}`, env.CHECKOUT_RISK_CONTEXT_SECRET);
-    const emailLimitKey = trustedIp
-      ? await hashRiskIdentifier(`email-ip:${emailHash}:${trustedIp}`, env.CHECKOUT_RISK_CONTEXT_SECRET)
-      : emailHash;
-    const emailLimit = await orderRateLimiter.limit(ctx, "orderByEmail", { key: emailLimitKey });
+    const emailKey = args.customerEmail.trim().toLowerCase();
+    const emailLimit = await orderRateLimiter.limit(ctx, "orderByEmail", { key: emailKey });
     if (!emailLimit.ok) throw new Error("Bu e-posta adresiyle çok sık sipariş başlatıldı. Bir süre sonra tekrar deneyin.");
-    if (trustedIp) {
-      const ipHash = await hashRiskIdentifier(`ip:${trustedIp}`, env.CHECKOUT_RISK_CONTEXT_SECRET);
-      const ipLimit = await orderRateLimiter.limit(ctx, "orderByIp", { key: ipHash });
-      if (!ipLimit.ok) throw new Error("Bu bağlantıdan kısa sürede çok fazla sipariş başlatıldı. Bir süre sonra tekrar deneyin.");
-    }
     if (userId) {
-      const accountHash = await hashRiskIdentifier(`account:${userId}`, env.CHECKOUT_RISK_CONTEXT_SECRET);
-      const accountLimit = await orderRateLimiter.limit(ctx, "orderByAccount", { key: accountHash });
+      const accountLimit = await orderRateLimiter.limit(ctx, "orderByAccount", { key: userId });
       if (!accountLimit.ok) throw new Error("Hesabınızdan kısa sürede çok fazla sipariş başlatıldı. Bir süre sonra tekrar deneyin.");
     }
     if (args.items.length === 0 || args.items.length > 100) throw new Error("Sipariş 1 ile 100 ürün içermeli.");
@@ -398,11 +338,16 @@ export const createOrder = mutation({
       },
       invoiceRecipient: args.invoiceRecipient,
     });
-    if (trustedIp && env.CHECKOUT_RISK_CONTEXT_SECRET) {
-      await ctx.db.patch(orderId, {
-        checkoutIpEncrypted: await encryptCheckoutIp(trustedIp, orderId, env.CHECKOUT_RISK_CONTEXT_SECRET),
-      });
+    const createdOrder = await ctx.db.get(orderId);
+    if (createdOrder) {
+      await reserveOrderInventory(ctx, createdOrder, reservationExpiresAt);
+      if (coupon?.valid) {
+        await commitCouponReservation(ctx, createdOrder);
+      }
     }
+
+    await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId });
+    await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.markConvertedForOrder, { orderId });
     await ctx.scheduler.runAfter(reservationTtl, internal.orders.expirePendingOrder, {
       orderId,
       reservationExpiresAt,
@@ -419,14 +364,6 @@ export const expirePendingOrder = internalMutation({
     const order = await ctx.db.get(orderId);
     if (!order || order.status !== "pending" || order.reservationExpiresAt !== reservationExpiresAt ||
       reservationExpiresAt > Date.now()) return null;
-    const payment = await ctx.db.query("checkoutPayments")
-      .withIndex("by_order", (q) => q.eq("orderId", orderId))
-      .order("desc")
-      .first();
-    if (payment?.status === "review" || payment?.status === "paid") return null;
-    if (payment && (payment.status === "initializing" || payment.status === "pending")) {
-      await ctx.db.patch(payment._id, { status: "failed" });
-    }
     await changeOrderStatus(ctx, orderId, "cancelled");
     return null;
   },
@@ -441,26 +378,13 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
 
   const transitions: Record<OrderStatus, readonly OrderStatus[]> = {
     pending: ["paid", "cancelled"],
-    paid: ["shipped"],
+    paid: ["shipped", "cancelled"],
     shipped: ["delivered"],
     delivered: [],
     cancelled: [],
   };
   if (!transitions[order.status].includes(status)) {
     throw new Error("Sipariş bu durumdan seçilen duruma geçirilemiyor.");
-  }
-
-  const latestPayment = order.status === "pending" && (status === "paid" || status === "cancelled")
-    ? await ctx.db.query("checkoutPayments")
-      .withIndex("by_order", (q) => q.eq("orderId", id))
-      .order("desc")
-      .first()
-    : null;
-  if (status === "paid" && latestPayment?.status !== "paid") {
-    throw new Error("Ödeme sağlayıcısı onaylamadan sipariş ödenmiş duruma geçirilemez.");
-  }
-  if (status === "cancelled" && latestPayment && latestPayment.status !== "failed") {
-    throw new Error("Ödeme oturumu sonuçlanmadan sipariş iptal edilemez.");
   }
 
   const canceling = order.status !== "cancelled" && status === "cancelled";

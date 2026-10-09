@@ -5,12 +5,7 @@ import { useConvexAuth } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
-import {
-  Location01Icon,
-  Add01Icon,
-  Delete02Icon,
-  Edit02Icon,
-} from "hugeicons-react";
+import { Add01Icon, Delete02Icon, Edit02Icon } from "hugeicons-react";
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
 import {
@@ -243,36 +238,9 @@ export default function AccountAddressesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
-
-        <Button
-          onClick={openNewModal}
-          size="sm"
-          className="rounded-2xl gap-2 font-semibold self-start sm:self-auto shadow-md"
-        >
-          <Add01Icon className="h-4 w-4" />
-          <span>Yeni Adres Ekle</span>
-        </Button>
-      </div>
-
+    <div>
       {authLoading || addresses === undefined ? (
         <AccountAddressesSkeleton />
-      ) : addresses.length === 0 ? (
-        <Card className="rounded-3xl border-border bg-card p-12 text-center shadow-xs">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Location01Icon className="h-8 w-8" />
-          </div>
-          <h3 className="mt-4 text-lg font-bold text-foreground">
-            Henüz kayıtlı bir adresiniz yok
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sipariş verirken veya buradan yeni teslimat adresi tanımlayabilirsiniz.
-          </p>
-          <Button onClick={openNewModal} size="lg" className="mt-6 rounded-2xl font-semibold shadow-md">
-            <Add01Icon className="mr-2 h-4 w-4" /> İlk Adresinizi Ekleyin
-          </Button>
-        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {addresses.map((addr) => (
@@ -342,6 +310,18 @@ export default function AccountAddressesPage() {
               </div>
             </Card>
           ))}
+
+          <button
+            type="button"
+            onClick={openNewModal}
+            aria-haspopup="dialog"
+            className="group flex min-h-[15rem] w-full flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-card p-6 text-center transition-colors hover:border-primary/50 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+              <Add01Icon className="h-6 w-6" />
+            </span>
+            <span className="text-sm font-semibold text-foreground">Adres Ekle</span>
+          </button>
         </div>
       )}
 

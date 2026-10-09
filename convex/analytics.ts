@@ -3,7 +3,14 @@ import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { env, internalMutation, mutation, query } from "./_generated/server";
 import { assertAdminApiSecret } from "./adminAuth";
-import { hashRiskIdentifier } from "./paymentRisk";
+
+async function hashCustomerKey(email: string, secret?: string) {
+  const data = new TextEncoder().encode(`customer:${secret ?? "analytics"}:${email}`);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 const eventTypeValidator = v.union(
   v.literal("page_view"),
@@ -274,7 +281,7 @@ export const syncOrderAttribution = internalMutation({
       orderId,
       sessionId: session.sessionId,
       visitorId: session.visitorId,
-      customerKey: await hashRiskIdentifier(order.customerEmail.trim().toLowerCase(), env.ADMIN_API_SECRET),
+      customerKey: await hashCustomerKey(order.customerEmail.trim().toLowerCase(), env.ADMIN_API_SECRET),
       source: session.source,
       medium: session.medium,
       campaign: session.campaign,
@@ -371,7 +378,7 @@ export const getDashboard = query({
     const orderHistoryLimited = paidByStatus.some((orders) => orders.length === 250);
     const customers = new Map<string, Array<{ orderId: string; paidAt: number; amountCents: number; month: string }>>();
     for (const order of paidOrders) {
-      const customerKey = await hashRiskIdentifier(order.customerEmail.trim().toLowerCase(), env.ADMIN_API_SECRET);
+      const customerKey = await hashCustomerKey(order.customerEmail.trim().toLowerCase(), env.ADMIN_API_SECRET);
       const orders = customers.get(customerKey) ?? [];
       orders.push({
         orderId: order._id,

@@ -10,7 +10,7 @@ export default async function Image(props: {
 }) {
   const params = await props.params;
   const category = await getCategory(params.category);
-  const title = category?.seo?.title || category?.title;
+  const title = category?.title;
 
   return await OpengraphImage({ title });
 }

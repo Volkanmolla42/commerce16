@@ -1,12 +1,11 @@
 "use client";
 
 import { useCart } from "@/components/cart/cart-context";
-import { useCheckoutRiskContext } from "@/components/checkout/risk-context";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import {
@@ -27,15 +26,15 @@ import {
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
-import { useQuickBuyDraft } from "@/components/cart/quick-buy-store";
-import { getCartRecoverySessionKey } from "@/components/cart/recovery-store";
+import { clearQuickBuyItem, useQuickBuyDraft } from "@/components/cart/quick-buy-store";
+import { clearCartRecoverySessionKey, getCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
 
 function CheckoutContent() {
-  const { items: cartItems } = useCart();
-  const riskContext = useCheckoutRiskContext();
+  const router = useRouter();
+  const { items: cartItems, clearCart } = useCart();
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
   const quickBuy = useQuickBuyDraft();
   const items = useMemo(
@@ -49,7 +48,6 @@ function CheckoutContent() {
 
   const profile = useQuery(api.users.getMyProfile);
   const addresses = useQuery(api.addresses.getMyAddresses);
-  const paymentAvailability = useQuery(api.checkoutPayments.getAvailability, {});
   const recoveryAvailability = useQuery(api.abandonedCartRecovery.getAvailability, {});
   const legalDocuments = useQuery(api.legalDocuments.getCheckoutDocuments, {});
   const [couponCheckTime, setCouponCheckTime] = useState(() => Date.now());
@@ -72,7 +70,6 @@ function CheckoutContent() {
   const createOrder = useMutation(api.orders.createOrder);
   const captureRecovery = useMutation(api.abandonedCartRecovery.capture);
   const linkRecoveryOrder = useMutation(api.abandonedCartRecovery.linkOrder);
-  const createCheckout = useAction(api.checkoutPayments.createCheckout);
 
   // Form State
   const [draft, setDraft] = useState<CheckoutDraft>({});
@@ -85,7 +82,6 @@ function CheckoutContent() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [identityNumber, setIdentityNumber] = useState("");
   const [invoiceRecipientType, setInvoiceRecipientType] = useState<"individual" | "business">("individual");
   const [businessTitle, setBusinessTitle] = useState("");
   const [taxNumber, setTaxNumber] = useState("");
@@ -162,11 +158,6 @@ function CheckoutContent() {
       return;
     }
 
-    if (!paymentAvailability?.ready) {
-      setErrorMessage("Güvenli ödeme altyapısı henüz yapılandırılmamış.");
-      setIsSubmitting(false);
-      return;
-    }
     if (!provinceId || !districtId) {
       setErrorMessage("Teslimat için geçerli bir il ve ilçe seçin.");
       setIsSubmitting(false);
@@ -178,7 +169,7 @@ function CheckoutContent() {
       return;
     }
     if (payableKurus <= 0) {
-      setErrorMessage("Kupon indirimi sepet toplamını sıfırlıyor; ücretsiz sipariş bu ödeme akışında kullanılamıyor.");
+      setErrorMessage("Kupon indirimi sepet toplamını sıfırlıyor.");
       setIsSubmitting(false);
       return;
     }
@@ -261,7 +252,6 @@ function CheckoutContent() {
               taxOffice: taxOffice.trim(),
             }
           : { type: "individual" as const },
-        ...(riskContext ? { riskContext } : {}),
         saveAddress: saveAddressPayload,
       });
 
@@ -269,19 +259,14 @@ function CheckoutContent() {
         await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
       }
 
-      const checkout = await createCheckout({
-        orderId,
-        customerEmail: customerEmail.trim(),
-        customerName: customerName.trim(),
-        customerPhone: phone.trim(),
-        shippingAddress: fullShippingAddress,
-        city: city.trim(),
-        provinceId,
-        districtId,
-        identityNumber: identityNumber.trim(),
-        ...(riskContext ? { riskContext } : {}),
-      });
-      window.location.assign(checkout.paymentPageUrl);
+      clearCart();
+      clearQuickBuyItem();
+      try {
+        clearCartRecoverySessionKey();
+      } catch {
+        // Ignored
+      }
+      router.push("/checkout/result?status=success");
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
     } finally {
@@ -337,8 +322,8 @@ function CheckoutContent() {
         </div>
 
         <Badge variant="outline" className="gap-1.5 py-1 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/60 font-medium">
-          <LockIcon className="h-3.5 w-3.5" />
-          <span>Ödeme: {paymentAvailability?.provider === "paytr" ? "PayTR" : "iyzico"}</span>
+          <CheckmarkBadge01Icon className="h-3.5 w-3.5" />
+          <span>Güvenli Sipariş</span>
         </Badge>
       </div>
 
@@ -405,26 +390,6 @@ function CheckoutContent() {
                   placeholder="05XX XXX XX XX"
                 />
               </div>
-              <div className="sm:col-span-2 space-y-2">
-                <Label htmlFor="checkout-identity-number" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  T.C. Kimlik Numarası
-                </Label>
-                <Input
-                  id="checkout-identity-number"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  maxLength={11}
-                  pattern="[0-9]{11}"
-                  required
-                  value={identityNumber}
-                  onChange={(e) => setIdentityNumber(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  placeholder="11 haneli numara"
-                  aria-describedby="checkout-identity-help"
-                />
-                <p id="checkout-identity-help" className="text-xs text-muted-foreground">
-                  Ödeme sağlayıcısına iletilir; mağaza sipariş kaydında saklanmaz.
-                </p>
-              </div>
             </div>
           </Card>
 
@@ -462,7 +427,7 @@ function CheckoutContent() {
                 </div>
               )}
               <p className="text-xs leading-5 text-muted-foreground">
-                Kurumsal fatura bilgileri sipariş kaydında ve yapılandırılmışsa fatura entegratörüne iletilir. Bireysel T.C. kimlik numaranız ödeme sağlayıcısına iletilir; mağaza sipariş kaydında saklanmaz. <Link href="/privacy-policy" className="underline underline-offset-4">Gizlilik politikası</Link>
+                Kurumsal fatura bilgileri sipariş kaydında ve yapılandırılmışsa fatura entegratörüne iletilir. <Link href="/privacy-policy" className="underline underline-offset-4">Gizlilik politikası</Link>
               </p>
             </fieldset>
           </Card>
@@ -670,28 +635,7 @@ function CheckoutContent() {
             )}
           </Card>
 
-          <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">
-                {paymentAvailability?.provider === "paytr" ? "PayTR güvenli iFrame ödeme" : "iyzico ile güvenli ödeme"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {paymentAvailability?.provider === "paytr"
-                  ? "Kart bilgilerinizi mağaza almaz. Ödeme PayTR’nin güvenli formunda tamamlanır."
-                  : "Kart bilgilerinizi mağaza almaz. Hesabınızda etkin olan kayıtlı kart ve hızlı ödeme seçenekleri iyzico ödeme sayfasında görünür."}
-              </p>
-              {riskContext && (
-                <p className="text-xs text-muted-foreground">
-                  Ödeme güvenliği ve fraud kontrolü için doğrulanmış bağlantı IP adresiniz iyzico ile paylaşılır; mağaza bunu sipariş kaydında saklamaz.
-                </p>
-              )}
-              {!paymentAvailability?.ready && (
-                <p className="text-xs font-medium text-destructive">
-                  Ödeme tamamlanamıyor: seçili ödeme sağlayıcısının sunucu ayarları eksik.
-                </p>
-              )}
-            </div>
-          </Card>
+
 
           {(recoveryAvailability?.email || recoveryAvailability?.whatsapp) && (
             <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
@@ -852,7 +796,7 @@ function CheckoutContent() {
             <Button
               type="submit"
               size="lg"
-              disabled={isSubmitting || !paymentAvailability?.ready || shippingQuote === undefined}
+              disabled={isSubmitting || shippingQuote === undefined}
               className="mt-6 w-full rounded-2xl shadow-lg font-semibold gap-2 h-14"
             >
               {isSubmitting ? (
@@ -862,8 +806,8 @@ function CheckoutContent() {
                 </>
               ) : (
                 <>
-                  <LockIcon className="h-4 w-4" />
-                  <span>Güvenli Ödemeye Geç ({formatMoney(payableAmount)})</span>
+                  <CheckmarkBadge01Icon className="h-4 w-4" />
+                  <span>Siparişi Tamamla ({formatMoney(payableAmount)})</span>
                 </>
               )}
             </Button>

@@ -360,27 +360,9 @@ export const claimReminder = internalMutation({
     }
     if (cart.orderId) {
       const order = await ctx.db.get(cart.orderId);
-      if (order && ["paid", "shipped", "delivered"].includes(order.status)) {
+      if (order && order.status !== "cancelled") {
         await ctx.db.patch(cartId, { items: [], status: "converted", email: undefined, whatsapp: undefined, reminderScheduled: false });
         return null;
-      }
-      if (order?.status === "pending") {
-        const payment = await ctx.db
-          .query("checkoutPayments")
-          .withIndex("by_order", (q) => q.eq("orderId", cart.orderId!))
-          .order("desc")
-          .first();
-        if (payment?.status === "review") {
-          await ctx.db.patch(cartId, { items: [], status: "failed", email: undefined, whatsapp: undefined, reminderScheduled: false });
-          return null;
-        }
-        if (payment && ["initializing", "pending"].includes(payment.status) && payment.expiresAt > now) {
-          await ctx.scheduler.runAfter(payment.expiresAt - now + 1000, internal.abandonedCartRecovery.processReminder, {
-            cartId,
-            notificationId,
-          });
-          return null;
-        }
       }
     }
 

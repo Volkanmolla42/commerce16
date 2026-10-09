@@ -7,7 +7,6 @@ import {
   BoughtTogetherShelf,
   ProductViewTracker,
 } from "@/components/product/recommendation-shelves";
-import { ProductReviews } from "@/components/product/product-reviews";
 import {
   getProduct,
   getProductRecommendations,
@@ -151,7 +150,6 @@ async function ProductContent({
             </Suspense>
           </div>
         </div>
-        <ProductReviews productId={product.id} productTitle={product.title} />
         <Suspense fallback={null}>
           <ProductMerchandising product={product} />
         </Suspense>

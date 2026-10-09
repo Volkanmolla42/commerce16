@@ -11,9 +11,9 @@ export function UserNav() {
     return (
       <div
         aria-hidden
-        className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 animate-pulse dark:border-neutral-800 dark:bg-neutral-900"
+        className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 animate-pulse sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <div className="h-4 w-4 rounded-full bg-neutral-200 dark:bg-neutral-800" />
+        <div className="h-5 w-5 rounded-full bg-neutral-200 dark:bg-neutral-800" />
         <div className="hidden sm:block h-3 w-14 rounded bg-neutral-200 dark:bg-neutral-800" />
       </div>
     );
@@ -22,11 +22,11 @@ export function UserNav() {
   if (isAuthenticated) {
     return (
       <Link
-        href="/account"
+        href="/account/orders"
         aria-label="Hesabım"
-        className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:text-black dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:text-white"
+        className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:text-black sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:text-white"
       >
-        <UserIcon className="h-4 w-4" />
+        <UserIcon className="h-5 w-5" />
         <span className="hidden sm:inline">Hesabım</span>
       </Link>
     );
@@ -36,9 +36,9 @@ export function UserNav() {
     <Link
       href="/login"
       aria-label="Giriş Yap"
-      className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:text-black dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:text-white"
+      className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:text-black sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:text-white"
     >
-      <UserIcon className="h-4 w-4" />
+      <UserIcon className="h-5 w-5" />
       <span className="hidden sm:inline">Giriş Yap</span>
     </Link>
   );

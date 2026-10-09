@@ -28,18 +28,3 @@ export function allocateCouponDiscount(
     };
   });
 }
-
-export function refundAmountForQuantity(
-  linePayableKurus: number,
-  orderedQuantity: number,
-  previouslyRefundedQuantity: number,
-  requestedQuantity: number,
-) {
-  if (!Number.isSafeInteger(linePayableKurus) || !Number.isSafeInteger(orderedQuantity) ||
-    !Number.isSafeInteger(previouslyRefundedQuantity) || !Number.isSafeInteger(requestedQuantity) ||
-    orderedQuantity <= 0 || previouslyRefundedQuantity < 0 || requestedQuantity <= 0 ||
-    previouslyRefundedQuantity + requestedQuantity > orderedQuantity) return 0;
-  const beforeRefund = Math.floor(linePayableKurus * previouslyRefundedQuantity / orderedQuantity);
-  const afterRefund = Math.floor(linePayableKurus * (previouslyRefundedQuantity + requestedQuantity) / orderedQuantity);
-  return afterRefund - beforeRefund;
-}

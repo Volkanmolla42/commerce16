@@ -1,15 +1,10 @@
 import type { Product } from "./types";
 import type { CategoryAttributeDefinition } from "./attributes";
 
-export type ProductFacet = "size" | "color";
-
 export type CatalogFilters = {
   minPrice: string;
   maxPrice: string;
-  size: string[];
-  color: string[];
   stock: "" | "in" | "out";
-  rating: number | null;
 };
 
 export type CategoryAttributeFilter = { values: string[]; min: string; max: string };
@@ -61,43 +56,8 @@ export function getActiveCategoryAttributeFilterCount(filters: CategoryAttribute
 export const EMPTY_CATALOG_FILTERS: CatalogFilters = {
   minPrice: "",
   maxPrice: "",
-  size: [],
-  color: [],
   stock: "",
-  rating: null,
 };
-
-const OPTION_NAMES: Record<ProductFacet, string[]> = {
-  size: ["beden", "size", "olcu", "boyut"],
-  color: ["renk", "color", "colour"],
-};
-
-function normalize(value: string) {
-  return value
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ı/g, "i");
-}
-
-function getProductFacetValues(product: Product, facet: ProductFacet) {
-  const optionValues = (product.options ?? [])
-    .filter((option) => OPTION_NAMES[facet].includes(normalize(option.name)))
-    .flatMap((option) => option.values);
-
-  return [
-    ...new Set(
-      optionValues.filter((value) => Boolean(value.trim())),
-    ),
-  ];
-}
-
-export function getProductFacetOptions(products: Product[], facet: ProductFacet) {
-  return [...new Set(products.flatMap((product) => getProductFacetValues(product, facet)))].sort(
-    (left, right) => left.localeCompare(right, "tr", { sensitivity: "base" }),
-  );
-}
 
 function getProductPrice(product: Product) {
   const price = Number(product.price);
@@ -120,18 +80,8 @@ export function matchesCatalogFilters(product: Product, filters: CatalogFilters)
   if (minPrice !== null && (price === null || price < minPrice)) return false;
   if (maxPrice !== null && (price === null || price > maxPrice)) return false;
 
-  for (const facet of ["size", "color"] as const) {
-    if (
-      filters[facet].length > 0 &&
-      !getProductFacetValues(product, facet).some((value) => filters[facet].includes(value))
-    ) {
-      return false;
-    }
-  }
-
   if (filters.stock === "in" && !isProductInStock(product)) return false;
   if (filters.stock === "out" && isProductInStock(product)) return false;
-  if (filters.rating !== null && (product.rating ?? 0) < filters.rating) return false;
 
   return true;
 }
@@ -140,9 +90,6 @@ export function getActiveCatalogFilterCount(filters: CatalogFilters) {
   return (
     Number(filters.minPrice !== "") +
     Number(filters.maxPrice !== "") +
-    filters.size.length +
-    filters.color.length +
-    Number(filters.stock !== "") +
-    Number(filters.rating !== null)
+    Number(filters.stock !== "")
   );
 }

@@ -1,5 +1,6 @@
+import { Suspense } from "react";
 import { Card } from "@/components/ui";
-import { AccountNav } from "./account-nav";
+import { AccountNav, AccountNavFallback } from "./account-nav";
 import { SidebarProfile } from "./sidebar-profile";
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,9 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
             <SidebarProfile />
 
             <div className="pt-3">
-              <AccountNav />
+              <Suspense fallback={<AccountNavFallback />}>
+                <AccountNav />
+              </Suspense>
             </div>
           </Card>
         </aside>

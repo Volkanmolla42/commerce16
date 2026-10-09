@@ -1,6 +1,6 @@
 import {
   getCategory,
-  getCategoryProducts,
+  getCategories,
 } from "@/lib/catalog";
 import type { Metadata, ResolvingMetadata } from "next";
 import { notFound } from "next/navigation";
@@ -8,7 +8,7 @@ import { Suspense } from "react";
 import { baseUrl } from "@/lib/utils";
 
 import { FacetedProductGrid } from "@/components/layout/faceted-product-grid";
-import { defaultSort, sorting } from "@/lib/constants";
+import { getCatalogPage } from "@/lib/catalog/pages";
 
 export const prefetch = "partial";
 
@@ -21,8 +21,8 @@ export async function generateMetadata(props: {
   if (!category) return notFound();
 
   const parentMetadata = await parent;
-  const title = category.seo?.title || category.title;
-  const description = category.seo?.description || category.description || `${category.title} ürünleri`;
+  const title = category.title;
+  const description = category.description || `${category.title} ürünleri`;
   const canonical = new URL(category.path, baseUrl).toString();
 
   return {
@@ -51,23 +51,21 @@ async function CategoryContent(props: {
 }) {
   const searchParams = await props.searchParams;
   const params = await props.params;
-  const sort = (searchParams?.sort as string) || undefined;
-  const { sortKey, reverse } =
-    sorting.find((item) => item.slug === sort) || defaultSort;
-  const [category, products] = await Promise.all([
-    getCategory(params.category),
-    getCategoryProducts({
-      category: params.category,
-      sortKey,
-      reverse,
-    }),
+  const [category, categories] = await Promise.all([
+    getCategory(params.category), getCategories(),
   ]);
-
   if (!category) return notFound();
+  const catalog = await getCatalogPage(searchParams ?? {}, params.category);
 
   return (
     <FacetedProductGrid
-      products={products}
+      key={params.category}
+      {...catalog}
+      initialFilters={catalog.filters}
+      initialAttributeFilters={catalog.attributeFilters}
+      categories={categories}
+      selectedCategory={params.category}
+      query={typeof searchParams?.q === "string" ? searchParams.q : undefined}
       categoryAttributes={category.attributes}
       title={category.title}
       emptyMessage="Bu kategoride ürün bulunamadı."
@@ -80,7 +78,7 @@ export default function CategoryPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<p role="status" className="text-sm text-muted-foreground">Ürünler yükleniyor…</p>}>
       <CategoryContent
         params={props.params}
         searchParams={props.searchParams}

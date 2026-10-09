@@ -2,6 +2,7 @@ import type { Product, ProductVariant } from "./types";
 
 type ProductPriceSource = {
   price: string;
+  priceRange?: { min: string; max: string };
   options?: { name: string; values: string[] }[];
   variants?: {
     price?: string | { amount: string };
@@ -17,6 +18,7 @@ export function getProductPriceRange(
   product: ProductPriceSource,
   params?: Pick<URLSearchParams, "get">,
 ): { min: string; max: string } {
+  if (!params && product.priceRange) return product.priceRange;
   const optionVariants = product.variants?.filter((variant) => variant.selectedOptions.length > 0) ?? [];
   const matchingVariants = params && optionVariants.length > 0
     ? optionVariants.filter((variant) => variant.selectedOptions.every(({ name, value }) => {

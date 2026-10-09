@@ -37,7 +37,7 @@ export default function CustomerLoginPage() {
         password,
         flow: step,
       });
-      router.push("/account");
+      router.push("/account/orders");
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || "Giriş işlemi sırasında bir hata oluştu.");
@@ -74,7 +74,7 @@ export default function CustomerLoginPage() {
 
           <div className="mt-6 flex flex-col gap-3">
             <Button asChild size="lg" className="w-full rounded-xl shadow-md font-semibold">
-              <Link href="/account">Hesabıma Git</Link>
+              <Link href="/account/orders">Hesabıma Git</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="w-full rounded-xl font-semibold border-border">
               <Link href="/">Alışverişe Devam Et</Link>
@@ -97,11 +97,9 @@ export default function CustomerLoginPage() {
     <div className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md p-8 shadow-xl border-border bg-card rounded-3xl space-y-6">
         <div className="text-center">
-          <Badge variant="secondary" className="font-semibold text-xs py-1 px-3">
-            Müşteri Hesabı
-          </Badge>
+
           <h2 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            {step === "signIn" ? "Müşteri Girişi" : "Yeni Müşteri Kaydı"}
+            {step === "signIn" ? "Giriş Yap" : "Kayıt Ol"}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             {step === "signIn"
@@ -154,8 +152,8 @@ export default function CustomerLoginPage() {
             {isSubmitting
               ? "İşleniyor..."
               : step === "signIn"
-              ? "Giriş Yap"
-              : "Kayıt Ol"}
+                ? "Giriş Yap"
+                : "Kayıt Ol"}
           </Button>
         </form>
 

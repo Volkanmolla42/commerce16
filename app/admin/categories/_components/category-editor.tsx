@@ -17,10 +17,16 @@ import {
 import { AdminNotice } from "../../_components/admin-primitives";
 import { runAdminAction } from "../../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
-import { type CategoryAttributeDefinition, type CategoryAttributeType } from "@/lib/catalog/attributes";
-import { CategoryAttributeOptionsInput } from "./category-attribute-options-input";
+import { CATEGORY_ATTRIBUTE_LIMIT, normalizeAttributeLabel, parseAttributeTemplate, parseCategoryAttributes, type CategoryAttributeDefinition } from "@/lib/catalog/attributes";
+import { CategoryAttributeFields } from "./category-attribute-fields";
+import { CategoryAttributeLibrary, type CategoryAttributePreset } from "./category-attribute-library";
 
 export type AdminCategory = Omit<Doc<"categories">, "seo"> & { imageUrl: string | null };
+function createAttributeKey() {
+  const id = globalThis.crypto?.randomUUID?.().replaceAll("-", "")
+    ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `attr-${id}`;
+}
 
 async function uploadCategoryImage(file: File): Promise<Id<"_storage">> {
   const { uploadUrl } = await runAdminAction<{ uploadUrl: string }>("category.image-upload-url");
@@ -55,6 +61,10 @@ export function CategoryEditor({
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savingPresetKey, setSavingPresetKey] = useState<string | null>(null);
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [presetVersion, setPresetVersion] = useState(0);
+  const [presetNotice, setPresetNotice] = useState("");
   const previewUrlRef = useRef<string | null>(null);
 
   useEffect(() => () => {
@@ -92,34 +102,63 @@ export function CategoryEditor({
   };
 
   const addAttribute = () => {
-    const key = `ozellik-${globalThis.crypto?.randomUUID?.().slice(0, 8) ?? Date.now().toString(36)}`;
     setAttributes((current) => [...current, {
-      key,
+      key: createAttributeKey(),
       label: "",
       type: "text",
       required: false,
     }]);
   };
 
-  const updateAttribute = (index: number, patch: Partial<CategoryAttributeDefinition>) => {
-    setAttributes((current) => current.map((attribute, attributeIndex) =>
-      attributeIndex === index ? { ...attribute, ...patch } : attribute,
-    ));
+  const addPreset = (preset: CategoryAttributePreset) => {
+    if (attributes.length >= CATEGORY_ATTRIBUTE_LIMIT) {
+      setError("Kategoriye en fazla 30 özellik eklenebilir.");
+      return;
+    }
+    if (attributes.some((attribute) => normalizeAttributeLabel(attribute.label) === normalizeAttributeLabel(preset.label))) {
+      setError("Bu özellik kategoriye zaten eklenmiş.");
+      return;
+    }
+    setAttributes((current) => [...current, {
+      key: createAttributeKey(),
+      ...parseAttributeTemplate(preset),
+    }]);
+    setError(null);
+  };
+
+  const saveAttributePreset = async (attribute: CategoryAttributeDefinition) => {
+    if (savingPresetKey !== null) return;
+    setSavingPresetKey(attribute.key);
+    setError(null);
+    setPresetNotice("");
+    try {
+      const template = parseAttributeTemplate(attribute);
+      await runAdminAction("category-attribute-preset.create", template);
+      setPresetNotice(`${template.label} kütüphaneye kaydedildi.`);
+      setPresetVersion((current) => current + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Özellik kütüphaneye kaydedilemedi.");
+    } finally {
+      setSavingPresetKey(null);
+    }
+  };
+
+  const updateAttribute = (key: string, patch: Partial<CategoryAttributeDefinition>) => {
+    setAttributes((current) => current.map((attribute) => attribute.key === key ? { ...attribute, ...patch } : attribute));
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saving || savingPresetKey !== null || libraryBusy) return;
     setError(null);
     setSaving(true);
-    for (const attr of attributes) {
-      if (attr.type === "select" || attr.type === "multiselect") {
-        const cleanOpts = (attr.options ?? []).map((o) => o.trim()).filter(Boolean);
-        if (cleanOpts.length === 0) {
-          setError(`"${attr.label || "İsimsiz"}" özelliği için en az bir seçenek girmelisiniz.`);
-          setSaving(false);
-          return;
-        }
-      }
+    let cleanAttributes: CategoryAttributeDefinition[];
+    try {
+      cleanAttributes = parseCategoryAttributes(attributes);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Özellikleri kontrol edin.");
+      setSaving(false);
+      return;
     }
 
     const autoSlug = slugify(title.trim()) || category?.slug || "";
@@ -134,18 +173,7 @@ export function CategoryEditor({
       title: title.trim(),
       slug: autoSlug,
       description: description.trim(),
-      attributes: attributes.map((attribute) => {
-        const isChoice = attribute.type === "select" || attribute.type === "multiselect";
-        const cleanOptions = isChoice
-          ? (attribute.options ?? []).map((o) => o.trim()).filter(Boolean)
-          : undefined;
-        return {
-          ...attribute,
-          label: attribute.label.trim(),
-          options: cleanOptions && cleanOptions.length > 0 ? cleanOptions : undefined,
-          ...(attribute.type === "number" ? { unit: attribute.unit?.trim() || undefined } : { unit: undefined }),
-        };
-      }),
+      attributes: cleanAttributes,
     };
     let uploadedImageId: Id<"_storage"> | null = null;
     try {
@@ -174,8 +202,8 @@ export function CategoryEditor({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="flex max-h-[min(92dvh,56rem)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+    <Dialog open onOpenChange={(open) => { if (!open && !saving && savingPresetKey === null && !libraryBusy) onClose(); }}>
+      <DialogContent className="flex max-h-[min(92dvh,56rem)] w-[calc(100vw-2rem)] max-w-4xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12 text-left sm:px-7">
           <DialogTitle>{category ? "Kategoriyi düzenle" : "Yeni kategori"}</DialogTitle>
         </DialogHeader>
@@ -245,64 +273,37 @@ export function CategoryEditor({
                 </div>
               </div>
               <section aria-labelledby="category-attributes-heading" className="space-y-3 rounded-xl border border-border p-4 lg:col-span-2">
-                <div className="flex items-center justify-between gap-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)_minmax(0,1fr)] md:items-center">
                   <h3 id="category-attributes-heading" className="text-sm font-semibold">Özellikler</h3>
-                  <Button type="button" variant="outline" size="sm" onClick={addAttribute} disabled={attributes.length >= 30}>Özellik ekle</Button>
+                  <CategoryAttributeLibrary revision={presetVersion} onBusyChange={setLibraryBusy} onAdd={addPreset} attributes={attributes} disabled={saving || savingPresetKey !== null} />
+                  <div className="flex justify-end">
+                    <Button type="button" variant="outline" size="sm" onClick={addAttribute} disabled={saving || savingPresetKey !== null || libraryBusy || attributes.length >= CATEGORY_ATTRIBUTE_LIMIT}>Özellik ekle</Button>
+                  </div>
                 </div>
+                {presetNotice && <p role="status" className="text-xs text-muted-foreground">{presetNotice}</p>}
+                {attributes.length === 0 && <p className="text-sm text-muted-foreground">Kütüphaneden seçin veya yeni bir özellik ekleyin.</p>}
                 {attributes.map((attribute, index) => (
-                  <fieldset key={attribute.key} className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]">
-                    <legend className="sr-only">Özellik {index + 1}</legend>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`category-attribute-label-${index}`}>Özellik adı</Label>
-                      <Input id={`category-attribute-label-${index}`} value={attribute.label} required maxLength={80} onChange={(event) => updateAttribute(index, { label: event.target.value })} placeholder="Özellik adı" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`category-attribute-type-${index}`}>Tür</Label>
-                      <select id={`category-attribute-type-${index}`} value={attribute.type} onChange={(event) => {
-                        const type = event.target.value as CategoryAttributeType;
-                        updateAttribute(index, {
-                          type,
-                          options: type === "select" || type === "multiselect" ? attribute.options ?? [] : undefined,
-                          unit: type === "number" ? attribute.unit : undefined,
-                        });
-                      }} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                        <option value="text">Metin</option>
-                        <option value="number">Sayı</option>
-                        <option value="select">Tekli seçim</option>
-                        <option value="multiselect">Çoklu seçim</option>
-                        <option value="boolean">Evet / Hayır</option>
-                      </select>
-                    </div>
-                    <Button type="button" variant="ghost" className="self-end text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Kaldır: ${attribute.label || `Özellik ${index + 1}`}`} onClick={() => {
-                      setAttributes((current) => current.filter((_, attributeIndex) => attributeIndex !== index));
-                    }}>Kaldır</Button>
-                    {(attribute.type === "select" || attribute.type === "multiselect") && (
-                      <div className="sm:col-span-3">
-                        <CategoryAttributeOptionsInput
-                          options={attribute.options ?? []}
-                          onChange={(next) => updateAttribute(index, { options: next })}
-                          disabled={saving}
-                        />
+                  <div key={attribute.key} className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">Özellik {index + 1}</span>
+                      <div className="flex flex-wrap gap-1">
+                        <Button type="button" variant="ghost" size="sm" disabled={saving || savingPresetKey !== null || libraryBusy || !attribute.label.trim()} onClick={() => void saveAttributePreset(attribute)}>
+                          {savingPresetKey === attribute.key ? "Kaydediliyor…" : "Kütüphaneye kaydet"}
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" disabled={saving || savingPresetKey !== null || libraryBusy} aria-label={`Kaldır: ${attribute.label || `Özellik ${index + 1}`}`} onClick={() => setAttributes((current) => current.filter((item) => item.key !== attribute.key))}>Kaldır</Button>
                       </div>
-                    )}
-                    {attribute.type === "number" && (
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <Label htmlFor={`category-attribute-unit-${index}`}>Birim</Label>
-                        <Input id={`category-attribute-unit-${index}`} value={attribute.unit ?? ""} maxLength={20} onChange={(event) => updateAttribute(index, { unit: event.target.value })} placeholder="Birim" />
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-x-5 gap-y-2 sm:col-span-3">
-                      <label className="flex min-h-9 cursor-pointer select-none items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={attribute.required} onChange={(event) => updateAttribute(index, { required: event.target.checked })} className="size-4 accent-foreground rounded focus-visible:ring-2 focus-visible:ring-ring" />Zorunlu</label>
                     </div>
-                  </fieldset>
+                    <CategoryAttributeFields value={attribute} onChange={(patch) => updateAttribute(attribute.key, patch)} disabled={saving || savingPresetKey !== null || libraryBusy} />
+                  </div>
                 ))}
               </section>
             </div>
             {error && <div role="alert"><AdminNotice kind="error">{error}</AdminNotice></div>}
           </div>
           <DialogFooter className="shrink-0 gap-2 border-t border-border bg-background px-5 py-4 sm:px-7">
-            <Button type="button" variant="ghost" onClick={onClose}>Vazgeç</Button>
-            <Button type="submit" disabled={saving}>{saving ? pendingImage ? "Görsel yükleniyor…" : "Kaydediliyor…" : category ? "Değişiklikleri kaydet" : "Kategori oluştur"}</Button>
+            {libraryBusy && <p role="status" className="mr-auto self-center text-xs text-muted-foreground">Önce kütüphane işlemini kaydedin veya iptal edin.</p>}
+            <Button type="button" variant="ghost" disabled={saving || savingPresetKey !== null || libraryBusy} onClick={onClose}>Vazgeç</Button>
+            <Button type="submit" disabled={saving || savingPresetKey !== null || libraryBusy}>{saving ? pendingImage ? "Görsel yükleniyor…" : "Kaydediliyor…" : category ? "Değişiklikleri kaydet" : "Kategori oluştur"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

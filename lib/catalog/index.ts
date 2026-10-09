@@ -35,7 +35,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   return await fetchQuery(api.settings.getStoreSettings, {});
 }
 
-function formatProduct(item: Doc<"products">): Product {
+function formatProduct(item: Omit<Doc<"products">, "priceValue" | "searchText">): Product {
   const slug = item.slug || "";
 
   return {
