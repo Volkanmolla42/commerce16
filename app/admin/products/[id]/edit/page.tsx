@@ -11,7 +11,7 @@ export default function EditProductPage({
     <Suspense
       fallback={
         <div className="w-full">
-          <AdminLoading label="Ürün formu" />
+          <AdminLoading label="Ürün formu" variant="form" />
         </div>
       }
     >

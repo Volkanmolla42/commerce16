@@ -203,11 +203,36 @@ export function AdminShellFallback() {
           <div className="h-8 w-32 rounded bg-muted" />
         </div>
         <main aria-label="Yönetim paneli yükleniyor" className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8 sm:py-8">
-          <div className="h-8 w-44 rounded bg-muted" />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 rounded-xl border border-border bg-card" />)}
+          <div aria-hidden="true" className="border-b border-border pb-5">
+            <div className="h-7 w-44 motion-safe:animate-pulse rounded-md bg-muted" />
+            <div className="mt-2 h-4 w-72 max-w-full motion-safe:animate-pulse rounded-md bg-muted" />
           </div>
-          <div className="h-56 rounded-xl border border-border bg-card" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div aria-hidden="true" key={index} className="rounded-lg border border-border bg-card p-4 sm:p-5">
+                <div className="h-3 w-20 motion-safe:animate-pulse rounded-md bg-muted" />
+                <div className="mt-3 h-7 w-28 motion-safe:animate-pulse rounded-md bg-muted" />
+                <div className="mt-2 h-3 w-24 motion-safe:animate-pulse rounded-md bg-muted" />
+              </div>
+            ))}
+          </div>
+          <div aria-hidden="true" className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="border-b border-border px-4 py-4 sm:px-5">
+              <div className="h-4 w-36 motion-safe:animate-pulse rounded-md bg-muted" />
+              <div className="mt-2 h-3 w-24 motion-safe:animate-pulse rounded-md bg-muted" />
+            </div>
+            <div className="divide-y divide-border">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="flex min-h-[4.5rem] items-center gap-3 px-4 py-4 sm:px-5">
+                  <div className="size-10 motion-safe:animate-pulse rounded-md bg-muted" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-44 max-w-full motion-safe:animate-pulse rounded-md bg-muted" />
+                    <div className="h-3 w-28 max-w-full motion-safe:animate-pulse rounded-md bg-muted" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
       </div>
     </div>

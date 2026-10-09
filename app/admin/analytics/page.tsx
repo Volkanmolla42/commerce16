@@ -4,7 +4,7 @@ import { AnalyticsContent } from "./analytics-client";
 
 export default function AdminAnalyticsPage() {
   return (
-    <Suspense fallback={<AdminLoading label="E-ticaret analitiği" />}>
+    <Suspense fallback={<AdminLoading label="E-ticaret analitiği" variant="analytics" />}>
       <AnalyticsContent />
     </Suspense>
   );

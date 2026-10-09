@@ -27,7 +27,7 @@ function StatCard({ label, value, note }: { label: string; value: string | numbe
 function AdminOverviewContent() {
   const { data, error, loading } = useAdminResource<AdminOverview>("overview");
 
-  if (loading) return <AdminLoading label="Mağaza özeti" />;
+  if (loading) return <AdminLoading label="Mağaza özeti" variant="overview" />;
 
   return (
     <>

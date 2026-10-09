@@ -77,7 +77,7 @@ function AdminProductsContent() {
         </div>
 
         <p aria-live="polite" className="px-4 pt-3 text-sm text-muted-foreground">{pending ? "Ürünler yükleniyor…" : `Bu sayfada ${filteredProducts.length} ürün`}</p>
-        {loading ? <div className="p-5"><AdminLoading label="Ürünler" /></div> : filteredProducts.length === 0 ? (
+        {loading ? <AdminLoading label="Ürünler" variant="table" /> : filteredProducts.length === 0 ? (
           <div className="p-5"><AdminEmpty title={!data?.isDone ? "Bu sayfada eşleşen ürün yok" : hasActiveFilters ? "Filtrelere uyan ürün yok" : "Henüz ürün yok"} description={!data?.isDone ? "Sonraki sayfayı inceleyebilirsiniz." : hasActiveFilters ? "Arama ve filtreleri değiştirip yeniden dene." : "İlk ürünü ekleyerek kataloğu oluşturmaya başlayabilirsin."} /></div>
         ) : (
           <div className="divide-y divide-border">

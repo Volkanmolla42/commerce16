@@ -1031,7 +1031,7 @@ function ProductEditorData({ productId }: { productId?: string }) {
   const loading = categoriesLoading || (Boolean(productId) && productsLoading);
   const error = categoriesError || (productId && productsError) || null;
 
-  if (loading) return <div className="w-full"><AdminLoading label="Ürün formu" /></div>;
+  if (loading) return <AdminLoading label="Ürün formu" variant="form" />;
   if (error) return <div className="w-full"><AdminNotice kind="error">{error}</AdminNotice></div>;
   if (productId && !product) return <div className="w-full"><AdminNotice kind="error">Ürün bulunamadı.</AdminNotice></div>;
 

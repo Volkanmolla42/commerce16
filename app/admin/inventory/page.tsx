@@ -60,7 +60,7 @@ export default function InventoryPage() {
         />
       </Card>
 
-      {loading && !data ? <AdminLoading label="Stok bilgileri" /> : products.length === 0 ? (
+      {loading && !data ? <AdminLoading label="Stok bilgileri" variant="list" /> : products.length === 0 ? (
         <Card className="p-5">
           <AdminEmpty
             title={query ? "Eşleşen ürün yok" : "Stok kaydı yok"}

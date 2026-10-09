@@ -457,7 +457,7 @@ export default function AdminCartsPage() {
       </Card>
 
       <p aria-live="polite" className="sr-only">{currentLoading ? "Sepetler yükleniyor…" : `${filteredCarts.length} sepet listelendi`}</p>
-      {currentLoading ? <AdminLoading label={view === "active" ? "Aktif sepetler" : "Terk edilen sepetler"} /> : filteredCarts.length === 0 ? (
+      {currentLoading ? <AdminLoading label={view === "active" ? "Aktif sepetler" : "Terk edilen sepetler"} variant="table" /> : filteredCarts.length === 0 ? (
         <AdminEmpty
           title={search || (view === "abandoned" && (statusFilter !== "all" || consentFilter !== "all")) ? "Aramayla eşleşen sepet yok" : view === "active" ? "Aktif sepet yok" : "Terk edilmiş sepet bulunamadı"}
           description={search || (view === "abandoned" && (statusFilter !== "all" || consentFilter !== "all")) ? "Aramayı veya filtreleri değiştirip yeniden deneyin." : view === "active" ? "Ziyaretçi mağazada ürün eklediğinde sepeti burada görünür." : "Ödeme aşamasında terk edilmiş bir sepet kaydı henüz oluşmamış."}

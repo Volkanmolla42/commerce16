@@ -179,7 +179,7 @@ function AdminCouponsContent() {
       <AdminPageHeader title="Kuponlar" description="İndirim kuralları ve kullanım limitleri" actions={<Button onClick={() => setEditingCoupon(null)}>Kupon ekle</Button>} />
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
       <Card className="overflow-hidden rounded-lg">
-        {loading ? <div className="p-5"><AdminLoading label="Kuponlar" /></div> : !coupons?.length ? (
+        {loading ? <AdminLoading label="Kuponlar" variant="table" /> : !coupons?.length ? (
           <div className="p-5"><AdminEmpty title="Henüz kupon yok" description="Yeni kupon oluşturarak müşterilerinize indirim tanımlayın." /></div>
         ) : (
           <div className="divide-y divide-border">

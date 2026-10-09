@@ -126,7 +126,7 @@ function AdminSettingsContent() {
     }
   };
 
-  if (loading) return <AdminLoading label="Mağaza ayarları" />;
+  if (loading) return <AdminLoading label="Mağaza ayarları" variant="settings" />;
   if (!data) {
     return (
       <AdminEmpty

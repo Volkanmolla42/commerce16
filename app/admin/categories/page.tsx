@@ -40,7 +40,7 @@ function AdminCategoriesContent() {
 
       <Card className="overflow-hidden rounded-lg">
         {loading ? (
-          <div className="p-5"><AdminLoading label="Kategoriler" /></div>
+          <AdminLoading label="Kategoriler" variant="table" />
         ) : !categories?.length ? (
           <div className="p-5">
             <AdminEmpty

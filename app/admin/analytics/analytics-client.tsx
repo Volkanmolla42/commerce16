@@ -25,7 +25,7 @@ export function AnalyticsContent() {
   const [days, setDays] = useState<7 | 30 | 90>(30);
   const { data, error, loading } = useAdminResource<AnalyticsDashboard>("analytics", { days: String(days) });
 
-  if (loading && !data) return <AdminLoading label="E-ticaret analitiği" />;
+  if (loading && !data) return <AdminLoading label="E-ticaret analitiği" variant="analytics" />;
 
   return (
     <>
