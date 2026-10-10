@@ -3,7 +3,7 @@
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight01Icon } from "hugeicons-react";
+import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui";
 import { setQuickBuyItem } from "./quick-buy-store";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
@@ -51,7 +51,7 @@ export function QuickBuyButton({ product, variant }: { product: Product; variant
       ) : (
         <>
           <span>Hemen Satın Al</span>
-          <ArrowRight01Icon className="h-5 w-5" />
+          <ArrowRightIcon className="h-5 w-5" />
         </>
       )}
     </Button>

@@ -4,18 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { HeartIcon } from "@heroicons/react/24/outline";
 import {
-  ShoppingBag01Icon,
+  HeartIcon,
+  MapPinIcon,
+  ShoppingBagIcon,
   UserIcon,
-  Location01Icon,
-} from "hugeicons-react";
+} from "@heroicons/react/24/outline";
 import { useFavorites } from "@/components/favorites/favorites-context";
 
 const NAV_ITEMS = [
   { label: "Favorilerim", href: "/account/favorites", icon: HeartIcon },
-  { label: "Siparişlerim", href: "/account/orders", icon: ShoppingBag01Icon },
-  { label: "Adreslerim", href: "/account/addresses", icon: Location01Icon },
+  { label: "Siparişlerim", href: "/account/orders", icon: ShoppingBagIcon },
+  { label: "Adreslerim", href: "/account/addresses", icon: MapPinIcon },
   { label: "Profil ve Güvenlik", href: "/account/profile", icon: UserIcon },
 ] as const;
 

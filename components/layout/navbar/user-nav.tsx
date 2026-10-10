@@ -1,7 +1,7 @@
 "use client";
 
 import { useConvexAuth } from "@convex-dev/auth/react";
-import { UserIcon } from "hugeicons-react";
+import { UserIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 
 export function UserNav() {

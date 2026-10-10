@@ -100,9 +100,12 @@ export function ProductDescription({ product }: { product: Product }) {
             />
           </div>
           {purchaseActivity && purchaseActivity.buyerCount > 0 && (
-            <p role="status" aria-live="polite" className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">
-              Son 24 saatte {purchaseActivity.limited ? "en az " : ""}{purchaseActivity.buyerCount} alıcı bu ürünü satın aldı
-            </p>
+            <div role="status" aria-live="polite" className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+              <span>
+                Son 24 saatte {purchaseActivity.limited ? "en az " : ""}{purchaseActivity.buyerCount} kişi bu ürünü satın aldı
+              </span>
+            </div>
           )}
         </header>
 
@@ -126,6 +129,22 @@ export function ProductDescription({ product }: { product: Product }) {
               quantity: replacementSource.quantity,
             } : undefined}
           />
+        </div>
+
+        {/* Customer Reassurance / Trust Badges */}
+        <div className="mt-6 grid grid-cols-2 gap-3 rounded-2xl border border-border/60 bg-muted/30 p-3.5 text-xs text-muted-foreground sm:grid-cols-3">
+          <div className="flex items-center gap-2">
+            <span className="grid size-6 place-items-center rounded-lg bg-background text-foreground shadow-2xs">✓</span>
+            <span>Hızlı Teslimat</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="grid size-6 place-items-center rounded-lg bg-background text-foreground shadow-2xs">✓</span>
+            <span>14 Gün İade Hakkı</span>
+          </div>
+          <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+            <span className="grid size-6 place-items-center rounded-lg bg-background text-foreground shadow-2xs">✓</span>
+            <span>Güvenli Alışveriş</span>
+          </div>
         </div>
 
         {visibleAttributes.length > 0 && category !== undefined && (

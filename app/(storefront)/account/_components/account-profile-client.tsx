@@ -6,10 +6,9 @@ import { api } from "@/convex/_generated/api";
 import { useState, type ReactNode } from "react";
 import {
   UserIcon,
-  LockIcon,
-  Logout01Icon,
-  CheckmarkBadge01Icon,
-} from "hugeicons-react";
+  LockClosedIcon,
+  CheckBadgeIcon,
+} from "@heroicons/react/24/outline";
 import {
   Button,
   Card,
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui";
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
+import { ArrowRight01Icon } from "hugeicons-react";
 
 function ProfileCardHeader({
   icon: Icon,
@@ -103,121 +103,121 @@ export default function AccountProfilePage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-      {/* Profil Bilgileri */}
-      <Card className="rounded-3xl border-border bg-card shadow-xs">
-        <ProfileCardHeader icon={UserIcon} title="Kişisel Bilgiler" />
-        <CardContent className="p-6">
-          <form onSubmit={handleProfileSubmit} className="space-y-4">
-            {statusMessage && (
-              <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400">
-                <CheckmarkBadge01Icon className="h-4 w-4 shrink-0" />
-                <span>{statusMessage}</span>
+        {/* Profil Bilgileri */}
+        <Card className="rounded-3xl border-border bg-card shadow-xs">
+          <ProfileCardHeader icon={UserIcon} title="Kişisel Bilgiler" />
+          <CardContent className="p-6">
+            <form onSubmit={handleProfileSubmit} className="space-y-4">
+              {statusMessage && (
+                <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckBadgeIcon className="h-4 w-4 shrink-0" />
+                  <span>{statusMessage}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field id="prof-name" label="Ad Soyad">
+                  {!profile ? (
+                    <Sk className="h-10 rounded-xl" />
+                  ) : (
+                    <Input
+                      id="prof-name"
+                      type="text"
+                      autoComplete="name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Adınız ve Soyadınız"
+                    />
+                  )}
+                </Field>
+
+                <Field id="prof-phone" label="Telefon Numarası">
+                  {!profile ? (
+                    <Sk className="h-10 rounded-xl" />
+                  ) : (
+                    <Input
+                      id="prof-phone"
+                      type="tel"
+                      autoComplete="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="05XX XXX XX XX"
+                    />
+                  )}
+                </Field>
               </div>
-            )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field id="prof-name" label="Ad Soyad">
-              {!profile ? (
-                <Sk className="h-10 rounded-xl" />
-              ) : (
-              <Input
-                id="prof-name"
-                type="text"
-                autoComplete="name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Adınız ve Soyadınız"
-              />
-              )}
-            </Field>
-
-            <Field id="prof-phone" label="Telefon Numarası">
-              {!profile ? (
-                <Sk className="h-10 rounded-xl" />
-              ) : (
-              <Input
-                id="prof-phone"
-                type="tel"
-                autoComplete="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="05XX XXX XX XX"
-              />
-              )}
-            </Field>
-            </div>
-
-            <Field
-              id="prof-email"
-              label="E-Posta Adresi"
-              hint={
-                <p className="text-[11px] text-muted-foreground">
-                  E-posta adresi güvenlik nedeniyle değiştirilemez.
-                </p>
-              }
-            >
-              {!profile ? (
-                <Sk className="h-10 rounded-xl" />
-              ) : (
-              <Input
+              <Field
                 id="prof-email"
-                type="email"
+                label="E-Posta Adresi"
+                hint={
+                  <p className="text-[11px] text-muted-foreground">
+                    E-posta adresi güvenlik nedeniyle değiştirilemez.
+                  </p>
+                }
+              >
+                {!profile ? (
+                  <Sk className="h-10 rounded-xl" />
+                ) : (
+                  <Input
+                    id="prof-email"
+                    type="email"
+                    disabled
+                    value={profile.email || ""}
+                    className="bg-muted cursor-not-allowed opacity-75"
+                  />
+                )}
+              </Field>
+
+              <Button
+                type="submit"
+                disabled={isSaving || !profile}
+                className="rounded-2xl font-semibold shadow-md"
+              >
+                {isSaving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Şifre Değiştir */}
+        <Card className="rounded-3xl border-border bg-card shadow-xs">
+          <ProfileCardHeader icon={LockClosedIcon} title="Şifre Değiştir" />
+          <CardContent className="p-6">
+            <form onSubmit={(event) => event.preventDefault()} className="space-y-4">
+              <p className="text-xs text-muted-foreground">Şifre değiştirme şu anda kullanılamıyor.</p>
+
+              <Field id="curr-pass" label="Mevcut Şifre">
+                <Input
+                  id="curr-pass"
+                  type="password"
+                  autoComplete="current-password"
+                  disabled
+                  placeholder="••••••••"
+                />
+              </Field>
+
+              <Field id="new-pass" label="Yeni Şifre">
+                <Input
+                  id="new-pass"
+                  type="password"
+                  autoComplete="new-password"
+                  disabled
+                  placeholder="En az 6 karakter"
+                />
+              </Field>
+
+              <Button
+                type="submit"
+                variant="outline"
                 disabled
-                value={profile.email || ""}
-                className="bg-muted cursor-not-allowed opacity-75"
-              />
-              )}
-            </Field>
-
-            <Button
-              type="submit"
-              disabled={isSaving || !profile}
-              className="rounded-2xl font-semibold shadow-md"
-            >
-              {isSaving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Şifre Değiştir */}
-      <Card className="rounded-3xl border-border bg-card shadow-xs">
-        <ProfileCardHeader icon={LockIcon} title="Şifre Değiştir" />
-        <CardContent className="p-6">
-          <form onSubmit={(event) => event.preventDefault()} className="space-y-4">
-            <p className="text-xs text-muted-foreground">Şifre değiştirme şu anda kullanılamıyor.</p>
-
-            <Field id="curr-pass" label="Mevcut Şifre">
-              <Input
-                id="curr-pass"
-                type="password"
-                autoComplete="current-password"
-                disabled
-                placeholder="••••••••"
-              />
-            </Field>
-
-            <Field id="new-pass" label="Yeni Şifre">
-              <Input
-                id="new-pass"
-                type="password"
-                autoComplete="new-password"
-                disabled
-                placeholder="En az 6 karakter"
-              />
-            </Field>
-
-            <Button
-              type="submit"
-              variant="outline"
-              disabled
-              className="rounded-2xl font-semibold border-border"
-            >
-              Şifreyi Güncelle
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+                className="rounded-2xl font-semibold border-border"
+              >
+                Şifreyi Güncelle
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Oturumu Kapat */}
@@ -234,7 +234,7 @@ export default function AccountProfilePage() {
             onClick={() => signOut()}
             className="rounded-2xl gap-2 font-semibold border-border self-start sm:self-auto"
           >
-            <Logout01Icon className="h-4 w-4 text-muted-foreground" />
+            <ArrowRight01Icon className="h-4 w-4 text-muted-foreground" />
             <span>Oturumu Kapat</span>
           </Button>
         </CardContent>

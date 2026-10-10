@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -11,13 +11,16 @@ import { useCart } from "@/components/cart/cart-context";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ShoppingBag01Icon,
-  Delete02Icon,
-  PlusSignIcon,
-  MinusSignIcon,
-  ArrowRight01Icon,
-  ArrowLeft01Icon,
-} from "hugeicons-react";
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  ArrowRightIcon,
+  MinusIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+  ShoppingBagIcon,
+  TrashIcon,
+  TruckIcon,
+} from "@heroicons/react/24/outline";
 import {
   Button,
   Card,
@@ -42,9 +45,11 @@ function CartContent() {
     token: string;
     cart: Awaited<ReturnType<typeof restoreCart>>;
   } | null>(null);
+
   const restoredCart = restoreToken
     ? restoreState?.token === restoreToken ? restoreState.cart : undefined
     : null;
+
   useEffect(() => {
     let cancelled = false;
     restoreHandled.current = false;
@@ -61,6 +66,7 @@ function CartContent() {
       ? "skip"
       : { ids: (restoredCart?.items ?? []).map((item) => item.productId as Id<"products">) },
   );
+
   useEffect(() => {
     if (!restoreToken || restoredCart === undefined || restoredProducts === undefined || restoreHandled.current) return;
     restoreHandled.current = true;
@@ -114,8 +120,9 @@ function CartContent() {
 
   if (restoreToken) {
     return (
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 text-center text-sm text-muted-foreground" aria-busy="true">
-        Sepetiniz geri yükleniyor...
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">
+        <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent mb-3" />
+        <p>Sepetiniz geri yükleniyor...</p>
       </div>
     );
   }
@@ -123,21 +130,21 @@ function CartContent() {
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
-        <Card className="mx-auto max-w-md text-center p-8 border-border bg-card shadow-lg">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <ShoppingBag01Icon className="h-10 w-10" />
+        <Card className="mx-auto max-w-md text-center p-8 border-border/80 bg-card/60 shadow-lg backdrop-blur-xs rounded-3xl">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <ShoppingBagIcon className="h-10 w-10" />
           </div>
           <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
             Sepetiniz Boş
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sepetinize eklediğiniz ürünler burada görünür.
+            Henüz sepetinize bir ürün eklemediniz. İlginizi çeken koleksiyonları keşfetmeye hemen başlayın!
           </p>
           <div className="mt-8">
-            <Button asChild size="lg" className="rounded-full shadow-md font-semibold">
+            <Button asChild size="lg" className="rounded-full shadow-md font-semibold px-8">
               <Link href="/search" className="gap-2">
-                <span>Ürünlere göz at</span>
-                <ArrowRight01Icon className="h-4 w-4" />
+                <span>Alışverişe Başla</span>
+                <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -148,13 +155,13 @@ function CartContent() {
 
   return (
     <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-8 sm:py-12">
-      <div className="flex flex-col gap-2 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 border-b border-border/60 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
             Alışveriş Sepeti
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Toplam {totalCount} adet ürün bulunuyor
+            Sepetinizde toplam {totalCount} adet ürün bulunuyor
           </p>
         </div>
         <Button
@@ -163,15 +170,15 @@ function CartContent() {
           onClick={clearCart}
           className="text-xs text-muted-foreground hover:text-destructive self-start sm:self-auto gap-1.5"
         >
-          <Delete02Icon className="h-3.5 w-3.5" />
-          <span>Sepeti Temizle</span>
+          <TrashIcon className="h-3.5 w-3.5" />
+          <span>Sepeti Boşalt</span>
         </Button>
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
         {/* Ürün Listesi */}
         <div className="lg:col-span-8">
-          <Card className="divide-y divide-border border-border bg-card shadow-sm overflow-hidden rounded-3xl">
+          <Card className="divide-y divide-border/60 border-border/80 bg-card shadow-sm overflow-hidden rounded-3xl">
             {items.map((item) => {
               const unitPrice = getProductUnitPrice(item.product, item.variantId);
               const lineTotal = (
@@ -181,22 +188,24 @@ function CartContent() {
               return (
                 <div
                   key={`${item.product.id}:${item.variantId ?? ""}`}
-                  className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
                 >
                   <div className="flex items-center gap-4">
                     <Link
                       href={`/product/${item.product.slug}`}
                       className="flex-none overflow-hidden rounded-2xl border border-border bg-muted/30"
                     >
-                      {item.product.images[0] ? <Image
-                        src={item.product.images[0].url}
-                        width={96}
-                        height={96}
-                        alt={item.product.title}
-                        className="h-24 w-24 object-cover"
-                      /> : (
-                        <div className="flex h-24 w-24 items-center justify-center text-muted-foreground">
-                          <ShoppingBag01Icon className="h-8 w-8" />
+                      {item.product.images[0] ? (
+                        <Image
+                          src={item.product.images[0].url}
+                          width={96}
+                          height={96}
+                          alt={item.product.title}
+                          className="h-20 w-20 object-cover sm:h-24 sm:w-24"
+                        />
+                      ) : (
+                        <div className="flex h-20 w-20 items-center justify-center text-muted-foreground sm:h-24 sm:w-24">
+                          <ShoppingBagIcon className="h-8 w-8" />
                         </div>
                       )}
                     </Link>
@@ -221,7 +230,7 @@ function CartContent() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t border-border sm:border-0">
+                  <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t border-border/60 sm:border-0">
                     {/* Adet Kontrolü */}
                     <div className="flex items-center rounded-xl border border-border bg-muted/40">
                       <Button
@@ -234,7 +243,7 @@ function CartContent() {
                         }
                         aria-label="Azalt"
                       >
-                        <MinusSignIcon className="h-3.5 w-3.5" />
+                        <MinusIcon className="h-3.5 w-3.5" />
                       </Button>
                       <span className="px-3 text-xs font-bold text-foreground">
                         {item.quantity}
@@ -249,7 +258,7 @@ function CartContent() {
                         }
                         aria-label="Arttır"
                       >
-                        <PlusSignIcon className="h-3.5 w-3.5" />
+                        <PlusIcon className="h-3.5 w-3.5" />
                       </Button>
                     </div>
 
@@ -267,7 +276,7 @@ function CartContent() {
                       className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       aria-label="Ürünü Sil"
                     >
-                      <Delete02Icon className="h-4 w-4" />
+                      <TrashIcon className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -278,7 +287,7 @@ function CartContent() {
           <div className="mt-6">
             <Button asChild variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
               <Link href="/search">
-                <ArrowLeft01Icon className="h-4 w-4" />
+                <ArrowLeftIcon className="h-4 w-4" />
                 <span>Alışverişe Devam Et</span>
               </Link>
             </Button>
@@ -287,36 +296,55 @@ function CartContent() {
 
         {/* Sipariş Özeti */}
         <div className="lg:col-span-4">
-          <Card className="sticky top-24 rounded-3xl border-border bg-card p-6 shadow-sm">
-            <CardHeader className="p-0 pb-4">
+          <Card className="sticky top-24 rounded-3xl border-border/80 bg-card p-6 shadow-sm space-y-5">
+            <CardHeader className="p-0">
               <CardTitle className="text-lg font-bold text-foreground">
                 Sipariş Özeti
               </CardTitle>
             </CardHeader>
             <Separator />
 
-            <CardContent className="p-0 pt-4 space-y-3.5 text-sm">
+            <CardContent className="p-0 space-y-4 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Ara Toplam</span>
                 <span className="font-semibold text-foreground">
                   {formatMoney(totalAmount)}
                 </span>
               </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Kargo</span>
+                <span className="font-medium text-emerald-500">Ücretsiz</span>
+              </div>
               <Separator />
-              <div className="flex justify-between text-lg font-bold text-foreground pt-1">
+              <div className="flex justify-between text-lg font-bold text-foreground">
                 <span>Genel Toplam</span>
-                <span>{formatMoney(totalAmount)}</span>
+                <span className="text-primary">{formatMoney(totalAmount)}</span>
               </div>
 
-              <div className="pt-4">
-                <Button asChild size="lg" className="w-full rounded-2xl shadow-lg font-semibold gap-2">
+              <div className="pt-2">
+                <Button asChild size="lg" className="w-full rounded-2xl shadow-lg font-semibold gap-2 h-12">
                   <Link href="/checkout">
                     <span>Ödemeye Geç</span>
-                    <ArrowRight01Icon className="h-4 w-4" />
+                    <ArrowRightIcon className="h-4 w-4" />
                   </Link>
                 </Button>
               </div>
 
+              {/* Güven Rozetleri */}
+              <div className="pt-2 space-y-2 border-t border-border/60 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <ShieldCheckIcon className="size-4 text-primary" />
+                  <span>256-Bit SSL ile güvenli ödeme</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TruckIcon className="size-4 text-primary" />
+                  <span>Sigortalı ve özenli paketleme</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowPathIcon className="size-4 text-primary" />
+                  <span>14 gün içinde koşulsuz kolay iade</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -328,7 +356,7 @@ function CartContent() {
 
 export default function CartPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 text-center text-sm text-muted-foreground" aria-busy="true">Sepetiniz açılıyor...</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">Sepetiniz yükleniyor...</div>}>
       <CartContent />
     </Suspense>
   );

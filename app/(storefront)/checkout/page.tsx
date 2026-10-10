@@ -9,10 +9,10 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import {
-  CheckmarkBadge01Icon,
-  ArrowLeft01Icon,
-  ShoppingBag01Icon,
-} from "hugeicons-react";
+  CheckBadgeIcon,
+  ArrowLeftIcon,
+  ShoppingBagIcon,
+} from "@heroicons/react/24/outline";
 import {
   Button,
   Input,
@@ -281,7 +281,7 @@ function CheckoutContent() {
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
             <Link href="/cart">
-              <ArrowLeft01Icon className="h-4 w-4" />
+              <ArrowLeftIcon className="h-4 w-4" />
               <span>Sepete Dön</span>
             </Link>
           </Button>
@@ -292,7 +292,7 @@ function CheckoutContent() {
         </div>
 
         <Badge variant="outline" className="gap-1.5 py-1 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/60 font-medium">
-          <CheckmarkBadge01Icon className="h-3.5 w-3.5" />
+          <CheckBadgeIcon className="h-3.5 w-3.5" />
           <span>Güvenli Sipariş</span>
         </Badge>
       </div>
@@ -543,7 +543,7 @@ function CheckoutContent() {
                 <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2.5">
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <CheckmarkBadge01Icon className="h-4 w-4" />
+                      <CheckBadgeIcon className="h-4 w-4" />
                     </div>
                     <div>
                       <span className="font-semibold text-foreground">Teslim Edilecek Adres:</span>{" "}
@@ -612,7 +612,7 @@ function CheckoutContent() {
                       className="h-12 w-12 rounded-xl object-cover border border-border flex-none"
                     /> : (
                       <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
-                        <ShoppingBag01Icon className="h-5 w-5" />
+                        <ShoppingBagIcon className="h-5 w-5" />
                       </div>
                     )}
                     <div>
@@ -705,7 +705,7 @@ function CheckoutContent() {
                 </>
               ) : (
                 <>
-                  <CheckmarkBadge01Icon className="h-4 w-4" />
+                  <CheckBadgeIcon className="h-4 w-4" />
                   <span>Siparişi Tamamla ({formatMoney(payableAmount)})</span>
                 </>
               )}

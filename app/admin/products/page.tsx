@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button, Input, Card } from "@/components/ui";
+import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
@@ -93,15 +94,30 @@ function AdminProductsContent() {
                     )}
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-semibold text-foreground">{product.title}</h3>
-                      <p className="mt-1 truncate font-mono text-xs text-muted-foreground">/product/{product.slug}</p>
+                      <a
+                        href={`/product/${product.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 truncate font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        title="Ürün sayfasına git"
+                      >
+                        <span>/product/{product.slug}</span>
+                        <ArrowTopRightOnSquareIcon className="size-3 shrink-0" />
+                      </a>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground"><span className="mr-2 text-xs text-muted-foreground lg:hidden">Kategori</span>{category?.title || "Kategorisiz"}</p>
                   <p className="text-sm font-semibold tabular-nums text-foreground"><span className="mr-2 text-xs font-normal text-muted-foreground lg:hidden">Fiyat</span>{formatMoney(product.price)}</p>
                   <p className="text-xs font-semibold"><span className={`mr-2 inline-block h-2 w-2 rounded-full ${product.availableForSale ? "bg-primary" : "bg-muted-foreground"}`} />{product.availableForSale ? "Satışta" : "Pasif"}</p>
-                  <div className="flex gap-2 lg:justify-end">
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <Button asChild size="sm" variant="outline" className="min-h-10 gap-1.5" title="Ürün sayfasına git">
+                      <a href={`/product/${product.slug}`} target="_blank" rel="noopener noreferrer">
+                        <ArrowTopRightOnSquareIcon className="size-4" />
+                        <span>Görüntüle</span>
+                      </a>
+                    </Button>
                     <Button asChild size="sm" variant="outline" className="min-h-10"><Link href={adminPath(`products/${product._id}/edit`)}>Düzenle</Link></Button>
-                    <Button size="sm" variant="ghost" className="min-h-10" onClick={() => void handleDelete(product)}>Sil</Button>
+                    <Button size="sm" variant="ghost" className="min-h-10 text-muted-foreground hover:text-destructive" onClick={() => void handleDelete(product)}>Sil</Button>
                   </div>
                 </article>
               );

@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckmarkBadge01Icon, Clock01Icon } from "hugeicons-react";
+import { CheckBadgeIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { useCart } from "@/components/cart/cart-context";
 import { clearQuickBuyItem } from "@/components/cart/quick-buy-store";
@@ -33,7 +33,7 @@ function ResultContent() {
     <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
       <Card className="mx-auto max-w-lg rounded-3xl border-border bg-card p-8 text-center shadow-xl sm:p-12">
         <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${isSuccess ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
-          {isSuccess ? <CheckmarkBadge01Icon className="h-12 w-12" /> : <Clock01Icon className="h-10 w-10" />}
+          {isSuccess ? <CheckBadgeIcon className="h-12 w-12" /> : <ClockIcon className="h-10 w-10" />}
         </div>
         <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
           {isSuccess ? "Siparişiniz Alındı" : "Sipariş Tamamlanamadı"}

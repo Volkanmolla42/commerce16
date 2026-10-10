@@ -7,14 +7,14 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowLeft01Icon,
-  ShoppingBag01Icon,
-  CheckmarkBadge01Icon,
-  Clock01Icon,
-  Cancel01Icon,
-  Location01Icon,
+  ArrowLeftIcon,
+  ShoppingBagIcon,
+  CheckBadgeIcon,
+  ClockIcon,
+  XCircleIcon,
+  MapPinIcon,
   CreditCardIcon,
-} from "hugeicons-react";
+} from "@heroicons/react/24/outline";
 import { orderStatusLabels } from "@/lib/orders";
 import { formatMoney } from "@/lib/format-money";
 import {
@@ -28,6 +28,7 @@ import {
 import { OrderStatusBadge } from "./order-status-badge";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
+import { Cancel01Icon } from "hugeicons-react";
 
 function OrderDetailsBackLink() {
   return (
@@ -38,7 +39,7 @@ function OrderDetailsBackLink() {
       className="mb-2 -ml-3 text-xs text-muted-foreground hover:text-foreground"
     >
       <Link href="/account/orders">
-        <ArrowLeft01Icon className="mr-1.5 h-3.5 w-3.5" /> Tüm Siparişlerime Dön
+        <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" /> Tüm Siparişlerime Dön
       </Link>
     </Button>
   );
@@ -90,7 +91,7 @@ export function AccountOrderDetailsSkeleton() {
       <Card className="rounded-3xl border-border bg-card shadow-xs overflow-hidden">
         <CardHeader className="border-b border-border bg-muted/20 px-6 py-4">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <ShoppingBag01Icon className="h-5 w-5 text-primary" />
+            <ShoppingBagIcon className="h-5 w-5 text-primary" />
             <span className="flex items-center gap-1.5">
               <span>Sipariş Edilen Ürünler (</span>
               <SkLine className="h-4 w-4" />
@@ -121,7 +122,7 @@ export function AccountOrderDetailsSkeleton() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card className="rounded-3xl border-border bg-card shadow-xs p-6 space-y-4">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <Location01Icon className="h-5 w-5 text-primary" />
+            <MapPinIcon className="h-5 w-5 text-primary" />
             <span>Teslimat & İletişim Bilgileri</span>
           </CardTitle>
           <Separator />
@@ -205,7 +206,7 @@ export default function AccountOrderDetailsClient({
     return (
       <Card className="rounded-3xl border-border bg-card p-12 text-center shadow-xs">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-          <Cancel01Icon className="h-8 w-8" />
+          <XCircleIcon className="h-8 w-8" />
         </div>
         <h2 className="mt-4 text-lg font-bold text-foreground">
           Sipariş Bulunamadı
@@ -215,7 +216,7 @@ export default function AccountOrderDetailsClient({
         </p>
         <Button asChild size="lg" className="mt-6 rounded-2xl font-semibold shadow-md">
           <Link href="/account/orders">
-            <ArrowLeft01Icon className="mr-2 h-4 w-4" /> Tüm Siparişlerime Dön
+            <ArrowLeftIcon className="mr-2 h-4 w-4" /> Tüm Siparişlerime Dön
           </Link>
         </Button>
       </Card>
@@ -223,8 +224,8 @@ export default function AccountOrderDetailsClient({
   }
 
   const steps = [
-    { key: "pending", label: "Sipariş Alındı", icon: Clock01Icon },
-    { key: "paid", label: orderStatusLabels.paid, icon: CheckmarkBadge01Icon },
+    { key: "pending", label: "Sipariş Alındı", icon: ClockIcon },
+    { key: "paid", label: orderStatusLabels.paid, icon: CheckBadgeIcon },
   ];
 
   const isCancelled = order.status === "cancelled";
@@ -262,7 +263,7 @@ export default function AccountOrderDetailsClient({
       <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
         {isCancelled ? (
           <div className="flex items-center gap-3 rounded-2xl bg-destructive/10 p-4 text-destructive">
-            <Cancel01Icon className="h-6 w-6 shrink-0" />
+            <XCircleIcon className="h-6 w-6 shrink-0" />
             <div>
               <p className="font-bold text-sm">Bu sipariş iptal edilmiştir.</p>
               <p className="text-xs opacity-90">
@@ -290,18 +291,16 @@ export default function AccountOrderDetailsClient({
                 return (
                   <div key={step.key} className="relative z-10 flex flex-col items-center">
                     <div
-                      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,box-shadow] duration-150 ${
-                        isPassed
+                      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,box-shadow] duration-150 ${isPassed
                           ? "border-primary bg-primary text-primary-foreground shadow-md"
                           : "border-border bg-card text-muted-foreground"
-                      } ${isCurrent ? "ring-4 ring-primary/20" : ""}`}
+                        } ${isCurrent ? "ring-4 ring-primary/20" : ""}`}
                     >
                       <Icon className="h-5 w-5" />
                     </div>
                     <span
-                      className={`mt-2 text-center text-xs font-semibold ${
-                        isPassed ? "text-foreground" : "text-muted-foreground"
-                      }`}
+                      className={`mt-2 text-center text-xs font-semibold ${isPassed ? "text-foreground" : "text-muted-foreground"
+                        }`}
                     >
                       {step.label}
                     </span>
@@ -317,7 +316,7 @@ export default function AccountOrderDetailsClient({
       <Card className="rounded-3xl border-border bg-card shadow-xs overflow-hidden">
         <CardHeader className="border-b border-border bg-muted/20 px-6 py-4">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <ShoppingBag01Icon className="h-5 w-5 text-primary" />
+            <ShoppingBagIcon className="h-5 w-5 text-primary" />
             <span>Sipariş Edilen Ürünler ({order.items.length})</span>
           </CardTitle>
         </CardHeader>
@@ -338,7 +337,7 @@ export default function AccountOrderDetailsClient({
                     </div>
                   ) : (
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-border bg-muted text-muted-foreground">
-                      <ShoppingBag01Icon className="h-6 w-6" />
+                      <ShoppingBagIcon className="h-6 w-6" />
                     </div>
                   )}
 
@@ -370,7 +369,7 @@ export default function AccountOrderDetailsClient({
         {/* Teslimat ve Müşteri Bilgileri */}
         <Card className="rounded-3xl border-border bg-card shadow-xs p-6 space-y-4">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <Location01Icon className="h-5 w-5 text-primary" />
+            <MapPinIcon className="h-5 w-5 text-primary" />
             <span>Teslimat & İletişim Bilgileri</span>
           </CardTitle>
           <Separator />

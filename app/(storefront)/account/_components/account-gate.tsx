@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { UserIcon, ArrowRight01Icon } from "hugeicons-react";
+import { UserIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { Button, Card } from "@/components/ui";
 
 export function AccountLoginCard() {
@@ -23,7 +23,7 @@ export function AccountLoginCard() {
           className="mt-6 w-full rounded-2xl font-semibold shadow-md"
         >
           <Link href="/login">
-            Giriş Yap <ArrowRight01Icon className="ml-2 h-4 w-4" />
+            Giriş Yap <ArrowRightIcon className="ml-2 h-4 w-4" />
           </Link>
         </Button>
       </Card>

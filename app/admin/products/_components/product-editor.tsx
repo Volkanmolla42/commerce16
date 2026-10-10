@@ -13,6 +13,7 @@ import { type CategoryAttributeDefinition, type ProductAttribute } from "@/lib/c
 import {
   AdjustmentsHorizontalIcon,
   ArrowPathIcon,
+  ArrowTopRightOnSquareIcon,
   CheckIcon,
   DocumentArrowDownIcon,
   GlobeAltIcon,
@@ -905,23 +906,23 @@ function ProductEditor({
                       <table className="w-full min-w-[760px] border-collapse text-left text-xs">
                         <thead className="bg-background text-muted-foreground">
                           <tr>
+                            <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
                             <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
-                            <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-destructive">*</span></th>
-                            <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
                             <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-destructive">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Stok</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
+                            <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-destructive">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
                             <th scope="col" className="px-3 py-3 font-medium"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)}>
+                          {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)} className="transition-colors hover:bg-muted/40">
+                            <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" /></td>
                             <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-foreground">{variant.selectedOptions.map(({ value }) => value).join(" / ") || "Tek ürün"}</td>
-                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
-                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
                             <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
                             <td className="w-24 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
-                            <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" /></td>
+                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
+                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
                             <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-9 px-2 text-muted-foreground hover:bg-muted hover:text-foreground" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
                           </tr>)}
                         </tbody>
@@ -934,11 +935,13 @@ function ProductEditor({
                           <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.length > 0 ? variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-muted px-2 py-1 text-xs text-foreground">{selected.name}: {selected.value}</span>) : <span className="text-xs text-muted-foreground">Tek ürün</span>}</div>
                           <Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-8 px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
                         </div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-muted-foreground">SKU <span className="text-destructive">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-11 rounded-lg border-border bg-card font-mono text-sm text-foreground" /></div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-muted-foreground">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-11 rounded-lg border-border bg-card font-mono text-sm text-foreground" /></div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (₺) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-11 rounded-lg border-border bg-card text-sm text-foreground" /></div>
-                        <div className="space-y-2"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-muted-foreground">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-11 rounded-lg border-border bg-card text-sm text-foreground" /></div>
-                        <label className="flex min-h-11 items-center gap-2 self-end text-xs text-muted-foreground"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" />Satışta</label>
+                        <label className="flex min-h-9 items-center gap-2 text-xs font-medium text-foreground"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" />Satışta</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1.5"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (₺) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
+                          <div className="space-y-1.5"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-muted-foreground">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
+                        </div>
+                        <div className="space-y-1.5"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-muted-foreground">SKU <span className="text-destructive">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>
+                        <div className="space-y-1.5"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-muted-foreground">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>
                       </section>)}
                   </div>
             </div>
@@ -953,6 +956,12 @@ function ProductEditor({
           <div className="flex flex-wrap items-center justify-end gap-2.5">
             {product ? (
               <>
+                <Button asChild type="button" variant="outline" size="sm" className="h-10 gap-1.5">
+                  <a href={`/product/${product.slug}`} target="_blank" rel="noopener noreferrer">
+                    <ArrowTopRightOnSquareIcon className="size-4" />
+                    <span>Mağazada Gör</span>
+                  </a>
+                </Button>
                 <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card/70 px-3 text-xs font-medium text-foreground hover:border-border">
                   <input
                     type="checkbox"

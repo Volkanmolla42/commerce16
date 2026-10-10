@@ -3,9 +3,8 @@
 import { useQuery, useMutation } from "convex/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
-import { Add01Icon, Delete02Icon, Edit02Icon } from "hugeicons-react";
+import { PlusIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
 import {
@@ -27,10 +26,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui";
+import { Id } from "@/convex/_generated/dataModel";
 
 const DEFAULT_PROVINCE = getProvinceByName("İstanbul")!;
 
-function AccountAddressesSkeleton() {
+export function AccountAddressesSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-hidden>
       {[0, 1].map((i) => (
@@ -58,7 +58,7 @@ function AccountAddressesSkeleton() {
                 disabled
                 className="h-8 rounded-xl border-border px-3 text-xs font-medium gap-1.5"
               >
-                <Edit02Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                <PencilSquareIcon className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Düzenle</span>
               </Button>
               <Button
@@ -67,7 +67,7 @@ function AccountAddressesSkeleton() {
                 disabled
                 className="h-8 rounded-xl border-border px-3 text-xs font-medium text-destructive gap-1.5"
               >
-                <Delete02Icon className="h-3.5 w-3.5" />
+                <TrashIcon className="h-3.5 w-3.5" />
                 <span>Sil</span>
               </Button>
             </div>
@@ -272,7 +272,7 @@ export default function AccountAddressesPage() {
                     onClick={() => openEditModal(addr)}
                     className="h-8 rounded-xl border-border px-3 text-xs font-medium gap-1.5"
                   >
-                    <Edit02Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <PencilSquareIcon className="h-3.5 w-3.5 text-muted-foreground" />
                     <span>Düzenle</span>
                   </Button>
                   <Button
@@ -281,7 +281,7 @@ export default function AccountAddressesPage() {
                     onClick={() => handleDelete(addr._id)}
                     className="h-8 rounded-xl border-border px-3 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5"
                   >
-                    <Delete02Icon className="h-3.5 w-3.5" />
+                    <TrashIcon className="h-3.5 w-3.5" />
                     <span>Sil</span>
                   </Button>
                 </div>
@@ -307,7 +307,7 @@ export default function AccountAddressesPage() {
             className="group flex min-h-[15rem] w-full flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-card p-6 text-center transition-colors hover:border-primary/50 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
-              <Add01Icon className="h-6 w-6" />
+              <PlusIcon className="h-6 w-6" />
             </span>
             <span className="text-sm font-semibold text-foreground">Adres Ekle</span>
           </button>

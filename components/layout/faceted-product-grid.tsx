@@ -326,7 +326,6 @@ export function FacetedProductGrid({
   };
 
   const pageTitle = title ?? (query ? `“${query}” sonuçları` : "Tüm ürünler");
-  const showFilters = activeFilterCount > 0;
 
   return (
     <div className="min-w-0">
@@ -357,8 +356,8 @@ export function FacetedProductGrid({
         </div>
       </header>
 
-      <div className={`grid min-w-0 gap-4 xl:gap-6 ${showFilters ? "xl:grid-cols-[250px_minmax(0,1fr)]" : ""}`}>
-        {showFilters ? <details className="group overflow-hidden rounded-2xl border border-border bg-card xl:hidden">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[250px_minmax(0,1fr)] xl:gap-6">
+        <details className="group overflow-hidden rounded-2xl border border-border bg-card xl:hidden">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
             <span>Filtreler</span>
             <span className="flex items-center gap-2 text-muted-foreground">
@@ -369,9 +368,9 @@ export function FacetedProductGrid({
           <div className="border-t border-border px-4">
             <FacetControls {...panelProps} inputSuffix="mobile" />
           </div>
-        </details> : null}
+        </details>
 
-        {showFilters ? <aside className="hidden min-w-0 xl:block">
+        <aside className="hidden min-w-0 xl:block">
           <Card className="sticky top-24 rounded-2xl bg-card/60 p-5 shadow-none">
             <div className="mb-1 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-foreground">Filtreler</h2>
@@ -383,7 +382,7 @@ export function FacetedProductGrid({
             </div>
             <FacetControls {...panelProps} inputSuffix="desktop" />
           </Card>
-        </aside> : null}
+        </aside>
 
         <section className={`min-w-0 ${isFiltering ? "opacity-60" : ""}`} aria-label="Filtrelenebilir ürünler" aria-busy={isFiltering}>
           {activeFilterCount > 0 ? (

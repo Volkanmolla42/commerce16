@@ -3,7 +3,7 @@
 import { useCart } from "./cart-context";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBag01Icon, Tick01Icon, ArrowRight01Icon } from "hugeicons-react";
+import { ShoppingBagIcon, CheckIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
@@ -59,7 +59,7 @@ export function AddToCart({
       >
         {added ? (
           <>
-            <Tick01Icon className="h-5 w-5 text-emerald-400" />
+            <CheckIcon className="h-5 w-5 text-emerald-400" />
             <span>{replaced ? "Sepet güncellendi" : "Sepete Eklendi"}</span>
           </>
         ) : needsSelection ? (
@@ -68,7 +68,7 @@ export function AddToCart({
           <span>Tükendi</span>
         ) : (
           <>
-            <ShoppingBag01Icon className="h-5 w-5" />
+            <ShoppingBagIcon className="h-5 w-5" />
             <span>Sepete Ekle</span>
           </>
         )}
@@ -83,7 +83,7 @@ export function AddToCart({
         >
           <Link href="/cart">
             <span>Sepeti Görüntüle</span>
-            <ArrowRight01Icon className="h-4 w-4" />
+            <ArrowRightIcon className="h-4 w-4" />
           </Link>
         </Button>
       )}
