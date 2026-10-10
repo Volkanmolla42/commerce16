@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Doc } from "@/convex/_generated/dataModel";
 import {
@@ -161,13 +161,11 @@ function AdminOrdersContent() {
     router.replace(`${adminPath("orders")}${queryString ? `?${queryString}` : ""}`, { scroll: false });
   };
 
-  const filteredOrders = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("tr-TR");
-    return (orders || []).filter((order) => {
-      const matchesTerm = !term || `${order._id} ${order.customerName} ${order.customerEmail}`.toLocaleLowerCase("tr-TR").includes(term);
-      return matchesTerm && (statusFilter === "all" || order.status === statusFilter);
-    });
-  }, [orders, query, statusFilter]);
+  const term = query.trim().toLocaleLowerCase("tr-TR");
+  const filteredOrders = (orders || []).filter((order) => {
+    const matchesTerm = !term || `${order._id} ${order.customerName} ${order.customerEmail}`.toLocaleLowerCase("tr-TR").includes(term);
+    return matchesTerm && (statusFilter === "all" || order.status === statusFilter);
+  });
 
   const updateStatus = async (order: Order, status: OrderStatus) => {
     setUpdatingId(order._id);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -357,7 +357,7 @@ export default function AdminCartsPage() {
     }
   };
 
-  const recoveryStats = useMemo(() => {
+  const recoveryStats = (() => {
     if (!carts) return { active: 0, recoveredRevenue: "0.00" };
     const active = carts.filter((c) => c.status === "active").length;
     const converted = carts.filter((c) => c.status === "converted");
@@ -370,26 +370,24 @@ export default function AdminCartsPage() {
       active,
       recoveredRevenue: recoveredRevenue.toFixed(2),
     };
-  }, [carts]);
+  })();
 
-  const filteredCarts = useMemo(() => {
-    const source: CartEntry[] = view === "active" ? activeCarts ?? [] : carts ?? [];
-    return source.filter((cart) => {
-      const isLiveCart = "updatedAt" in cart;
-      if (!isLiveCart && statusFilter !== "all" && cart.status !== statusFilter) return false;
-      if (!isLiveCart && consentFilter === "consented" && !cart.emailConsent) return false;
-      if (!isLiveCart && consentFilter === "no_consent" && cart.emailConsent) return false;
+  const cartSource: CartEntry[] = view === "active" ? activeCarts ?? [] : carts ?? [];
+  const filteredCarts = cartSource.filter((cart) => {
+    const isLiveCart = "updatedAt" in cart;
+    if (!isLiveCart && statusFilter !== "all" && cart.status !== statusFilter) return false;
+    if (!isLiveCart && consentFilter === "consented" && !cart.emailConsent) return false;
+    if (!isLiveCart && consentFilter === "no_consent" && cart.emailConsent) return false;
 
-      if (search.trim()) {
-        const query = search.toLowerCase();
-        const emailMatch = !isLiveCart && cart.email?.toLowerCase().includes(query);
-        const sessionMatch = cart.sessionKey.toLowerCase().includes(query);
-        const itemMatch = cart.items.some((item) => item.title.toLowerCase().includes(query));
-        if (!emailMatch && !sessionMatch && !itemMatch) return false;
-      }
-      return true;
-    });
-  }, [activeCarts, carts, statusFilter, consentFilter, search, view]);
+    if (search.trim()) {
+      const query = search.toLowerCase();
+      const emailMatch = !isLiveCart && cart.email?.toLowerCase().includes(query);
+      const sessionMatch = cart.sessionKey.toLowerCase().includes(query);
+      const itemMatch = cart.items.some((item) => item.title.toLowerCase().includes(query));
+      if (!emailMatch && !sessionMatch && !itemMatch) return false;
+    }
+    return true;
+  });
 
   const liveItemCount = (activeCarts ?? []).reduce((sum, cart) => sum + cart.itemCount, 0);
   const liveCartValue = (activeCarts ?? []).reduce((sum, cart) => sum + (Number.parseFloat(cart.estimatedTotal) || 0), 0);

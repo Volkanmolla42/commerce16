@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui";
 import { type CategoryAttributeDefinition } from "@/lib/catalog/attributes";
 import { ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/24/outline";
@@ -15,14 +15,12 @@ export function AttributeMultiSelect({
   onChange: (next: string[]) => void;
 }) {
   const [search, setSearch] = useState("");
-  const options = useMemo(() => attribute.options ?? [], [attribute.options]);
-  const selectedSet = useMemo(() => new Set(value), [value]);
-
-  const filteredOptions = useMemo(() => {
-    if (!search.trim()) return options;
-    const q = search.trim().toLocaleLowerCase("tr-TR");
-    return options.filter((opt) => opt.toLocaleLowerCase("tr-TR").includes(q));
-  }, [options, search]);
+  const options = attribute.options ?? [];
+  const selectedSet = new Set(value);
+  const normalizedSearch = search.trim().toLocaleLowerCase("tr-TR");
+  const filteredOptions = normalizedSearch
+    ? options.filter((opt) => opt.toLocaleLowerCase("tr-TR").includes(normalizedSearch))
+    : options;
 
   const toggle = (option: string) => {
     if (selectedSet.has(option)) {

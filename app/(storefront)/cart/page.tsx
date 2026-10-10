@@ -61,10 +61,21 @@ function CartContent() {
       ? "skip"
       : { ids: (restoredCart?.items ?? []).map((item) => item.productId as Id<"products">) },
   );
-  const restoredProductsById = useMemo(() => {
-    const mapped = new Map<string, Product>();
+  useEffect(() => {
+    if (!restoreToken || restoredCart === undefined || restoredProducts === undefined || restoreHandled.current) return;
+    restoreHandled.current = true;
+
+    if (restoredCart) {
+      try {
+        setCartRecoverySessionKey(restoredCart.sessionKey);
+      } catch {
+        // The cart can still be restored when browser storage is unavailable.
+      }
+    }
+
+    const restoredProductsById = new Map<string, Product>();
     for (const product of restoredProducts ?? []) {
-      mapped.set(product._id, {
+      restoredProductsById.set(product._id, {
         id: product._id,
         slug: product.slug,
         title: product.title,
@@ -79,20 +90,6 @@ function CartContent() {
         })),
         updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
       });
-    }
-    return mapped;
-  }, [restoredProducts]);
-
-  useEffect(() => {
-    if (!restoreToken || restoredCart === undefined || restoredProducts === undefined || restoreHandled.current) return;
-    restoreHandled.current = true;
-
-    if (restoredCart) {
-      try {
-        setCartRecoverySessionKey(restoredCart.sessionKey);
-      } catch {
-        // The cart can still be restored when browser storage is unavailable.
-      }
     }
 
     for (const restored of restoredCart?.items ?? []) {
@@ -113,7 +110,7 @@ function CartContent() {
     }
 
     router.replace("/cart");
-  }, [addItem, items, restoredCart, restoredProducts, restoredProductsById, restoreToken, router, updateQuantity]);
+  }, [addItem, items, restoredCart, restoredProducts, restoreToken, router, updateQuantity]);
 
   if (restoreToken) {
     return (

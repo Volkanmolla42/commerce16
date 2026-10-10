@@ -63,8 +63,8 @@ export function AdminGate() {
           </p>
 
           <form className="mt-6" onSubmit={verifyPin}>
-            <label htmlFor="admin-pin" className="mb-2 block text-sm font-medium">
-              6 haneli PIN
+            <label htmlFor="admin-pin" className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              6 Haneli PIN
             </label>
             <input
               id="admin-pin"
@@ -75,20 +75,22 @@ export function AdminGate() {
               pattern="[0-9]{6}"
               minLength={6}
               maxLength={6}
+              placeholder="••••••"
               required
+              autoFocus
               value={pin}
               onChange={(event) => {
                 setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
                 setError(null);
               }}
               disabled={submitting}
-              className="h-11 w-full rounded-md border border-input bg-background px-3 text-foreground outline-none disabled:opacity-60"
+              className="h-12 w-full rounded-xl border border-input bg-background px-4 text-center font-mono text-xl tracking-[0.4em] text-foreground transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 outline-none disabled:opacity-60"
             />
 
-            {error && <p role="alert" aria-live="polite" className="mt-4 text-sm font-medium text-destructive">{error}</p>}
+            {error && <p role="alert" aria-live="polite" className="mt-3 text-xs font-medium text-destructive">{error}</p>}
 
-            <Button type="submit" disabled={submitting || pin.length !== 6} className="mt-5 h-11 w-full">
-              {submitting ? "Doğrulanıyor…" : "Yönetim paneline gir"}
+            <Button type="submit" disabled={submitting || pin.length !== 6} className="mt-5 h-11 w-full rounded-xl font-medium">
+              {submitting ? "Doğrulanıyor…" : "Yönetim Paneline Gir"}
             </Button>
           </form>
         </CardContent>

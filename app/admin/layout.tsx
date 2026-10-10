@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { AdminShell } from "./_components/admin-shell";
 import { AdminGate } from "./_components/admin-gate";
-import { AdminThemeShell } from "./admin-theme-shell";
 import { hasAdminSession } from "@/lib/admin/session";
 
 export const metadata: Metadata = {
@@ -17,5 +18,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     return <AdminGate />;
   }
 
-  return <AdminThemeShell>{children}</AdminThemeShell>;
+  const cookieStore = await cookies();
+  const savedTheme = cookieStore.get("admin-theme")?.value;
+  const initialTheme = savedTheme === "dark" ? "dark" : "light";
+
+  return <AdminShell initialTheme={initialTheme}>{children}</AdminShell>;
 }

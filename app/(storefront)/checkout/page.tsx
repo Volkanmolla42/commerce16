@@ -1,7 +1,7 @@
 "use client";
 
 import { useCart } from "@/components/cart/cart-context";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -36,10 +36,7 @@ function CheckoutContent() {
   const { items: cartItems, clearCart } = useCart();
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
   const quickBuy = useQuickBuyDraft();
-  const items = useMemo(
-    () => isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems,
-    [cartItems, isQuickBuy, quickBuy.item],
-  );
+  const items = isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems;
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotalKurus = items.reduce((sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity, 0);
   const totalAmount = subtotalKurus / 100;
