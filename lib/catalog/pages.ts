@@ -19,12 +19,13 @@ export async function getCatalogPage(params: CatalogSearchParams, categorySlug?:
   cacheTag("products", "categories");
   cacheLife({ stale: 0, revalidate: 30, expire: 60 });
   const args = pageArguments(params, categorySlug);
-  const [result, attributes] = await Promise.all([
+  const [result, attributes, options] = await Promise.all([
     fetchQuery(api.catalog.page, args),
     categorySlug === undefined ? Promise.resolve({}) : fetchQuery(api.catalog.facets, { categorySlug }),
+    fetchQuery(api.catalog.optionFacets, { categorySlug }),
   ]);
   return { products: result.page, continueCursor: result.continueCursor, isDone: result.isDone,
-    facets: { attributes },
+    facets: { attributes, options },
     filters: args.filters, attributeFilters: args.attributes };
 }
 

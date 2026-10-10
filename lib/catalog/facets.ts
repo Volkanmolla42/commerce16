@@ -4,6 +4,7 @@ import type { CategoryAttributeDefinition } from "./attributes";
 export type CatalogFilters = {
   minPrice: string;
   maxPrice: string;
+  options?: Record<string, string[]>;
 };
 
 export type CategoryAttributeFilter = { values: string[]; min: string; max: string };
@@ -55,11 +56,42 @@ export function getActiveCategoryAttributeFilterCount(filters: CategoryAttribute
 export const EMPTY_CATALOG_FILTERS: CatalogFilters = {
   minPrice: "",
   maxPrice: "",
+  options: {},
 };
 
 function getProductPrice(product: Product) {
   const price = Number(product.price);
   return Number.isFinite(price) ? price : null;
+}
+
+export function matchesOptionFilters(product: Product, options?: Record<string, string[]>) {
+  if (!options) return true;
+  const activeEntries = Object.entries(options).filter(([, vals]) => Array.isArray(vals) && vals.length > 0);
+  if (activeEntries.length === 0) return true;
+
+  const variants = product.variants ?? [];
+  if (variants.length === 0) {
+    return activeEntries.every(([name, selectedValues]) => {
+      const opt = product.options?.find(
+        (o) => o.name.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")
+      );
+      return opt ? opt.values.some((val) => selectedValues.includes(val)) : false;
+    });
+  }
+
+  // A product matches if it has at least one in-stock / available variant matching every selected option dimension
+  return variants.some((variant) => {
+    if (variant.availableForSale === false) return false;
+    const rawStock = (variant as unknown as { stockQuantity?: number }).stockQuantity;
+    if (typeof rawStock === "number" && rawStock <= 0) return false;
+
+    return activeEntries.every(([name, selectedValues]) => {
+      const match = variant.selectedOptions.find(
+        (so) => so.name.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")
+      );
+      return match ? selectedValues.includes(match.value) : false;
+    });
+  });
 }
 
 export function matchesCatalogFilters(product: Product, filters: CatalogFilters) {
@@ -70,12 +102,53 @@ export function matchesCatalogFilters(product: Product, filters: CatalogFilters)
   if (minPrice !== null && (price === null || price < minPrice)) return false;
   if (maxPrice !== null && (price === null || price > maxPrice)) return false;
 
+  if (!matchesOptionFilters(product, filters.options)) return false;
+
   return true;
 }
 
 export function getActiveCatalogFilterCount(filters: CatalogFilters) {
+  const optionsCount = filters.options
+    ? Object.values(filters.options).reduce((sum, vals) => sum + (Array.isArray(vals) ? vals.length : 0), 0)
+    : 0;
   return (
     Number(filters.minPrice !== "") +
-    Number(filters.maxPrice !== "")
+    Number(filters.maxPrice !== "") +
+    optionsCount
   );
+}
+
+export type OptionKind = "size" | "color" | "general";
+
+const SIZE_OPTION_REGEX = /^(beden|size|numara|boyut|ebat)$/i;
+const COLOR_OPTION_REGEX = /^(renk|color)$/i;
+
+export function getOptionKind(name: string): OptionKind {
+  const normalized = name.trim();
+  if (SIZE_OPTION_REGEX.test(normalized)) return "size";
+  if (COLOR_OPTION_REGEX.test(normalized)) return "color";
+  return "general";
+}
+
+export const STANDARD_SIZES = [
+  "xxs", "xs", "s", "m", "l", "xl", "2xl", "xxl", "3xl", "xxxl", "4xl", "5xl",
+];
+
+export function sortOptionValues(name: string, values: string[]): string[] {
+  const kind = getOptionKind(name);
+  if (kind === "size") {
+    const isAllNumeric = values.every((v) => Number.isFinite(Number(v)));
+    if (isAllNumeric) {
+      return [...values].sort((a, b) => Number(a) - Number(b));
+    }
+    return [...values].sort((a, b) => {
+      const idxA = STANDARD_SIZES.indexOf(a.trim().toLowerCase());
+      const idxB = STANDARD_SIZES.indexOf(b.trim().toLowerCase());
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b, "tr", { numeric: true, sensitivity: "base" });
+    });
+  }
+  return [...values].sort((a, b) => a.localeCompare(b, "tr", { numeric: true, sensitivity: "base" }));
 }

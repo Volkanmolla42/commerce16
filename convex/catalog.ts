@@ -5,11 +5,15 @@ import type { DataModel, Doc } from "./_generated/dataModel";
 import { assertAdminApiSecret } from "./adminAuth";
 import { getProductPriceRange } from "../lib/catalog/variants";
 import { catalogSearchQuery, createCatalogSearchMatcher, getProductSearchFields } from "../lib/catalog/smart-search";
-import { matchesCatalogFilters, matchesCategoryAttributeFilters } from "../lib/catalog/facets";
+import { matchesCatalogFilters, matchesCategoryAttributeFilters, sortOptionValues } from "../lib/catalog/facets";
 import type { Product } from "../lib/catalog/types";
 import { getImagesForVariant } from "../lib/catalog/product-images";
 
-const filtersValidator = v.object({ minPrice: v.string(), maxPrice: v.string() });
+const filtersValidator = v.object({
+  minPrice: v.string(),
+  maxPrice: v.string(),
+  options: v.optional(v.record(v.string(), v.array(v.string()))),
+});
 const attributeFiltersValidator = v.record(v.string(), v.object({ values: v.array(v.string()), min: v.string(), max: v.string() }));
 const availabilityValidator = v.union(v.literal("all"), v.literal("active"), v.literal("inactive"));
 const imageValidator = v.object({
@@ -87,9 +91,21 @@ export const page = query({
     // bounded page, retaining its cursor even when no row matches.
     const matches = result.page.filter((product) => {
       if (matchesSearch && !matchesSearch(getProductSearchFields(product))) return false;
-      const target: Product = { id: product._id, title: product.title, slug: product.slug, price: getProductPriceRange(product).min,
-        images: [], availableForSale: product.availableForSale,
-        attributes: product.attributes, updatedAt: product.updatedAt };
+      const target: Product = {
+        id: product._id,
+        title: product.title,
+        slug: product.slug,
+        price: getProductPriceRange(product).min,
+        images: [],
+        availableForSale: product.availableForSale,
+        attributes: product.attributes,
+        options: product.options,
+        variants: product.variants.map((v) => ({
+          ...v,
+          price: { amount: v.price, currencyCode: "TRY" },
+        })),
+        updatedAt: product.updatedAt,
+      };
       return matchesCatalogFilters(target, args.filters) && matchesCategoryAttributeFilters(target, definitions, args.attributes);
     });
     return { ...result, page: await Promise.all(matches.map((product) => card(ctx, product))) };
@@ -120,5 +136,55 @@ export const facets = query({
       return [definition.key, values.map((entry) => entry.value)] as const;
     }));
     return Object.fromEntries(entries);
+  },
+});
+
+function extractOptionFacets(products: Doc<"products">[]): Record<string, string[]> {
+  const optionMap = new Map<string, Set<string>>();
+
+  for (const product of products) {
+    const activeVariants = product.variants.filter((v) => v.availableForSale && v.stockQuantity > 0);
+    const variantsToCheck = activeVariants.length > 0 ? activeVariants : product.variants;
+
+    for (const variant of variantsToCheck) {
+      for (const { name, value } of variant.selectedOptions) {
+        const trimmedName = name.trim();
+        const trimmedValue = value.trim();
+        if (!trimmedName || !trimmedValue) continue;
+        if (!optionMap.has(trimmedName)) optionMap.set(trimmedName, new Set());
+        optionMap.get(trimmedName)!.add(trimmedValue);
+      }
+    }
+
+    for (const opt of product.options ?? []) {
+      const trimmedName = opt.name.trim();
+      if (!optionMap.has(trimmedName)) optionMap.set(trimmedName, new Set());
+      for (const val of opt.values) {
+        const trimmedVal = val.trim();
+        if (trimmedVal) optionMap.get(trimmedName)!.add(trimmedVal);
+      }
+    }
+  }
+
+  const result: Record<string, string[]> = {};
+  for (const [name, set] of optionMap.entries()) {
+    if (set.size > 0) {
+      result[name] = sortOptionValues(name, [...set]);
+    }
+  }
+  return result;
+}
+
+export const optionFacets = query({
+  args: { categorySlug: v.optional(v.string()) },
+  returns: v.record(v.string(), v.array(v.string())),
+  handler: async (ctx, { categorySlug }) => {
+    const base = ctx.db.query("products");
+    const listing = categorySlug !== undefined
+      ? base.withIndex("by_available_and_category", (q) => q.eq("availableForSale", true).eq("categorySlug", categorySlug))
+      : base.withIndex("by_available", (q) => q.eq("availableForSale", true));
+
+    const products = await listing.take(200);
+    return extractOptionFacets(products);
   },
 });

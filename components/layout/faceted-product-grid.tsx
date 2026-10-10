@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ChevronDownIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Button, Card, Input } from "@/components/ui";
 import Grid from "@/components/grid";
 import ProductGridItems from "@/components/layout/product-grid-items";
@@ -15,6 +15,7 @@ import {
   EMPTY_CATALOG_FILTERS,
   getActiveCatalogFilterCount,
   getActiveCategoryAttributeFilterCount,
+  getOptionKind,
   type CatalogFilters,
   type CategoryAttributeFilter,
   type CategoryAttributeFilters,
@@ -80,6 +81,102 @@ function CategoryAttributeFacet({
   );
 }
 
+function OptionFacet({
+  name,
+  values,
+  selectedValues,
+  onChange,
+}: {
+  name: string;
+  values: string[];
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+}) {
+  if (values.length === 0) return null;
+  const kind = getOptionKind(name);
+
+  const toggle = (value: string) => {
+    if (selectedValues.includes(value)) {
+      onChange(selectedValues.filter((v) => v !== value));
+    } else {
+      onChange([...selectedValues, value]);
+    }
+  };
+
+  return (
+    <details open className="group border-b border-border py-3 last:border-0">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+        <span>{name}</span>
+        <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+          {selectedValues.length > 0 ? `${selectedValues.length} seçili` : null}
+          <ChevronDownIcon aria-hidden="true" className="size-4 transition-transform group-open:rotate-180" />
+        </span>
+      </summary>
+
+      {kind === "size" ? (
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {values.map((val) => {
+            const isSelected = selectedValues.includes(val);
+            return (
+              <button
+                key={val}
+                type="button"
+                onClick={() => toggle(val)}
+                className={`min-h-10 min-w-11 rounded-lg border px-3 text-xs font-semibold transition-all ${
+                  isSelected
+                    ? "border-foreground bg-foreground text-background shadow-sm"
+                    : "border-border bg-card text-foreground hover:border-foreground/40 hover:bg-muted"
+                }`}
+              >
+                {val}
+              </button>
+            );
+          })}
+        </div>
+      ) : kind === "color" ? (
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {values.map((val) => {
+            const isSelected = selectedValues.includes(val);
+            return (
+              <button
+                key={val}
+                type="button"
+                onClick={() => toggle(val)}
+                className={`flex min-h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition-all ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-500/15 font-semibold text-blue-400 shadow-sm"
+                    : "border-border bg-card text-foreground hover:border-foreground/40 hover:bg-muted"
+                }`}
+              >
+                <span className="size-2 rounded-full bg-current opacity-70" />
+                <span>{val}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <fieldset className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+          <legend className="sr-only">{name}</legend>
+          {values.map((val) => {
+            const isSelected = selectedValues.includes(val);
+            return (
+              <label key={val} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-1 text-sm text-foreground hover:bg-muted">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggle(val)}
+                  className="size-4 shrink-0 accent-blue-500"
+                />
+                <span className="min-w-0 flex-1 break-words">{val}</span>
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
+    </details>
+  );
+}
+
 function FacetControls({
   facetOptions,
   categoryAttributes,
@@ -88,6 +185,7 @@ function FacetControls({
   filters,
   inputSuffix,
   onPriceChange,
+  onOptionChange,
 }: {
   facetOptions: CatalogFacetOptions;
   categoryAttributes: CategoryAttributeDefinition[];
@@ -96,6 +194,7 @@ function FacetControls({
   filters: CatalogFilters;
   inputSuffix: string;
   onPriceChange: (key: "minPrice" | "maxPrice", value: string) => void;
+  onOptionChange: (name: string, values: string[]) => void;
 }) {
   return (
     <div>
@@ -132,6 +231,16 @@ function FacetControls({
           </label>
         </div>
       </fieldset>
+
+      {Object.entries(facetOptions.options ?? {}).map(([name, values]) => (
+        <OptionFacet
+          key={name}
+          name={name}
+          values={values}
+          selectedValues={filters.options?.[name] ?? []}
+          onChange={(newValues) => onOptionChange(name, newValues)}
+        />
+      ))}
 
       {categoryAttributes.filter((definition) => definition.type !== "text").map((definition) => (
         <CategoryAttributeFacet
@@ -309,11 +418,28 @@ export function FacetedProductGrid({
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
+  const updateOption = (name: string, values: string[]) => {
+    setFilters((current) => {
+      const currentOptions = { ...(current.options ?? {}) };
+      if (values.length > 0) {
+        currentOptions[name] = values;
+      } else {
+        delete currentOptions[name];
+      }
+      return { ...current, options: currentOptions };
+    });
+  };
+
   const updateCategoryAttribute = (key: string, patch: Partial<CategoryAttributeFilter>) => {
     setCategoryAttributeFilters((current) => {
       const filter = current[key] ?? { values: [], min: "", max: "" };
       return { ...current, [key]: { ...filter, ...patch } };
     });
+  };
+
+  const clearAllFilters = () => {
+    setFilters(EMPTY_CATALOG_FILTERS);
+    setCategoryAttributeFilters({});
   };
 
   const panelProps = {
@@ -323,6 +449,7 @@ export function FacetedProductGrid({
     onCategoryAttributeChange: updateCategoryAttribute,
     filters,
     onPriceChange: updatePrice,
+    onOptionChange: updateOption,
   };
 
   const pageTitle = title ?? (query ? `“${query}” sonuçları` : "Tüm ürünler");
@@ -365,17 +492,17 @@ export function FacetedProductGrid({
               <ChevronDownIcon aria-hidden="true" className="size-4 transition-transform group-open:rotate-180" />
             </span>
           </summary>
-          <div className="border-t border-border px-4">
+          <div className="border-t border-border px-4 pb-3">
             <FacetControls {...panelProps} inputSuffix="mobile" />
           </div>
         </details>
 
         <aside className="hidden min-w-0 xl:block">
           <Card className="sticky top-24 rounded-2xl bg-card/60 p-5 shadow-none">
-            <div className="mb-1 flex items-center justify-between gap-3">
+            <div className="mb-2 flex items-center justify-between gap-3 border-b border-border/40 pb-2.5">
               <h2 className="text-sm font-semibold text-foreground">Filtreler</h2>
               {activeFilterCount > 0 ? (
-                <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-semibold text-blue-400">
+                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-400">
                   {activeFilterCount}
                 </span>
               ) : null}
@@ -386,13 +513,55 @@ export function FacetedProductGrid({
 
         <section className={`min-w-0 ${isFiltering ? "opacity-60" : ""}`} aria-label="Filtrelenebilir ürünler" aria-busy={isFiltering}>
           {activeFilterCount > 0 ? (
-            <div className="mb-4 flex justify-end">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-border bg-card/50 p-2 sm:px-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-xs font-medium text-muted-foreground">Aktif:</span>
+                {Object.entries(filters.options ?? {}).flatMap(([name, vals]) =>
+                  vals.map((val) => (
+                    <button
+                      key={`${name}-${val}`}
+                      type="button"
+                      onClick={() => updateOption(name, vals.filter((v) => v !== val))}
+                      className="group inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground transition hover:border-foreground/40 hover:bg-muted"
+                      title={`${name}: ${val} filtresini kaldır`}
+                    >
+                      <span>{name}: {val}</span>
+                      <XMarkIcon aria-hidden="true" className="size-3 text-muted-foreground transition group-hover:text-foreground" />
+                    </button>
+                  ))
+                )}
+                {(filters.minPrice || filters.maxPrice) ? (
+                  <button
+                    type="button"
+                    onClick={() => setFilters((curr) => ({ ...curr, minPrice: "", maxPrice: "" }))}
+                    className="group inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground transition hover:border-foreground/40 hover:bg-muted"
+                    title="Fiyat filtresini kaldır"
+                  >
+                    <span>Fiyat: {filters.minPrice ? `${filters.minPrice}₺` : "0₺"} - {filters.maxPrice ? `${filters.maxPrice}₺` : "∞"}</span>
+                    <XMarkIcon aria-hidden="true" className="size-3 text-muted-foreground transition group-hover:text-foreground" />
+                  </button>
+                ) : null}
+                {Object.entries(categoryAttributeFilters).flatMap(([key, filter]) =>
+                  filter.values.map((val) => (
+                    <button
+                      key={`${key}-${val}`}
+                      type="button"
+                      onClick={() => updateCategoryAttribute(key, { values: filter.values.filter((v) => v !== val) })}
+                      className="group inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-foreground transition hover:border-foreground/40 hover:bg-muted"
+                      title={`${val} filtresini kaldır`}
+                    >
+                      <span>{val}</span>
+                      <XMarkIcon aria-hidden="true" className="size-3 text-muted-foreground transition group-hover:text-foreground" />
+                    </button>
+                  ))
+                )}
+              </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="min-h-11 text-blue-400"
-                onClick={() => { setFilters(EMPTY_CATALOG_FILTERS); setCategoryAttributeFilters({}); }}
+                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={clearAllFilters}
               >
                 Filtreleri temizle
               </Button>
