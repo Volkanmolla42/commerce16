@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { ViewTransition } from "react";
 import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRightIcon,
   CubeIcon,
@@ -25,12 +26,22 @@ type SearchOption = {
 };
 
 export default function Search() {
+  const pathname = usePathname();
+  const isSearchPage = pathname === "/search" || pathname?.startsWith("/search/");
+  if (isSearchPage) {
+    return null;
+  }
   const currentQuery = useSearchParams()?.get("q") ?? "";
   return <SearchInput key={currentQuery} initialQuery={currentQuery} />;
 }
 
 function SearchInput({ initialQuery }: { initialQuery: string }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isSearchPage = pathname === "/search" || pathname?.startsWith("/search/");
+  if (isSearchPage) {
+    return null;
+  }
   const componentId = useId();
   const listboxId = `search-suggestions-${componentId}`;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -160,42 +171,72 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
     .map((option, index) => ({ option, index }))
     .filter(({ option }) => option.kind === "product");
 
+  const handleInputFocus = () => {
+    setIsOpen(true);
+    if (!isSearchPage) {
+      startTransition(() => {
+        router.push(query ? `/search?q=${encodeURIComponent(query)}` : "/search");
+      });
+    }
+  };
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsOpen(false);
+    startTransition(() => {
+      const targetUrl = query.trim() ? `/search?q=${encodeURIComponent(query.trim())}` : "/search";
+      router.push(targetUrl);
+    });
+  };
+
+  const formElement = (
+    <form
+      action="/search"
+      method="get"
+      onSubmit={handleFormSubmit}
+      className="relative w-full"
+    >
+      <label htmlFor={`${componentId}-input`} className="sr-only">
+        Ürün veya kategori ara
+      </label>
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
+      </div>
+      <input
+        id={`${componentId}-input`}
+        type="search"
+        name="q"
+        role="combobox"
+        aria-label="Ürün veya kategori ara"
+        aria-autocomplete="list"
+        aria-expanded={panelIsVisible}
+        aria-controls={panelIsVisible ? listboxId : undefined}
+        aria-activedescendant={panelIsVisible && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+        placeholder="Ürün veya kategori ara..."
+        autoComplete="off"
+        value={query}
+        onFocus={handleInputFocus}
+        onClick={handleInputFocus}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setActiveIndex(-1);
+          setIsOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        className="w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-4 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900"
+      />
+    </form>
+  );
+
   return (
     <div ref={rootRef} className="relative w-full max-w-xs sm:max-w-sm md:max-w-md">
-      <Form
-        action="/search"
-        onSubmit={() => setIsOpen(false)}
-        className="relative w-full"
-      >
-        <label htmlFor={`${componentId}-input`} className="sr-only">
-          Ürün veya kategori ara
-        </label>
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
-          <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
-        </div>
-        <input
-          id={`${componentId}-input`}
-          type="search"
-          name="q"
-          role="combobox"
-          aria-label="Ürün veya kategori ara"
-          aria-autocomplete="list"
-          aria-expanded={panelIsVisible}
-          aria-controls={panelIsVisible ? listboxId : undefined}
-          aria-activedescendant={panelIsVisible && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
-          placeholder="Ürün veya kategori ara..."
-          autoComplete="off"
-          value={query}
-          onFocus={() => setIsOpen(true)}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setActiveIndex(-1);
-            setIsOpen(true);
-          }}
-          onKeyDown={handleKeyDown}
-          className="w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-4 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900"
-        />
-      </Form>
+      {isSearchPage ? (
+        formElement
+      ) : (
+        <ViewTransition name="catalog-search-bar" share="morph">
+          {formElement}
+        </ViewTransition>
+      )}
 
       {panelIsVisible ? (
         <div

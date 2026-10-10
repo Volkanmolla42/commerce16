@@ -9,6 +9,5 @@ export default function ChildrenWrapper({
 }: {
   children: React.ReactNode;
 }) {
-  const searchParams = useSearchParams();
-  return <Fragment key={searchParams.get("q")}>{children}</Fragment>;
+  return <>{children}</>;
 }

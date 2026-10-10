@@ -247,3 +247,29 @@ body:has(.admin-theme[data-admin-theme="dark"]) {
     transform: none !important;
   }
 }
+
+/* React View Transitions */
+:root {
+  --duration-exit: 150ms;
+  --duration-enter: 220ms;
+  --duration-move: 380ms;
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+::view-transition-group(catalog-search-bar) {
+  animation-duration: var(--duration-move);
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+::view-transition-old(catalog-search-bar),
+::view-transition-new(catalog-search-bar) {
+  animation-duration: var(--duration-move);
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  mix-blend-mode: normal;
+  height: 100%;
+  overflow: clip;
+}
