@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type ResourceState<T> = {
   data: T | null;
@@ -28,61 +28,48 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [settledKey, setSettledKey] = useState<string | null>(null);
-  const request = useRef<AbortController | null>(null);
-  const mounted = useRef(false);
   const paramsKey = JSON.stringify(params);
-  const resourceKey = `${resource}:${paramsKey}`;
-  const currentResourceKey = useRef(resourceKey);
 
-  const load = useCallback(() => {
-    if (!mounted.current || currentResourceKey.current !== resourceKey) return Promise.resolve();
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    const search = new URLSearchParams({ resource, ...JSON.parse(paramsKey) as Record<string, string> });
-    return adminRequest<T>(
+    try {
+      const parsedParams = JSON.parse(paramsKey) as Record<string, string>;
+      const search = new URLSearchParams({ resource, ...parsedParams });
+      const payload = await adminRequest<T>(
         `/api/admin?${search.toString()}`,
-        { cache: "no-store", signal: controller.signal },
+        { cache: "no-store", signal },
         "Veriler yüklenemedi.",
-      ).then((payload) => {
-      if (!controller.signal.aborted) {
+      );
+      if (!signal?.aborted) {
         setData(payload);
         setError(null);
-        setSettledKey(resourceKey);
       }
-    }).catch((cause: unknown) => {
-      if (!controller.signal.aborted) {
+    } catch (cause: unknown) {
+      if (!signal?.aborted) {
         setData(null);
         setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
-        setSettledKey(resourceKey);
       }
-    }).finally(() => {
-      if (!controller.signal.aborted) setLoading(false);
-    });
-  }, [paramsKey, resource, resourceKey]);
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [resource, paramsKey]);
 
   useEffect(() => {
-    mounted.current = true;
-    currentResourceKey.current = resourceKey;
-    void load();
+    const controller = new AbortController();
+    void fetchData(controller.signal);
+
     return () => {
-      mounted.current = false;
-      request.current?.abort();
+      controller.abort();
     };
-  }, [load, resourceKey]);
+  }, [fetchData]);
 
   const refresh = useCallback(async () => {
-    if (!mounted.current || currentResourceKey.current !== resourceKey) return;
-    setLoading(true);
-    setError(null);
-    await load();
-  }, [load, resourceKey]);
+    await fetchData();
+  }, [fetchData]);
 
-  // Never expose the previous search/cursor's rows while the next request starts.
-  const current = settledKey === resourceKey;
-  return { data: current ? data : null, error: current ? error : null, loading: loading || !current, refresh };
+  return { data, error, loading, refresh };
 }
 
 export async function runAdminAction<T = unknown>(action: string, input?: unknown, id?: string) {

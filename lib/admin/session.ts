@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 
 export const ADMIN_COOKIE_NAME = "commerce_admin_session";
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
@@ -65,6 +66,7 @@ export function isValidAdminPin(value: unknown) {
 }
 
 export async function hasAdminSession() {
+  await connection();
   if (!isAdminAuthConfigured()) return false;
   const cookieStore = await cookies();
   const session = cookieStore.get(ADMIN_COOKIE_NAME)?.value;

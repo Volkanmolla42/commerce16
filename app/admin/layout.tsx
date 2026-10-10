@@ -1,20 +1,21 @@
 import { ReactNode } from "react";
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { AdminShell } from "./_components/admin-shell";
 import { AdminGate } from "./_components/admin-gate";
 import { AdminThemeShell } from "./admin-theme-shell";
+import { hasAdminSession } from "@/lib/admin/session";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
-  return (
-    <AdminGate>
-      <Suspense fallback={<AdminShell initialTheme="light">{children}</AdminShell>}>
-        <AdminThemeShell>{children}</AdminThemeShell>
-      </Suspense>
-    </AdminGate>
-  );
+export const instant = false;
+
+export default async function AdminLayout({ children }: { children: ReactNode }) {
+  const isAuthenticated = await hasAdminSession();
+
+  if (!isAuthenticated) {
+    return <AdminGate />;
+  }
+
+  return <AdminThemeShell>{children}</AdminThemeShell>;
 }
