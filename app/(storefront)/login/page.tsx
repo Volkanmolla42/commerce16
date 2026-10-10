@@ -1,23 +1,19 @@
 "use client";
 
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Tick01Icon } from "hugeicons-react";
 import {
   Button,
   Input,
   Label,
   Card,
-  CardTitle,
-  CardDescription,
-  Badge,
 } from "@/components/ui";
 
 export default function CustomerLoginPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const { signIn, signOut } = useAuthActions();
+  const { signIn } = useAuthActions();
   const router = useRouter();
 
   const [step, setStep] = useState<"signIn" | "signUp">("signIn");
@@ -25,6 +21,12 @@ export default function CustomerLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/account/orders");
+    }
+  }, [isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,46 +51,10 @@ export default function CustomerLoginPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isAuthenticated) {
     return (
       <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
-      </div>
-    );
-  }
-
-  // Already logged-in customer view
-  if (isAuthenticated) {
-    return (
-      <div className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-md p-8 text-center shadow-xl border-border bg-card rounded-3xl">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-            <Tick01Icon className="h-7 w-7" />
-          </div>
-          <CardTitle className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Oturum açık
-          </CardTitle>
-          <CardDescription className="mt-2 text-sm text-muted-foreground">
-            Hesabınızı görüntüleyebilir veya oturumu kapatabilirsiniz.
-          </CardDescription>
-
-          <div className="mt-6 flex flex-col gap-3">
-            <Button asChild size="lg" className="w-full rounded-xl shadow-md font-semibold">
-              <Link href="/account/orders">Hesabıma Git</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="w-full rounded-xl font-semibold border-border">
-              <Link href="/">Alışverişe Devam Et</Link>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => signOut()}
-              className="text-xs text-muted-foreground hover:text-foreground pt-1"
-            >
-              Oturumu kapat
-            </Button>
-          </div>
-        </Card>
       </div>
     );
   }
