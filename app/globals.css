@@ -31,13 +31,26 @@
   --animate-blink: blink 1s ease-in-out infinite;
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes blink {
-    0%, 80%, 100% { opacity: 0.35; }
-    40% { opacity: 1; }
+
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+    }
+
+    40% {
+      opacity: 1;
+    }
   }
 }
 
@@ -113,12 +126,14 @@
 @utility no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+
   &::-webkit-scrollbar {
     display: none;
   }
 }
 
 @layer base {
+
   *,
   ::after,
   ::before,
@@ -217,9 +232,16 @@ body:has(.admin-theme[data-admin-theme="dark"]) {
   background-color: var(--background);
 }
 
-.admin-theme[data-admin-theme="light"] .scheme-dark { color-scheme: light; }
-.admin-theme[data-admin-theme="dark"] .scheme-dark { color-scheme: dark; }
+.admin-theme[data-admin-theme="light"] .scheme-dark {
+  color-scheme: light;
+}
+
+.admin-theme[data-admin-theme="dark"] .scheme-dark {
+  color-scheme: dark;
+}
+
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -249,27 +271,43 @@ body:has(.admin-theme[data-admin-theme="dark"]) {
 }
 
 /* React View Transitions */
-:root {
-  --duration-exit: 150ms;
-  --duration-enter: 220ms;
-  --duration-move: 380ms;
+@media (max-width: 767px) {
+
+  body:has([data-product-purchase-bar]) [data-floating-bar],
+  body:has([data-product-purchase-bar]) [data-floating-cart] {
+    bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  body:has([data-product-purchase-bar]) {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
 }
 
-@keyframes fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.search-scroll-up-glow {
+  border-color: rgba(99, 102, 241, 0.95) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 20px 2px rgba(99, 102, 241, 0.6) !important;
 }
 
-::view-transition-group(catalog-search-bar) {
-  animation-duration: var(--duration-move);
+
+::view-transition-group(.product-image-morph) {
+  animation-duration: 380ms;
   animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
-::view-transition-old(catalog-search-bar),
-::view-transition-new(catalog-search-bar) {
-  animation-duration: var(--duration-move);
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+::view-transition-old(.product-image-morph) {
+  display: none;
+}
+
+::view-transition-new(.product-image-morph) {
+  animation: none;
   mix-blend-mode: normal;
   height: 100%;
+  width: 100%;
   overflow: clip;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.product-image-morph) {
+    animation-duration: 0s !important;
+  }
 }

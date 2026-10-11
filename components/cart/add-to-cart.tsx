@@ -14,11 +14,15 @@ export function AddToCart({
   variant,
   buttonVariant = "default",
   replaceCartItem,
+  onAdded,
+  hideCartLinkOnMobile = false,
 }: {
   product: Product;
   variant?: ProductVariant;
   buttonVariant?: "default" | "outline";
   replaceCartItem?: { productId: string; variantId?: string; quantity: number };
+  onAdded?: () => void;
+  hideCartLinkOnMobile?: boolean;
 }) {
   const { addItem, replaceItem } = useCart();
   const [added, setAdded] = useState(false);
@@ -42,6 +46,7 @@ export function AddToCart({
       setReplaced(false);
     }
     setAdded(true);
+    onAdded?.();
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setAdded(false), 3000);
   };
@@ -79,7 +84,7 @@ export function AddToCart({
           asChild
           variant="outline"
           size="lg"
-          className="h-12 w-full rounded-xl font-semibold gap-2 border-border animate-fade-in"
+          className={`h-12 w-full rounded-xl font-semibold gap-2 border-border animate-fade-in ${hideCartLinkOnMobile ? "hidden md:inline-flex" : ""}`}
         >
           <Link href="/cart">
             <span>Sepeti Görüntüle</span>

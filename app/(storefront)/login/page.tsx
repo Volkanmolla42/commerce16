@@ -16,9 +16,8 @@ import {
   ShieldCheckIcon,
   ArrowLeftIcon,
   UserPlusIcon,
-  ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
-import { ArrowRight01Icon } from "hugeicons-react";
+import { ArrowRight01Icon, Door01Icon } from "hugeicons-react";
 
 export default function CustomerLoginPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -75,7 +74,7 @@ export default function CustomerLoginPage() {
         <div className="text-center space-y-2">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto mb-1">
             {step === "signIn" ? (
-              <ArrowRight01Icon className="h-6 w-6" />
+              <Door01Icon className="h-6 w-6" />
             ) : (
               <UserPlusIcon className="h-6 w-6" />
             )}
@@ -99,8 +98,8 @@ export default function CustomerLoginPage() {
               setError(null);
             }}
             className={`rounded-xl py-2 text-center transition-all ${step === "signIn"
-                ? "bg-card text-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-card text-foreground shadow-sm font-semibold"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             Giriş Yap
@@ -112,8 +111,8 @@ export default function CustomerLoginPage() {
               setError(null);
             }}
             className={`rounded-xl py-2 text-center transition-all ${step === "signUp"
-                ? "bg-card text-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-card text-foreground shadow-sm font-semibold"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             Kayıt Ol
@@ -179,13 +178,6 @@ export default function CustomerLoginPage() {
                 : "Hesap Oluştur"}
           </Button>
         </form>
-
-        {/* Security Trust Note */}
-        <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground pt-1">
-          <ShieldCheckIcon className="h-4 w-4 text-emerald-500 shrink-0" />
-          <span>256-Bit SSL ile güvenli bağlantı</span>
-        </div>
-
         {/* Return to Store */}
         <div className="border-t border-border pt-4 text-center">
           <Link

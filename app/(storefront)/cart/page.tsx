@@ -11,7 +11,6 @@ import { useCart } from "@/components/cart/cart-context";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowLeftIcon,
   ArrowPathIcon,
   ArrowRightIcon,
   MinusIcon,
@@ -28,7 +27,6 @@ import {
   CardHeader,
   CardTitle,
   Separator,
-  Badge,
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
@@ -37,7 +35,7 @@ import { CartRecommendationShelf } from "@/components/product/recommendation-she
 function CartContent() {
   const router = useRouter();
   const restoreToken = useSearchParams().get("recover");
-  const { items, addItem, updateQuantity, removeItem, clearCart, totalCount, totalAmount } =
+  const { items, addItem, updateQuantity, removeItem, totalCount, totalAmount } =
     useCart();
   const restoreHandled = useRef(false);
   const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
@@ -155,24 +153,10 @@ function CartContent() {
 
   return (
     <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-8 sm:py-12">
-      <div className="flex flex-col gap-2 border-b border-border/60 pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Alışveriş Sepeti
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sepetinizde toplam {totalCount} adet ürün bulunuyor
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={clearCart}
-          className="text-xs text-muted-foreground hover:text-destructive self-start sm:self-auto gap-1.5"
-        >
-          <TrashIcon className="h-3.5 w-3.5" />
-          <span>Sepeti Boşalt</span>
-        </Button>
+      <div className="border-b border-border/60 pb-6">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Sepetim
+        </h1>
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
@@ -190,7 +174,7 @@ function CartContent() {
                   key={`${item.product.id}:${item.variantId ?? ""}`}
                   className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
                     <Link
                       href={`/product/${item.product.slug}`}
                       className="flex-none overflow-hidden rounded-2xl border border-border bg-muted/30"
@@ -210,21 +194,14 @@ function CartContent() {
                       )}
                     </Link>
 
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <Link
                         href={`/product/${item.product.slug}`}
-                        className="text-base font-semibold text-foreground hover:underline line-clamp-1"
+                        className="text-sm sm:text-base font-semibold leading-snug text-foreground hover:underline line-clamp-2"
                       >
                         {item.product.title}
                       </Link>
-                      {item.product.categorySlug && (
-                        <div className="mt-1">
-                          <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider">
-                            {item.product.categorySlug}
-                          </Badge>
-                        </div>
-                      )}
-                      <div className="mt-1.5 text-sm font-semibold text-foreground">
+                      <div className="mt-1 text-sm font-semibold text-foreground">
                         {formatMoney(unitPrice)}
                       </div>
                     </div>
@@ -283,15 +260,6 @@ function CartContent() {
               );
             })}
           </Card>
-
-          <div className="mt-6">
-            <Button asChild variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
-              <Link href="/search">
-                <ArrowLeftIcon className="h-4 w-4" />
-                <span>Alışverişe Devam Et</span>
-              </Link>
-            </Button>
-          </div>
         </div>
 
         {/* Sipariş Özeti */}

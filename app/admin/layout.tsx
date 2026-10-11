@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { AdminShell } from "./_components/admin-shell";
@@ -9,7 +9,17 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function AdminLayout({ children }: { children: ReactNode }) {
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={<div role="status" className="p-6 text-sm text-muted-foreground">Yükleniyor...</div>}
+    >
+      <AuthenticatedAdminLayout>{children}</AuthenticatedAdminLayout>
+    </Suspense>
+  );
+}
+
+async function AuthenticatedAdminLayout({ children }: { children: ReactNode }) {
   const isAuthenticated = await hasAdminSession();
 
   if (!isAuthenticated) {

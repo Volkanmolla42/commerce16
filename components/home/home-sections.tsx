@@ -1,21 +1,21 @@
 import {
-  CheckBadgeIcon,
-  ShieldCheckIcon,
+  ArrowUpRightIcon,
   TagIcon,
-  TruckIcon,
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import Link from "next/link";
 import type { Category, Product } from "@/lib/catalog/types";
 import Grid from "@/components/grid";
 import ProductGridItems from "@/components/layout/product-grid-items";
+import { getProductImages } from "@/lib/catalog/product-images";
+import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 
 export function CategoryShortcuts({ categories }: { categories: Category[] }) {
   const visibleCategories = categories.filter((category) => category.slug !== "");
   if (visibleCategories.length === 0) return null;
 
   return (
-    <nav aria-label="Kategoriler" className="border-b border-border/60 py-4 sm:py-6">
+    <nav id="kategoriler" aria-label="Kategoriler" className="border-b border-border/60 py-4 sm:py-6">
       <ul className="flex snap-x snap-mandatory items-center gap-3 overflow-x-auto pb-2 [scrollbar-width:thin] sm:justify-center sm:gap-6">
         {visibleCategories.map((category) => (
           <li key={category.slug} className="w-18 shrink-0 snap-start sm:w-22">
@@ -50,67 +50,75 @@ export function CategoryShortcuts({ categories }: { categories: Category[] }) {
 export function HomeHero({
   storeName,
   slogan,
-  productCount,
+  featuredProduct,
+  hasCategories,
 }: {
   storeName: string;
   slogan?: string;
-  productCount: number;
+  featuredProduct?: Product;
+  hasCategories: boolean;
 }) {
-  const displaySlogan = slogan?.trim() || "Kaliteli ve seçkin ürünler en uygun fiyatlarla kapınızda.";
+  const heroImage = featuredProduct ? getProductImages(featuredProduct)[0] : undefined;
+  const heading = slogan?.trim() || "Yeni favorinizi bulun.";
 
   return (
     <section
       aria-label="Vitrin Karşılama"
-      className="relative my-4 overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-muted/50 via-background to-background px-6 py-10 text-center sm:my-6 sm:px-12 sm:py-16"
+      className={`my-4 overflow-hidden rounded-3xl border border-border/60 bg-card text-foreground sm:my-6 ${heroImage ? "lg:grid lg:grid-cols-[1fr_1.05fr]" : ""}`}
     >
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(45%_35%_at_50%_0%,theme(colors.primary/0.1),transparent_100%)]" />
-      <div className="mx-auto max-w-2xl space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
-          {displaySlogan}
-        </h1>
-        <p className="text-sm text-muted-foreground sm:text-base">
-          Özenle seçilmiş {productCount > 0 ? `${productCount}+ seçkin` : ""} ürünü keşfedin, güvenli ve hızlı alışverişin tadını çıkarın.
+      <div className={`flex flex-col items-start justify-center px-6 py-8 sm:px-10 sm:py-12 lg:px-14 lg:py-16 ${heroImage ? "" : "mx-auto max-w-3xl"}`}>
+        <p className="mb-5 max-w-full truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground sm:mb-8 sm:text-xs">
+          {storeName}
         </p>
-        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+        <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.08] tracking-tight text-balance sm:text-5xl xl:text-6xl">
+          {heading}
+        </h1>
+        <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground sm:mt-6 sm:text-base sm:leading-7">
+          Ürünleri keşfedin, seçenekleri inceleyin ve aradığınızı bulun.
+        </p>
+        <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 sm:mt-9">
           <Link
             href="/search"
-            className="inline-flex h-10 items-center justify-center rounded-full bg-foreground px-6 text-sm font-semibold text-background shadow-sm transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="inline-flex min-h-12 items-center justify-center gap-5 rounded-full bg-foreground px-6 text-sm font-semibold text-background transition-opacity hover:opacity-85"
           >
-            Tüm Ürünleri İncele
+            Ürünleri keşfet
+            <ArrowUpRightIcon className="size-4" aria-hidden="true" />
           </Link>
+          {hasCategories ? (
+            <Link href="#kategoriler" className="inline-flex min-h-11 items-center text-sm font-medium underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground">
+              Kategorilere göz at
+            </Link>
+          ) : null}
         </div>
       </div>
 
-      {/* Trust Badges */}
-      <div className="mt-10 grid grid-cols-1 gap-4 border-t border-border/60 pt-8 sm:grid-cols-3 sm:gap-6">
-        <div className="flex items-center justify-center gap-3 text-left">
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-            <TruckIcon className="size-5" />
+      {heroImage && featuredProduct ? (
+        <ProductImageLink
+          productId={featuredProduct.id}
+          href={`/product/${featuredProduct.slug}`}
+          aria-label={`${featuredProduct.title} ürününü incele`}
+          className="group relative block aspect-[6/5] overflow-hidden bg-neutral-100 sm:aspect-[4/3] lg:aspect-auto lg:min-h-[520px]"
+        >
+          <ProductImageTransition><Image
+            src={heroImage.url}
+            alt={featuredProduct.title}
+            fill
+            sizes="(min-width: 1536px) 740px, (min-width: 1024px) 52vw, calc(100vw - 2rem)"
+            loading="eager"
+            fetchPriority="high"
+            className="object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
+          /></ProductImageTransition>
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-5 pb-5 pt-16 text-white sm:px-8 sm:pb-7">
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-white/75">Koleksiyondan</p>
+            <div className="flex items-end justify-between gap-4">
+              <p className="max-w-sm text-sm font-medium leading-5 text-balance sm:text-base">{featuredProduct.title}</p>
+              <span className="grid size-10 shrink-0 place-items-center rounded-full border border-white/40 bg-black/10 backdrop-blur-sm">
+                <ArrowUpRightIcon className="size-5" aria-hidden="true" />
+              </span>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground">Hızlı ve Güvenli Teslimat</p>
-            <p className="text-[11px] text-muted-foreground">Siparişleriniz özenle paketlenir</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center gap-3 text-left">
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-            <ShieldCheckIcon className="size-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground">256-Bit SSL Güvenli Ödeme</p>
-            <p className="text-[11px] text-muted-foreground">Korumalı ödeme altyapısı</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center gap-3 text-left">
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-            <CheckBadgeIcon className="size-5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground">%100 Orijinal Ürün</p>
-            <p className="text-[11px] text-muted-foreground">Koşulsuz iade ve değişim güvencesi</p>
-          </div>
-        </div>
-      </div>
+        </ProductImageLink>
+      ) : null}
     </section>
   );
 }

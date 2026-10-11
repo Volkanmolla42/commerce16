@@ -2,6 +2,8 @@ import { FacetedProductGrid } from "@/components/layout/faceted-product-grid";
 import { getCategories } from "@/lib/catalog";
 import { getCatalogPage } from "@/lib/catalog/pages";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { SearchSkeleton } from "./loading";
 
 export const prefetch = "partial";
 
@@ -31,9 +33,6 @@ async function SearchContent(props: {
     />
   );
 }
-
-import { Suspense } from "react";
-import { SearchSkeleton } from "./loading";
 
 export default function SearchPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;

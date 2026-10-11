@@ -13,8 +13,8 @@ import {
 import { useFavorites } from "@/components/favorites/favorites-context";
 
 const NAV_ITEMS = [
-  { label: "Favorilerim", href: "/account/favorites", icon: HeartIcon },
   { label: "Siparişlerim", href: "/account/orders", icon: ShoppingBagIcon },
+  { label: "Favorilerim", href: "/account/favorites", icon: HeartIcon },
   { label: "Adreslerim", href: "/account/addresses", icon: MapPinIcon },
   { label: "Profil ve Güvenlik", href: "/account/profile", icon: UserIcon },
 ] as const;

@@ -38,7 +38,7 @@ export function VariantSelector({
 
   return options.map((option) => (
     <div key={option.id}>
-      <dl className="mb-6">
+      <dl className="mb-5">
         <dt className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
           {option.name}
           {searchParams.get(option.name.toLocaleLowerCase("tr-TR")) ? `: ${searchParams.get(option.name.toLocaleLowerCase("tr-TR"))}` : ""}
@@ -65,10 +65,10 @@ export function VariantSelector({
                 disabled={!hasCombination}
                 title={`${option.name} ${value}${!isAvailableForSale ? " (Tükendi)" : ""}`}
                 className={clsx(
-                  "flex min-h-11 min-w-12 items-center justify-center rounded-xl border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200",
+                  "flex min-h-12 min-w-12 items-center justify-center rounded-xl border px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                   {
-                    "border-rose-300 bg-rose-300 text-neutral-950": isActive,
-                    "hover:border-neutral-500 dark:hover:border-neutral-400": !isActive && isAvailableForSale,
+                    "border-foreground bg-foreground text-background": isActive,
+                    "border-border bg-background text-foreground hover:border-foreground/50": !isActive,
                     "relative overflow-hidden text-neutral-500 before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-rotate-12 before:bg-neutral-500": !isAvailableForSale,
                     "cursor-not-allowed opacity-45": !hasCombination,
                   },

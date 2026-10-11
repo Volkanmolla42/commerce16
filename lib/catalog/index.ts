@@ -118,10 +118,10 @@ export async function getCategories(): Promise<Category[]> {
   return [
     {
       slug: "",
-      title: "Tümü",
+      title: "Tüm Ürünler",
       description: "Tüm ürünler",
       seo: {
-        title: "Tümü",
+        title: "Tüm Ürünler",
         description: "Tüm ürünler",
       },
       path: "/search",

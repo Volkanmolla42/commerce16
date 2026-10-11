@@ -1,26 +1,55 @@
 "use client";
 
-import { ArrowLeftIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
+import { productGalleryClassName } from "./product-layout";
+
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  ArrowsPointingOutIcon,
+  PhotoIcon,
+} from "@heroicons/react/24/outline";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Product } from "@/lib/catalog/types";
-import { getProductImagesForSelection } from "@/lib/catalog/product-images";
+import {
+  getProductImages,
+  getProductImagesForSelection,
+} from "@/lib/catalog/product-images";
+import { getSelectedVariant } from "@/lib/catalog/variants";
+import { ProductImageTransition } from "./product-image-transition";
 
-export function Gallery({
-  product,
-}: {
-  product: Product;
-}) {
+const ProductLightbox = dynamic(() => import("./product-lightbox"), {
+  ssr: false,
+});
+
+export function Gallery({ product }: { product: Product }) {
   const router = useRouter();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const selection = product.options?.flatMap((option) => {
-    const value = searchParams.get(option.name.toLocaleLowerCase("tr-TR"));
-    return value ? [{ name: option.name, value }] : [];
-  }) ?? [];
-  const images = getProductImagesForSelection(product.images, selection);
+  const selection =
+    product.options?.flatMap((option) => {
+      const value = searchParams.get(option.name.toLocaleLowerCase("tr-TR"));
+      return value ? [{ name: option.name, value }] : [];
+    }) ?? [];
+  const matchingImages = getProductImagesForSelection(
+    product.images,
+    selection,
+  );
+  const images =
+    matchingImages.length || getSelectedVariant(product, searchParams)
+      ? matchingImages
+      : getProductImages(product);
   const requestedIndex = Number(searchParams.get("image") ?? 0);
-  const imageIndex = Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < images.length
-    ? requestedIndex : 0;
+  const imageIndex =
+    Number.isInteger(requestedIndex) &&
+    requestedIndex >= 0 &&
+    requestedIndex < images.length
+      ? requestedIndex
+      : 0;
+  const activeImage = images[imageIndex];
 
   const updateImage = (index: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -33,19 +62,47 @@ export function Gallery({
     imageIndex === 0 ? images.length - 1 : imageIndex - 1;
 
   return (
-    <div>
-      <div className="relative aspect-[4/5] max-h-[min(76vh,760px)] w-full overflow-hidden rounded-2xl bg-neutral-100 dark:bg-neutral-900">
-        {images[imageIndex] && (
-          <Image
-            className="h-full w-full object-contain"
-            fill
-            sizes="(min-width: 1536px) 960px, (min-width: 1024px) 60vw, calc(100vw - 6rem)"
-            alt={product.title}
-            src={images[imageIndex]!.url}
-            loading="eager"
-            fetchPriority="high"
-          />
+    <div className="min-w-0">
+      <div
+        className={`${productGalleryClassName} bg-neutral-100 dark:bg-neutral-900`}
+      >
+        {activeImage && failedImage !== activeImage.url ? (
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            aria-label="Ürün görselini tam ekran aç"
+            className="group absolute inset-0 cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-primary"
+          >
+            <ProductImageTransition productId={product.id}>
+              <Image
+                data-product-gallery-image
+                className="h-full w-full object-contain"
+                fill
+                sizes="(min-width: 1400px) 720px, (min-width: 1024px) 55vw, calc(100vw - 2rem)"
+                alt={product.title}
+                src={activeImage.url}
+                onError={() => setFailedImage(activeImage.url)}
+                loading="eager"
+                fetchPriority="high"
+              />
+            </ProductImageTransition>
+            <span className="absolute bottom-3 right-3 flex min-h-10 items-center gap-2 rounded-full bg-white/95 px-3 text-xs font-medium text-neutral-900 shadow-sm">
+              <ArrowsPointingOutIcon className="size-4" aria-hidden="true" />
+              Büyüt
+            </span>
+          </button>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <PhotoIcon className="size-10" aria-hidden="true" />
+            <p className="text-sm">Ürün görseli hazırlanıyor</p>
+          </div>
         )}
+
+        {images.length > 1 ? (
+          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium text-neutral-900">
+            {imageIndex + 1} / {images.length}
+          </span>
+        ) : null}
 
         {images.length > 1 ? (
           <>
@@ -72,13 +129,16 @@ export function Gallery({
       {images.length > 1 ? (
         <ul
           aria-label="Diğer ürün görselleri"
-          className="no-scrollbar mx-auto mt-5 flex w-fit max-w-full items-center justify-start gap-3 overflow-x-auto px-1 py-2 lg:justify-center"
+          className="no-scrollbar mt-3 flex max-w-full items-center gap-2 overflow-x-auto px-1 py-2"
         >
           {images.map((image, index) => {
             const isActive = index === imageIndex;
 
             return (
-              <li key={`${image.url}:${index}`} className="h-20 w-20 shrink-0">
+              <li
+                key={`${image.url}:${index}`}
+                className="size-16 shrink-0 sm:size-20"
+              >
                 <button
                   type="button"
                   onClick={() => updateImage(index)}
@@ -104,6 +164,17 @@ export function Gallery({
             );
           })}
         </ul>
+      ) : null}
+      {lightboxOpen ? (
+        <ProductLightbox
+          images={images}
+          title={product.title}
+          index={imageIndex}
+          onClose={(index) => {
+            setLightboxOpen(false);
+            if (index !== imageIndex) updateImage(index);
+          }}
+        />
       ) : null}
     </div>
   );

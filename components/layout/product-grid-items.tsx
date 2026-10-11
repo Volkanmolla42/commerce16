@@ -3,7 +3,7 @@
 import Grid from "@/components/grid";
 import { GridTileImage } from "@/components/grid/tile";
 import type { Product } from "@/lib/catalog/types";
-import Link from "next/link";
+import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Image from "next/image";
 import Price from "@/components/price";
@@ -41,26 +41,26 @@ export default function ProductGridItems({
           return (
             <Grid.Item key={product.slug} square={false} className="animate-fade-in">
               <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-blue-500/40 hover:shadow-lg">
-                <Link href={`/product/${product.slug}`} className="flex h-full flex-col">
+                <ProductImageLink productId={product.id} href={`/product/${product.slug}`} className="flex h-full flex-col">
                   <div className={`relative w-full overflow-hidden bg-neutral-100 dark:bg-neutral-900 ${
-                    aspectRatio === "square" ? "aspect-square" : "aspect-[3/4]"
+                    aspectRatio === "square" ? "aspect-square" : "aspect-[4/5]"
                   }`}>
                     {imageUrl ? (
-                      <Image
+                      <ProductImageTransition><Image
                         src={imageUrl}
                         alt={product.title}
                         fill
                         sizes={imageSizes}
                         loading={shouldLoadEagerly ? "eager" : "lazy"}
                         fetchPriority={shouldPrioritizeImage ? "high" : undefined}
-                        className={`transition-transform duration-500 group-hover:scale-105 ${
+                        className={
                           imageFit === "contain" ? "object-contain p-3" : "object-cover"
-                        }`}
-                      />
+                        }
+                      /></ProductImageTransition>
                     ) : null}
                   </div>
-                  <div className="flex flex-1 flex-col justify-between space-y-2 p-3.5 sm:p-4">
-                    <h2 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-foreground transition-colors group-hover:text-blue-400">
+                  <div className="flex flex-1 flex-col justify-between space-y-1.5 p-3 sm:p-3.5">
+                    <h2 className="line-clamp-2 text-xs sm:text-[13px] font-medium leading-snug text-foreground">
                       {product.title}
                     </h2>
                     <Price
@@ -71,7 +71,7 @@ export default function ProductGridItems({
                       className="flex flex-wrap items-baseline text-sm font-semibold text-foreground"
                     />
                   </div>
-                </Link>
+                </ProductImageLink>
                 <FavoriteButton
                   product={product}
                   className="absolute right-3 top-3 z-10 size-9 min-h-9 min-w-9 shadow-md"
@@ -84,7 +84,7 @@ export default function ProductGridItems({
         return (
           <Grid.Item key={product.slug} className="animate-fade-in">
             <div className="relative h-full w-full">
-              <Link
+              <ProductImageLink productId={product.id}
                 className="relative block h-full w-full"
                 href={`/product/${product.slug}`}
               >
@@ -97,12 +97,13 @@ export default function ProductGridItems({
                     currencyCode: "TRY",
                   }}
                   src={imageUrl}
+                  transitionImage
                   fill
                   sizes={imageSizes}
                   loading={shouldLoadEagerly ? "eager" : "lazy"}
                   fetchPriority={shouldPrioritizeImage ? "high" : undefined}
                 />
-              </Link>
+              </ProductImageLink>
               <FavoriteButton
                 product={product}
                 className="absolute right-3 top-3 z-10 h-11 w-11"

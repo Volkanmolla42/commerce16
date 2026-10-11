@@ -1,14 +1,17 @@
 import clsx from "clsx";
 import Image from "next/image";
 import Label from "../label";
+import { ProductImageTransition } from "@/components/product/product-image-transition";
 
 export function GridTileImage({
   active,
   label,
   alt,
+  transitionImage = false,
   ...props
 }: {
   active?: boolean;
+  transitionImage?: boolean;
   label?: {
     title: string;
     amount: string;
@@ -17,6 +20,10 @@ export function GridTileImage({
     position?: "bottom" | "center";
   };
 } & React.ComponentProps<typeof Image>) {
+  const image = props.src ? (
+    <Image className="relative h-full w-full object-contain" alt={alt ?? ""} {...props} />
+  ) : null;
+
   return (
     <div
       className={clsx(
@@ -28,13 +35,7 @@ export function GridTileImage({
         },
       )}
     >
-      {props.src ? (
-        <Image
-          className="relative h-full w-full object-contain"
-          alt={alt ?? ""}
-          {...props}
-        />
-      ) : null}
+      {transitionImage ? <ProductImageTransition>{image}</ProductImageTransition> : image}
       {label ? (
         <Label
           title={label.title}

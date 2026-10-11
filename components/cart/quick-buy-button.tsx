@@ -9,7 +9,7 @@ import { setQuickBuyItem } from "./quick-buy-store";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 import { getVariantImages } from "@/lib/catalog/product-images";
 
-export function QuickBuyButton({ product, variant }: { product: Product; variant?: ProductVariant }) {
+export function QuickBuyButton({ product, variant, buttonVariant = "default" }: { product: Product; variant?: ProductVariant; buttonVariant?: "default" | "outline" }) {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const selectedVariant = variant ?? getSelectedVariant(product, new URLSearchParams());
@@ -34,6 +34,7 @@ export function QuickBuyButton({ product, variant }: { product: Product; variant
     <Button
       type="button"
       size="lg"
+      variant={buttonVariant}
       onClick={handleQuickBuy}
       disabled={!isAvailable || isNavigating}
       aria-label="Hemen Satın Al"

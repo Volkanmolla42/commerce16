@@ -37,7 +37,7 @@ export function AllCategoriesMenu({ categories }: { categories: Menu[] }) {
         aria-controls={panelId}
         className="text-sm font-medium text-neutral-600 transition hover:text-black dark:text-neutral-400 dark:hover:text-white"
       >
-        Tümü
+        Tüm Ürünler
       </Link>
       <div
         id={panelId}

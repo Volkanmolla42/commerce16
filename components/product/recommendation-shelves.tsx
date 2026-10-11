@@ -22,6 +22,7 @@ import {
 } from "@/lib/catalog/recommendations";
 import { getProductPriceRange, getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 import { getProductImages, getVariantImages } from "@/lib/catalog/product-images";
+import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
 
 export function ProductViewTracker({ slug }: { slug: string }) {
   useEffect(() => recordRecentProduct(slug), [slug]);
@@ -64,11 +65,11 @@ function Shelf({ title, products, showCartActions = false, upsellSources, layout
               <li key={product.id} className="min-w-0">
                 <article className="overflow-hidden rounded-2xl border border-border bg-card">
                   <div className="relative aspect-square bg-muted/30">
-                    <Link href={productHref} aria-label={`${product.title} ürününü incele`} className="absolute inset-0">
+                    <ProductImageLink productId={product.id} href={productHref} aria-label={`${product.title} ürününü incele`} className="absolute inset-0">
                       {imageUrl && (
-                        <Image src={imageUrl} alt={product.title} fill sizes="(min-width: 768px) 224px, 192px" className="object-contain p-3" />
+                        <ProductImageTransition><Image src={imageUrl} alt={product.title} fill sizes="(min-width: 768px) 224px, 192px" className="object-contain p-3" /></ProductImageTransition>
                       )}
-                    </Link>
+                    </ProductImageLink>
                     <FavoriteButton product={product} className="absolute right-3 top-3 z-10" />
                   </div>
                   <div className="space-y-3 p-3">

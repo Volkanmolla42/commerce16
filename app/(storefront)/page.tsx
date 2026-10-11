@@ -4,6 +4,7 @@ import { baseUrl } from "@/lib/utils";
 import { getCategories, getRecommendationCatalog, getStoreSettings } from "@/lib/catalog";
 import { PersonalizedRecommendationShelf } from "@/components/product/recommendation-shelves";
 import type { Metadata } from "next";
+import { getProductImages } from "@/lib/catalog/product-images";
 
 export const prefetch = "partial";
 
@@ -100,7 +101,8 @@ export default async function HomePage() {
         <HomeHero
           storeName={storeName}
           slogan={slogan}
-          productCount={availableProducts.length}
+          featuredProduct={availableProducts.find((product) => getProductImages(product).length > 0)}
+          hasCategories={categories.some((category) => category.slug !== "")}
         />
         <CategoryShortcuts categories={categories} />
         <HomeProductShelf title="Öne Çıkan Ürünler" products={availableProducts.slice(0, 10)} />

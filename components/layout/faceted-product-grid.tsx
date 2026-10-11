@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, ViewTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   AdjustmentsHorizontalIcon,
   ChevronDownIcon,
@@ -9,9 +9,10 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, Input } from "@/components/ui";
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import Grid from "@/components/grid";
 import ProductGridItems from "@/components/layout/product-grid-items";
-import { defaultSort, sorting } from "@/lib/constants";
+import { CategorySelect, SortMenu } from "./catalog-selection";
 import { createUrl } from "@/lib/utils";
 import type { Category, Product } from "@/lib/catalog/types";
 import type { CategoryAttributeDefinition } from "@/lib/catalog/attributes";
@@ -29,6 +30,7 @@ import {
 
 import type { CatalogFacetOptions } from "@/lib/catalog/paging";
 import { CatalogPagination } from "./catalog-pagination";
+import { createCatalogSearchParams } from "@/lib/catalog/search-params";
 
 function CategoryAttributeFacet({
   definition,
@@ -128,10 +130,10 @@ function OptionFacet({
                 key={val}
                 type="button"
                 onClick={() => toggle(val)}
-                className={`min-h-10 min-w-11 rounded-lg border px-3 text-xs font-semibold transition-all ${
+                className={`h-10 min-w-11 rounded-xl border px-3 text-xs font-semibold transition-all active:scale-95 cursor-pointer ${
                   isSelected
-                    ? "border-foreground bg-foreground text-background shadow-sm"
-                    : "border-border bg-card text-foreground hover:border-foreground/40 hover:bg-muted"
+                    ? "border-primary bg-primary text-primary-foreground shadow-xs font-bold"
+                    : "border-border/80 bg-muted/20 text-foreground hover:border-foreground/40 hover:bg-muted"
                 }`}
               >
                 {val}
@@ -148,10 +150,10 @@ function OptionFacet({
                 key={val}
                 type="button"
                 onClick={() => toggle(val)}
-                className={`flex min-h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition-all ${
+                className={`flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition-all active:scale-95 cursor-pointer ${
                   isSelected
-                    ? "border-blue-500 bg-blue-500/15 font-semibold text-blue-400 shadow-sm"
-                    : "border-border bg-card text-foreground hover:border-foreground/40 hover:bg-muted"
+                    ? "border-primary bg-primary/15 font-semibold text-primary ring-1 ring-primary/40 shadow-xs"
+                    : "border-border/80 bg-muted/20 text-foreground hover:border-foreground/40 hover:bg-muted"
                 }`}
               >
                 <span className="size-2 rounded-full bg-current opacity-70" />
@@ -204,14 +206,15 @@ function FacetControls({
 }) {
   return (
     <div>
-      <fieldset className="space-y-2 border-b border-border py-3">
-        <legend className="pb-2 text-sm font-semibold text-foreground">Fiyat aralığı</legend>
-        <div className="grid grid-cols-2 gap-2">
+      <fieldset className="space-y-2 border-b border-border/60 py-3.5">
+        <legend className="pb-1 text-sm font-semibold text-foreground">Fiyat aralığı</legend>
+        <div className="grid grid-cols-2 gap-2.5">
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">En az (₺)</span>
+            <span className="text-xs font-medium text-muted-foreground">En az (₺)</span>
             <Input
               aria-label="En düşük fiyat"
-              className="min-h-12"
+              placeholder="₺0"
+              className="h-10 text-xs sm:text-sm rounded-xl border-border/80 bg-muted/20 focus:bg-background"
               inputMode="decimal"
               min="0"
               name={`min-price-${inputSuffix}`}
@@ -222,10 +225,11 @@ function FacetControls({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">En çok (₺)</span>
+            <span className="text-xs font-medium text-muted-foreground">En çok (₺)</span>
             <Input
               aria-label="En yüksek fiyat"
-              className="min-h-12"
+              placeholder="₺9999"
+              className="h-10 text-xs sm:text-sm rounded-xl border-border/80 bg-muted/20 focus:bg-background"
               inputMode="decimal"
               min="0"
               name={`max-price-${inputSuffix}`}
@@ -259,110 +263,6 @@ function FacetControls({
       ))}
 
     </div>
-  );
-}
-
-function SortMenu() {
-  const pathname = usePathname() ?? "/search";
-  const searchParams = useSearchParams();
-  const isSearch = Boolean(searchParams.get("q")?.trim());
-  const selectedSlug = isSearch ? null : searchParams.get("sort");
-  const selectedSort = sorting.find((item) => item.slug === selectedSlug) ?? defaultSort;
-
-  if (isSearch) return <span className="px-4 py-2.5 text-sm text-muted-foreground">Alaka sırası</span>;
-
-  return (
-    <details className="group relative">
-      <summary
-        aria-label={`Sıralama: ${selectedSort.title}`}
-        className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-full border border-border bg-card px-4 text-sm text-foreground transition hover:border-blue-500/50 [&::-webkit-details-marker]:hidden"
-      >
-        <span className="text-muted-foreground">Sırala</span>
-        <span className="font-medium">{selectedSort.title}</span>
-        <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
-      </summary>
-      <ul className="absolute right-0 top-full z-30 mt-2 min-w-60 rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl">
-        {sorting.map((item) => {
-          const params = new URLSearchParams(searchParams.toString());
-          if (item.slug) params.set("sort", item.slug);
-          else params.delete("sort");
-          params.delete("page");
-          params.delete("cursor");
-          const active = item.slug === selectedSlug;
-
-          return (
-            <li key={item.slug ?? "recommended"}>
-              <Link
-                href={createUrl(pathname, params)}
-                prefetch={false}
-                onClick={(e) => {
-                  e.currentTarget.closest("details")?.removeAttribute("open");
-                }}
-                aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 items-center rounded-xl px-3 text-sm transition-colors ${active
-                    ? "bg-blue-500/10 font-medium text-blue-400"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-              >
-                {item.title}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </details>
-  );
-}
-
-function CategorySelect({
-  categories,
-  selectedCategory,
-  query,
-}: {
-  categories: Category[];
-  selectedCategory?: string;
-  query?: string;
-}) {
-  const searchParams = useSearchParams();
-  const selected = categories.find((category) => category.slug === selectedCategory)
-    ?? categories.find((category) => category.slug === "");
-  const categorySearchParams = new URLSearchParams();
-  const currentQuery = searchParams.get("q") || query;
-  const sort = searchParams.get("sort");
-  if (currentQuery) categorySearchParams.set("q", currentQuery);
-  if (sort) categorySearchParams.set("sort", sort);
-
-  return (
-    <details className="group relative">
-      <summary
-        aria-label={`Kategori: ${selected?.title ?? "Tümü"}`}
-        className="flex min-h-12 max-w-full cursor-pointer list-none items-center gap-3 rounded-full border border-border bg-card px-4 text-sm text-foreground transition hover:border-blue-500/50 [&::-webkit-details-marker]:hidden"
-      >
-        <span className="text-muted-foreground">Kategori</span>
-        <span className="max-w-28 truncate font-medium sm:max-w-44">{selected?.title ?? "Tümü"}</span>
-        <ChevronDownIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-      </summary>
-      <ul className="absolute right-0 top-full z-40 mt-2 max-h-[min(60dvh,24rem)] min-w-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl">
-        {categories.map((category) => (
-          <li key={category.slug || "all"}>
-            <Link
-              href={createUrl(category.path, categorySearchParams)}
-              prefetch={false}
-              onClick={(e) => {
-                e.currentTarget.closest("details")?.removeAttribute("open");
-              }}
-              aria-current={category.slug === (selectedCategory ?? "") ? "page" : undefined}
-              className={`flex min-h-11 items-center rounded-xl px-3 text-sm transition-colors ${category.slug === (selectedCategory ?? "")
-                  ? "bg-blue-500/10 font-medium text-blue-400"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-            >
-              {category.title}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }
 
@@ -412,62 +312,32 @@ export function FacetedProductGrid({
   useEffect(() => {
     if (stateKey === lastSubmitted.current) return;
     const timer = setTimeout(() => {
+      if (stateKey === lastSubmitted.current) return;
       lastSubmitted.current = stateKey;
-      const params = new URLSearchParams(searchKey);
-      params.delete("page");
-      params.delete("cursor");
-      if (getActiveCatalogFilterCount(filters)) params.set("filters", JSON.stringify(filters));
-      else params.delete("filters");
-      if (getActiveCategoryAttributeFilterCount(categoryAttributeFilters)) params.set("attributes", JSON.stringify(categoryAttributeFilters));
-      else params.delete("attributes");
+      const params = createCatalogSearchParams(searchKey, filters, categoryAttributeFilters);
       startTransition(() => router.replace(createUrl(pathname, params), { scroll: false }));
     }, 250);
     return () => clearTimeout(timer);
   }, [stateKey, searchKey, filters, categoryAttributeFilters, pathname, router]);
   const currentQuery = searchParams.get("q") ?? query ?? "";
-  const [searchInput, setSearchInput] = useState(currentQuery);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filterTitleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    setSearchInput(currentQuery);
-  }, [currentQuery]);
-
-  const executeSearch = (valueToSearch: string) => {
-    const params = new URLSearchParams(searchKey);
-    params.delete("page");
-    params.delete("cursor");
-    if (valueToSearch.trim()) {
-      params.set("q", valueToSearch.trim());
-    } else {
-      params.delete("q");
-    }
-    startTransition(() => {
-      router.replace(createUrl(pathname, params), { scroll: false });
-    });
-  };
-
-  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      executeSearch(searchInput);
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearchInput("");
-    executeSearch("");
-  };
+    if (!mobileFiltersOpen) return;
+    const desktop = window.matchMedia("(min-width: 1280px)");
+    const closeOnDesktop = () => {
+      if (desktop.matches) setMobileFiltersOpen(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, [mobileFiltersOpen]);
 
   const clearAllFiltersAndSearch = () => {
     setFilters(EMPTY_CATALOG_FILTERS);
     setCategoryAttributeFilters({});
-    setSearchInput("");
-    const params = new URLSearchParams(searchKey);
-    params.delete("filters");
-    params.delete("attributes");
-    params.delete("q");
-    params.delete("page");
-    params.delete("cursor");
+    lastSubmitted.current = JSON.stringify([EMPTY_CATALOG_FILTERS, {}]);
+    const params = createCatalogSearchParams(searchKey, EMPTY_CATALOG_FILTERS, {}, "");
     startTransition(() => {
       router.replace(createUrl(pathname, params), { scroll: false });
     });
@@ -513,197 +383,222 @@ export function FacetedProductGrid({
     onOptionChange: updateOption,
   };
 
-  const currentCategoryObj = categories?.find((cat) => cat.slug === selectedCategory);
-  const categoryTitle = currentCategoryObj?.title;
-  const pageTitle = title ?? (categoryTitle ? categoryTitle : query ? `“${query}” sonuçları` : "Tüm ürünler");
+  const categoryTitle = categories?.find((category) => category.slug === selectedCategory)?.title;
+  const pageTitle = title ?? categoryTitle ?? (query ? `“${query}” sonuçları` : "Tüm ürünler");
 
   return (
+    <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
     <div className="min-w-0">
       <h1 className="sr-only">{pageTitle}</h1>
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-        {/* SOL: Bütünleşik Filtre Paneli (Masaüstü) */}
         <aside className="hidden min-w-0 xl:block">
-          <Card className="sticky top-20 rounded-2xl bg-card/60 p-5 shadow-none">
-            <div className="mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
+          <Card className="sticky top-20 rounded-2xl bg-card/60 p-5 shadow-none space-y-4">
+            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <FunnelIcon className="size-4 text-muted-foreground" aria-hidden="true" />
                 <h2 className="text-sm font-semibold text-foreground">Filtreler</h2>
               </div>
               {activeFilterCount > 0 ? (
-                <span className="flex size-5 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
-                  {activeFilterCount}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="flex size-5 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearAllFiltersAndSearch}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    Temizle
+                  </button>
+                </div>
               ) : null}
             </div>
+
+            {/* Masaüstü Sıralama ve Kategori */}
+            <div className="space-y-3 border-b border-border pb-4">
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Sıralama
+                </span>
+                <SortMenu inline />
+              </div>
+
+              {categories?.length ? (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Kategori
+                  </span>
+                  <CategorySelect
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    query={query}
+                    inline
+                  />
+                </div>
+              ) : null}
+            </div>
+
             <FacetControls {...panelProps} inputSuffix="desktop" />
+
+            {activeFilterCount > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearAllFiltersAndSearch}
+                className="w-full rounded-xl text-xs font-medium gap-1.5 cursor-pointer mt-2"
+              >
+                <XMarkIcon className="size-3.5" />
+                <span>Filtreleri temizle ({activeFilterCount})</span>
+              </Button>
+            ) : null}
           </Card>
         </aside>
 
-        {/* SAĞ: Üstte Toolbar (Arama, Kategori, Sıralama, Temizle), Altta Ürünler */}
-        <div className="min-w-0 flex flex-col gap-6">
-          {/* Kontrol Çubuğu (Toolbar) */}
-          <div className="relative z-30 rounded-2xl border border-border bg-card/60 p-3 sm:p-4 backdrop-blur-xs">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              
-              {/* Mobil Filtre Butonu (xl:hidden) */}
-              <div className="xl:hidden">
-                <button
-                  type="button"
-                  onClick={() => setMobileFiltersOpen((prev) => !prev)}
-                  aria-label="Filtre panelini aç/kapat"
-                  className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-xs transition hover:border-foreground/30"
-                >
-                  <AdjustmentsHorizontalIcon className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <span>Filtreler</span>
-                  {activeFilterCount > 0 ? (
-                    <span className="flex size-5 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
-                      {activeFilterCount}
-                    </span>
-                  ) : null}
-                  <ChevronDownIcon
-                    aria-hidden="true"
-                    className={`size-3.5 text-muted-foreground transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-              </div>
-
-              {/* ORTADA: Arama Inputu (ViewTransition ile sarmalanmış) */}
-              <div className="w-full flex-1 max-w-lg">
-                <ViewTransition name="catalog-search-bar" share="morph">
-                  <div className="relative w-full">
-                    <button
-                      type="button"
-                      onClick={() => executeSearch(searchInput)}
-                      aria-label="Arama yap"
-                      className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      <MagnifyingGlassIcon className="size-4" aria-hidden="true" />
-                    </button>
-                    <input
-                      type="text"
-                      value={searchInput}
-                      onChange={(event) => setSearchInput(event.target.value)}
-                      onKeyDown={handleSearchKeyDown}
-                      placeholder={categoryTitle ? `"${categoryTitle}" içinde ara...` : "Ürün veya kategori ara..."}
-                      aria-label="Koleksiyonda ara"
-                      className="w-full rounded-full border border-border bg-background py-2.5 pl-10 pr-9 text-sm text-foreground transition placeholder:text-muted-foreground focus:border-foreground/40 focus:outline-hidden"
-                    />
-                    {searchInput ? (
-                      <button
-                        type="button"
-                        onClick={handleClearSearch}
-                        aria-label="Aramayı temizle"
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                      >
-                        <XMarkIcon className="size-4" aria-hidden="true" />
-                      </button>
+        <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
+          <div className="relative z-30 xl:hidden">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+              <div className="shrink-0">
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Filtre panelini aç/kapat"
+                    className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border/80 bg-background px-3 text-xs font-semibold text-foreground shadow-xs transition hover:border-foreground/30 hover:bg-muted whitespace-nowrap"
+                  >
+                    <AdjustmentsHorizontalIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span>Filtreler</span>
+                    {activeFilterCount > 0 ? (
+                      <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                        {activeFilterCount}
+                      </span>
                     ) : null}
-                  </div>
-                </ViewTransition>
+                  </button>
+                </DialogTrigger>
               </div>
 
-              {/* SAĞDA: Kategori, Sıralama, Filtre Temizle */}
-              <div className="flex flex-wrap items-center gap-2.5 justify-start sm:justify-end">
-                {categories?.length ? (
+              {categories?.length ? (
+                <div className="shrink-0">
                   <CategorySelect
                     categories={categories}
                     selectedCategory={selectedCategory}
                     query={query}
                   />
-                ) : null}
+                </div>
+              ) : null}
 
+              <div className="shrink-0">
                 <SortMenu />
-
-                {/* Filtreleri Temizle Butonu (Aktif filtre veya arama metni varsa) */}
-                {(activeFilterCount > 0 || Boolean(searchInput.trim())) ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={clearAllFiltersAndSearch}
-                    className="min-h-11 rounded-full border-red-500/30 bg-red-500/10 px-4 text-xs font-semibold text-red-500 hover:bg-red-500/20 hover:text-red-600 transition"
-                  >
-                    <XMarkIcon className="mr-1 size-3.5" aria-hidden="true" />
-                    Filtreleri temizle
-                  </Button>
-                ) : null}
               </div>
-
             </div>
           </div>
 
-          {/* Mobil Filtre Paneli Açıkken */}
-          {mobileFiltersOpen ? (
-            <div className="rounded-2xl border border-border bg-card p-4 xl:hidden">
-              <div className="mb-2 flex items-center justify-between border-b border-border pb-2">
-                <span className="text-sm font-semibold text-foreground">Filtreleri Özelleştir</span>
-                <button
-                  type="button"
-                  onClick={() => setMobileFiltersOpen(false)}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Kapat
-                </button>
+          <DialogContent
+            aria-describedby={undefined}
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              filterTitleRef.current?.focus();
+            }}
+            className="bottom-0 left-0 top-auto max-h-[85dvh] max-w-none grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 rounded-b-none rounded-t-[28px] border-t border-border/80 bg-background p-0 shadow-2xl translate-x-0 translate-y-0"
+          >
+            {/* Sürükleme / Tutma Çubuğu */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="h-1.5 w-12 rounded-full bg-muted-foreground/30" />
+            </div>
+
+            {/* Başlık Satırı */}
+            <div className="flex items-center justify-between border-b border-border/60 px-5 pb-3.5 pt-1 pr-12">
+              <div className="flex items-center gap-2">
+                <DialogTitle ref={filterTitleRef} tabIndex={-1} className="text-base font-semibold text-foreground">
+                  Filtreler
+                </DialogTitle>
+                {activeFilterCount > 0 ? (
+                  <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {activeFilterCount}
+                  </span>
+                ) : null}
               </div>
+            </div>
+
+            {/* Kaydırılabilir Filtreler */}
+            <div className="overflow-y-auto overscroll-contain px-5 py-2">
               <FacetControls {...panelProps} inputSuffix="mobile" />
             </div>
-          ) : null}
 
-        <section
-          className={`relative min-w-0 transition-opacity duration-200 ${isFiltering ? "opacity-50" : ""}`}
-          aria-label="Filtrelenebilir ürünler"
-          aria-busy={isFiltering}
-        >
-          {isFiltering ? (
-            <div className="absolute inset-x-0 -top-3 z-10 flex justify-center">
-              <span className="rounded-full bg-foreground/10 px-3 py-1 text-xs font-medium text-foreground backdrop-blur-md">
-                Güncelleniyor...
-              </span>
+            {/* Dengeli ve Uyumlu Alt Eylem Butonları */}
+            <div className="grid grid-cols-2 gap-3 border-t border-border/60 bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={clearAllFilters}
+                disabled={activeFilterCount === 0}
+                className="h-12 rounded-xl text-xs font-semibold text-foreground border-border/80 hover:bg-muted disabled:opacity-40 cursor-pointer"
+              >
+                Temizle {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
+              </Button>
+              <DialogClose asChild>
+                <Button className="h-12 rounded-xl text-xs font-semibold shadow-xs cursor-pointer">
+                  Ürünleri Göster
+                </Button>
+              </DialogClose>
             </div>
-          ) : null}
+          </DialogContent>
 
-          {products.length > 0 ? (
-            <Grid className="grid-cols-2 lg:grid-cols-3">
-              <ProductGridItems products={products} cardLayout="stacked" />
-            </Grid>
-          ) : (
-            <Card className="rounded-3xl border-dashed bg-card/40 px-6 py-12 text-center shadow-none sm:px-10 sm:py-16">
-              <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl border border-border bg-muted/50 text-muted-foreground">
-                <MagnifyingGlassIcon aria-hidden="true" className="size-6" />
-              </span>
-              <h2 className="text-lg font-semibold text-foreground">
-                {!isDone ? "Bu sayfada eşleşen ürün yok" : activeFilterCount > 0 ? "Bu filtrelerle ürün bulunamadı" : query ? "Sonuç bulunamadı" : emptyMessage}
-              </h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                {!isDone
-                  ? "Sonraki sayfayı inceleyebilirsiniz."
-                  : activeFilterCount > 0
-                  ? "Daha fazla ürünü görmek için seçili filtreleri kaldırın."
-                  : query
-                    ? "Aramanızı kısaltıp farklı bir yazımla tekrar deneyin."
-                    : "Yeni ürünler eklendiğinde burada görünecek."}
-              </p>
-              {activeFilterCount > 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-6 min-h-12 rounded-full px-5"
-                  onClick={() => { setFilters(EMPTY_CATALOG_FILTERS); setCategoryAttributeFilters({}); }}
-                >
-                  Filtreleri temizle
-                </Button>
-              ) : query && products.length === 0 ? (
-                <Button asChild variant="outline" className="mt-6 min-h-12 rounded-full px-5">
-                  <Link href="/search">Tüm ürünleri göster</Link>
-                </Button>
-              ) : null}
-            </Card>
-          )}
-          <CatalogPagination key={JSON.stringify([selectedCategory, query, initialFilters, initialAttributeFilters, searchParams.get("sort")])} continueCursor={continueCursor} isDone={isDone} count={products.length} />
-        </section>
+          <section
+            className={`relative min-w-0 transition-opacity duration-200 ${isFiltering ? "opacity-50" : ""}`}
+            aria-label="Filtrelenebilir ürünler"
+            aria-busy={isFiltering}
+          >
+            {isFiltering ? (
+              <div className="absolute inset-x-0 -top-3 z-10 flex justify-center">
+                <span className="rounded-full bg-foreground/10 px-3 py-1 text-xs font-medium text-foreground backdrop-blur-md">
+                  Güncelleniyor...
+                </span>
+              </div>
+            ) : null}
+
+            {products.length > 0 ? (
+              <Grid className="grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+                <ProductGridItems products={products} cardLayout="stacked" />
+              </Grid>
+            ) : (
+              <Card className="rounded-3xl border-dashed bg-card/40 px-6 py-12 text-center shadow-none sm:px-10 sm:py-16">
+                <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl border border-border bg-muted/50 text-muted-foreground">
+                  <MagnifyingGlassIcon aria-hidden="true" className="size-6" />
+                </span>
+                <h2 className="text-lg font-semibold text-foreground">
+                  {!isDone ? "Bu sayfada eşleşen ürün yok" : activeFilterCount > 0 ? "Bu filtrelerle ürün bulunamadı" : query ? "Sonuç bulunamadı" : emptyMessage}
+                </h2>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                  {!isDone
+                    ? "Sonraki sayfayı inceleyebilirsiniz."
+                    : activeFilterCount > 0
+                    ? "Daha fazla ürünü görmek için seçili filtreleri kaldırın."
+                    : query
+                      ? "Aramanızı kısaltıp farklı bir yazımla tekrar deneyin."
+                      : "Yeni ürünler eklendiğinde burada görünecek."}
+                </p>
+                {activeFilterCount > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-6 min-h-12 rounded-full px-5"
+                    onClick={clearAllFilters}
+                  >
+                    Filtreleri temizle
+                  </Button>
+                ) : query && products.length === 0 ? (
+                  <Button asChild variant="outline" className="mt-6 min-h-12 rounded-full px-5">
+                    <Link href="/search">Tüm ürünleri göster</Link>
+                  </Button>
+                ) : null}
+              </Card>
+            )}
+            <CatalogPagination key={JSON.stringify([selectedCategory, query, initialFilters, initialAttributeFilters, searchParams.get("sort")])} continueCursor={continueCursor} isDone={isDone} count={products.length} />
+          </section>
+        </div>
       </div>
     </div>
-  </div>
-);
+    </Dialog>
+  );
 }

@@ -1,11 +1,9 @@
 "use client";
 
-import { startTransition, useEffect, useId, useRef, useState } from "react";
-import { ViewTransition } from "react";
-import Form from "next/form";
+import { useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRightIcon,
   CubeIcon,
@@ -14,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { formatMoney } from "@/lib/format-money";
 import { normalizeSearchText } from "@/lib/catalog/smart-search";
+import { createUrl } from "@/lib/utils";
 
 type SearchOption = {
   key: string;
@@ -25,30 +24,72 @@ type SearchOption = {
   maxPrice?: string;
 };
 
-export default function Search() {
-  const pathname = usePathname();
-  const isSearchPage = pathname === "/search" || pathname?.startsWith("/search/");
-  if (isSearchPage) {
-    return null;
-  }
-  const currentQuery = useSearchParams()?.get("q") ?? "";
-  return <SearchInput key={currentQuery} initialQuery={currentQuery} />;
+function useScrollDirection() {
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const diff = currentScrollY - lastScrollY;
+
+      // Küçük titreşimleri önlemek için eşik değeri
+      if (Math.abs(diff) > 6) {
+        if (diff < 0 && currentScrollY > 40) {
+          setScrollDirection("up");
+          if (timeoutId) clearTimeout(timeoutId);
+          // Yukarı kaydırma durduğunda efektin yumuşak sönümlenmesi
+          timeoutId = setTimeout(() => {
+            setScrollDirection(null);
+          }, 1400);
+        } else {
+          setScrollDirection("down");
+        }
+      } else if (currentScrollY <= 20) {
+        setScrollDirection(null);
+      }
+
+      lastScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  return scrollDirection;
 }
 
-function SearchInput({ initialQuery }: { initialQuery: string }) {
+const headerInputClassName =
+  "min-h-10 w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-3 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900";
+
+const floatingInputBaseClassName =
+  "h-12 w-full rounded-full border bg-white/95 py-2 pl-10 pr-4 text-sm font-medium text-black backdrop-blur-md transition-[border-color,box-shadow,background-color,color] duration-700 ease-out placeholder:text-neutral-500 focus:outline-hidden dark:bg-neutral-900/95 dark:text-white dark:placeholder:text-neutral-400";
+
+export default function Search({
+  variant = "header",
+}: {
+  variant?: "header" | "floating";
+}) {
   const router = useRouter();
-  const pathname = usePathname();
-  const isSearchPage = pathname === "/search" || pathname?.startsWith("/search/");
-  if (isSearchPage) {
-    return null;
-  }
+  const searchParams = useSearchParams();
   const componentId = useId();
   const listboxId = `search-suggestions-${componentId}`;
   const rootRef = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState(initialQuery);
-  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get("q") ?? "");
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+
+  const scrollDirection = useScrollDirection();
+  const isFloating = variant === "floating";
+  const isScrollingUp = isFloating && scrollDirection === "up";
+
   const normalizedQuery = normalizeSearchText(query);
   const normalizedDebouncedQuery = normalizeSearchText(debouncedQuery);
   const shouldLoadSuggestions = isOpen && normalizedDebouncedQuery.length >= 2;
@@ -59,13 +100,24 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
   useEffect(() => {
     if (!shouldLoadSuggestions) return;
     const controller = new AbortController();
-    fetch(`/api/catalog/search?q=${encodeURIComponent(debouncedQuery)}`, { signal: controller.signal })
+    fetch(`/api/catalog/search?q=${encodeURIComponent(debouncedQuery)}`, {
+      signal: controller.signal,
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("Arama yüklenemedi");
         const result: SearchOption[] = await response.json();
-        if (!controller.signal.aborted) { setOptions(result); setSuggestionError(false); setCompletedQuery(debouncedQuery); }
-      }).catch(() => {
-        if (!controller.signal.aborted) { setOptions([]); setSuggestionError(true); setCompletedQuery(debouncedQuery); }
+        if (!controller.signal.aborted) {
+          setOptions(result);
+          setSuggestionError(false);
+          setCompletedQuery(debouncedQuery);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setOptions([]);
+          setSuggestionError(true);
+          setCompletedQuery(debouncedQuery);
+        }
       });
     return () => controller.abort();
   }, [shouldLoadSuggestions, debouncedQuery]);
@@ -84,7 +136,9 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [isOpen]);
 
-  const isQuerySettled = normalizedQuery === normalizedDebouncedQuery && normalizeSearchText(completedQuery) === normalizedDebouncedQuery;
+  const isQuerySettled =
+    normalizedQuery === normalizedDebouncedQuery &&
+    normalizeSearchText(completedQuery) === normalizedDebouncedQuery;
   const visibleOptions = isQuerySettled ? options : [];
   const panelIsVisible = isOpen && normalizedQuery.length >= 2;
 
@@ -100,7 +154,9 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
       setActiveIndex((current) => (current + 1) % visibleOptions.length);
     } else if (event.key === "ArrowUp" && visibleOptions.length > 0) {
       event.preventDefault();
-      setActiveIndex((current) => current <= 0 ? visibleOptions.length - 1 : current - 1);
+      setActiveIndex((current) =>
+        current <= 0 ? visibleOptions.length - 1 : current - 1,
+      );
     } else if (event.key === "Home" && visibleOptions.length > 0) {
       event.preventDefault();
       setActiveIndex(0);
@@ -112,6 +168,14 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
       setIsOpen(false);
       router.push(visibleOptions[activeIndex].href);
     }
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsOpen(false);
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    router.push(createUrl("/search", params));
   };
 
   const renderOption = (option: SearchOption, index: number) => {
@@ -154,7 +218,13 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
             {option.title}
           </span>
           <span className="block text-xs text-neutral-500 dark:text-neutral-400">
-            {option.kind === "category" ? "Kategori" : `${formatMoney(option.price ?? "0")}${option.maxPrice && Number(option.maxPrice) !== Number(option.price) ? ` ile ${formatMoney(option.maxPrice)}` : ""}`}
+            {option.kind === "category"
+              ? "Kategori"
+              : `${formatMoney(option.price ?? "0")}${
+                  option.maxPrice && Number(option.maxPrice) !== Number(option.price)
+                    ? ` ile ${formatMoney(option.maxPrice)}`
+                    : ""
+                }`}
           </span>
         </span>
         {option.kind === "category" ? (
@@ -171,79 +241,67 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
     .map((option, index) => ({ option, index }))
     .filter(({ option }) => option.kind === "product");
 
-  const handleInputFocus = () => {
-    setIsOpen(true);
-    if (!isSearchPage) {
-      startTransition(() => {
-        router.push(query ? `/search?q=${encodeURIComponent(query)}` : "/search");
-      });
-    }
-  };
-
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsOpen(false);
-    startTransition(() => {
-      const targetUrl = query.trim() ? `/search?q=${encodeURIComponent(query.trim())}` : "/search";
-      router.push(targetUrl);
-    });
-  };
-
-  const formElement = (
-    <form
-      action="/search"
-      method="get"
-      onSubmit={handleFormSubmit}
-      className="relative w-full"
-    >
-      <label htmlFor={`${componentId}-input`} className="sr-only">
-        Ürün veya kategori ara
-      </label>
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
-        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
-      </div>
-      <input
-        id={`${componentId}-input`}
-        type="search"
-        name="q"
-        role="combobox"
-        aria-label="Ürün veya kategori ara"
-        aria-autocomplete="list"
-        aria-expanded={panelIsVisible}
-        aria-controls={panelIsVisible ? listboxId : undefined}
-        aria-activedescendant={panelIsVisible && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
-        placeholder="Ürün veya kategori ara..."
-        autoComplete="off"
-        value={query}
-        onFocus={handleInputFocus}
-        onClick={handleInputFocus}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setActiveIndex(-1);
-          setIsOpen(true);
-        }}
-        onKeyDown={handleKeyDown}
-        className="w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-4 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900"
-      />
-    </form>
-  );
+  const floatingClass = isScrollingUp
+    ? `${floatingInputBaseClassName} search-scroll-up-glow border-blue-500/80 shadow-xl`
+    : `${floatingInputBaseClassName} border-neutral-300/80 shadow-lg hover:border-neutral-400 focus:border-neutral-900 focus:bg-white dark:border-neutral-700/80 dark:hover:border-neutral-600 dark:focus:border-white dark:focus:bg-black`;
 
   return (
-    <div ref={rootRef} className="relative w-full max-w-xs sm:max-w-sm md:max-w-md">
-      {isSearchPage ? (
-        formElement
-      ) : (
-        <ViewTransition name="catalog-search-bar" share="morph">
-          {formElement}
-        </ViewTransition>
-      )}
+    <div ref={rootRef} className="relative w-full">
+      <form action="/search" method="get" className="relative w-full" onSubmit={handleSubmit}>
+        <label htmlFor={`${componentId}-input`} className="sr-only">
+          Ürün veya kategori ara
+        </label>
+
+        <button
+          type="submit"
+          aria-label="Arama yap"
+          className={`absolute inset-y-0 left-0 z-10 flex items-center transition-colors duration-500 cursor-pointer ${
+            isFloating
+              ? isScrollingUp
+                ? "pl-3.5 text-blue-600 dark:text-blue-400"
+                : "pl-3.5 text-neutral-500 dark:text-neutral-400"
+              : "pl-3 text-neutral-400"
+          }`}
+        >
+          <MagnifyingGlassIcon className={isFloating ? "size-5" : "size-4"} aria-hidden="true" />
+        </button>
+
+        <input
+          id={`${componentId}-input`}
+          type="search"
+          name="q"
+          role="combobox"
+          aria-label="Ürün veya kategori ara"
+          aria-autocomplete="list"
+          aria-expanded={panelIsVisible}
+          aria-controls={panelIsVisible ? listboxId : undefined}
+          aria-activedescendant={
+            panelIsVisible && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+          }
+          placeholder={isFloating ? "Ürün veya kategori ara..." : "Ara..."}
+          autoComplete="off"
+          value={query}
+          onFocus={() => setIsOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(-1);
+            setIsOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+          className={isFloating ? floatingClass : headerInputClassName}
+        />
+      </form>
 
       {panelIsVisible ? (
         <div
           id={listboxId}
           role="listbox"
           aria-label="Arama önerileri"
-          className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[min(70vh,28rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
+          className={`absolute z-[60] max-h-[min(65vh,26rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-2xl backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-white ${
+            isFloating
+              ? "bottom-full mb-3 left-0 right-[-3.625rem]"
+              : "top-full mt-2 left-0 right-0"
+          }`}
         >
           {!isQuerySettled ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
@@ -251,7 +309,9 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
             </p>
           ) : visibleOptions.length === 0 ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
-              {suggestionError ? "Arama önerileri yüklenemedi. Tüm sonuçları açabilirsiniz." : "Bu aramayla eşleşen ürün veya kategori bulunamadı."}
+              {suggestionError
+                ? "Arama önerileri yüklenemedi. Tüm sonuçları açabilirsiniz."
+                : "Bu aramayla eşleşen ürün veya kategori bulunamadı."}
             </p>
           ) : (
             <>
@@ -264,7 +324,11 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
                 </div>
               ) : null}
               {productOptions.length > 0 ? (
-                <div role="group" aria-label="Ürünler" className="border-t border-neutral-100 pt-1 dark:border-neutral-800">
+                <div
+                  role="group"
+                  aria-label="Ürünler"
+                  className="border-t border-neutral-100 pt-1 dark:border-neutral-800"
+                >
                   <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                     Ürünler
                   </p>
@@ -289,14 +353,15 @@ function SearchInput({ initialQuery }: { initialQuery: string }) {
 
 export function SearchSkeleton() {
   return (
-    <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md">
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
-        <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
-      </div>
+    <div className="relative w-full">
+      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+        <MagnifyingGlassIcon className="size-4" aria-hidden="true" />
+      </span>
       <input
-        placeholder="Ürün veya kategori ara..."
+        aria-label="Arama yükleniyor"
+        placeholder="Ara..."
         disabled
-        className="w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-4 text-sm text-black placeholder:text-neutral-500 dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white"
+        className={headerInputClassName}
       />
     </div>
   );
