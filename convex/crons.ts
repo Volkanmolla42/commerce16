@@ -3,17 +3,24 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-crons.daily(
+crons.cron(
   "purge expired analytics attribution",
-  { hourUTC: 0, minuteUTC: 10 },
+  "10 0 * * *",
   internal.analytics.purgeExpired,
   {},
 );
 
-crons.daily(
+crons.cron(
   "purge expired active carts",
-  { hourUTC: 0, minuteUTC: 20 },
+  "20 0 * * *",
   internal.activeCarts.purgeExpired,
+  {},
+);
+
+crons.cron(
+  "purge expired abandoned carts",
+  "30 0 * * *",
+  internal.abandonedCartRecovery.purgeExpired,
   {},
 );
 

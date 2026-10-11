@@ -23,6 +23,7 @@ import {
 import { getProductPriceRange, getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 import { getProductImages, getVariantImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
+import { burstCartConfetti } from "@/components/cart/cart-confetti";
 
 export function ProductViewTracker({ slug }: { slug: string }) {
   useEffect(() => recordRecentProduct(slug), [slug]);
@@ -82,9 +83,14 @@ function Shelf({ title, products, showCartActions = false, upsellSources, layout
                         <Link href={productHref}>{upsellSource ? "Seçeneği belirle" : "Seçenekleri seç"}</Link>
                       </Button>
                     ) : (
-                      <Button type="button" size="sm" className="w-full" onClick={() => upsellSource
-                        ? replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id)
-                        : addItem(selectedProduct, 1, defaultVariant?.id)}>
+                      <Button type="button" size="sm" className="w-full" onClick={(event) => {
+                        if (upsellSource) {
+                          replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id);
+                        } else {
+                          addItem(selectedProduct, 1, defaultVariant?.id);
+                          void burstCartConfetti(event.currentTarget);
+                        }
+                      }}>
                         {upsellSource ? "Sepettekiyle değiştir" : "Sepete ekle"}
                       </Button>
                     )}

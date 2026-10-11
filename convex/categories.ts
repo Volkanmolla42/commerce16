@@ -1,4 +1,5 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import schema from "./schema";
 import { assertAdminApiSecret } from "./adminAuth";
@@ -25,7 +26,7 @@ export const list = query({
   },
 });
 
-export const listAdmin = mutation({
+export const listAdmin = query({
   args: { adminSecret: v.string() },
   returns: v.array(categoryWithImageValidator),
   handler: async (ctx, { adminSecret }) => {
@@ -121,29 +122,12 @@ export const update = mutation({
     }
 
     if (slugChanged || removedAttributeKeys.size > 0) {
-      let cursor: string | null = null;
-      let isDone = false;
-      while (!isDone) {
-        const page = await ctx.db.query("products")
-          .withIndex("by_category", (q) => q.eq("categorySlug", current.slug))
-          .paginate({ numItems: 100, cursor });
-        for (const product of page.page) {
-          const attributes = product.attributes ?? [];
-          const nextAttributes = removedAttributeKeys.size > 0
-            ? attributes.filter((attribute) => !removedAttributeKeys.has(attribute.key))
-            : attributes;
-          const attributesChanged = nextAttributes.length !== attributes.length;
-          if (!slugChanged && !attributesChanged) continue;
-
-          await patchCatalogProduct(ctx, product, {
-            ...(slugChanged ? { categorySlug: nextSlug } : {}),
-            ...(attributesChanged ? { attributes: nextAttributes } : {}),
-            updatedAt: new Date().toISOString(),
-          });
-        }
-        cursor = page.continueCursor;
-        isDone = page.isDone;
-      }
+      await ctx.scheduler.runAfter(0, internal.categories.reassignCategoryProductsBatch, {
+        oldSlug: current.slug,
+        newSlug: nextSlug,
+        removedAttributeKeys: Array.from(removedAttributeKeys),
+        cursor: null,
+      });
     }
 
     const imageChanged = Object.hasOwn(rest, "imageStorageId") && rest.imageStorageId !== current.imageStorageId;
@@ -221,6 +205,48 @@ export const discardImageUpload = mutation({
       .withIndex("by_image_storage", (q) => q.eq("imageStorageId", args.storageId))
       .first();
     if (!categoryReference) await ctx.storage.delete(args.storageId);
+    return null;
+  },
+});
+
+export const reassignCategoryProductsBatch = internalMutation({
+  args: {
+    oldSlug: v.string(),
+    newSlug: v.string(),
+    removedAttributeKeys: v.array(v.string()),
+    cursor: v.union(v.string(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { oldSlug, newSlug, removedAttributeKeys, cursor }) => {
+    const slugChanged = oldSlug !== newSlug;
+    const removedKeysSet = new Set(removedAttributeKeys);
+    const page = await ctx.db.query("products")
+      .withIndex("by_category", (q) => q.eq("categorySlug", oldSlug))
+      .paginate({ numItems: 50, cursor });
+
+    for (const product of page.page) {
+      const attributes = product.attributes ?? [];
+      const nextAttributes = removedKeysSet.size > 0
+        ? attributes.filter((attribute) => !removedKeysSet.has(attribute.key))
+        : attributes;
+      const attributesChanged = nextAttributes.length !== attributes.length;
+      if (!slugChanged && !attributesChanged) continue;
+
+      await patchCatalogProduct(ctx, product, {
+        ...(slugChanged ? { categorySlug: newSlug } : {}),
+        ...(attributesChanged ? { attributes: nextAttributes } : {}),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.categories.reassignCategoryProductsBatch, {
+        oldSlug,
+        newSlug,
+        removedAttributeKeys,
+        cursor: page.continueCursor,
+      });
+    }
     return null;
   },
 });

@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import type { Doc } from "@/convex/_generated/dataModel";
 import {
   Button,
@@ -13,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader, OrderStatusBadge } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "../_components/admin-primitives";
+import { CsvExportButton } from "../_components/export-button";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 import { orderStatusLabels } from "@/lib/orders";
@@ -25,6 +27,8 @@ type Order = Doc<"orders"> & {
 type OrderStatus = Order["status"];
 type OrderEmailEvent = Doc<"orderEmailEvents">["event"];
 const statuses: OrderStatus[] = ["pending", "paid", "cancelled"];
+
+const LIST_COLUMNS = "lg:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_110px_150px_88px]";
 
 function availableStatusOptions(order: Order) {
   const options: OrderStatus[] = [order.status];
@@ -103,13 +107,6 @@ function OrderDetails({
               </div>
             ))}
           </section>
-          {order.legalAcceptance && (
-            <section className="space-y-1 border-t border-border pt-4">
-              <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Sipariş onay kayıtları</h3>
-              <p className="text-xs text-muted-foreground">{order.legalAcceptance.distanceSalesAgreement.title} ve {order.legalAcceptance.preInformationForm.title}</p>
-              <p className="text-xs text-muted-foreground">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(order.legalAcceptance.acceptedAt))} · belge sürümleri {order.legalAcceptance.distanceSalesAgreement.version} / {order.legalAcceptance.preInformationForm.version}</p>
-            </section>
-          )}
           <div className="space-y-2 border-t border-border pt-4">
             {order.couponCode && (
               <div className="flex items-center justify-between gap-3 text-sm">
@@ -203,17 +200,25 @@ function AdminOrdersContent() {
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
       <Card className="overflow-hidden rounded-lg">
-        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_220px] sm:px-5">
-          <div><Label htmlFor="order-search" className="sr-only">Sipariş ara</Label><Input id="order-search" name="order-search" type="search" placeholder="Sipariş, müşteri veya e-posta ara" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:px-5">
+          <div className="relative min-w-0"><Label htmlFor="order-search" className="sr-only">Sipariş ara</Label><MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input id="order-search" name="order-search" type="search" placeholder="Sipariş, müşteri veya e-posta ara" value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" /></div>
           <div><Label htmlFor="order-status-filter" className="sr-only">Duruma göre filtrele</Label><select id="order-status-filter" name="status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | OrderStatus)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring"><option value="all">Tüm durumlar</option>{statuses.map((status) => <option key={status} value={status}>{orderStatusLabels[status]}</option>)}</select></div>
+          <div className="flex items-center justify-end"><CsvExportButton type="orders" label="Siparişleri CSV olarak indir" /></div>
         </div>
 
         {loading ? <AdminLoading label="Siparişler" variant="table" /> : filteredOrders.length === 0 ? (
           <div className="p-5"><AdminEmpty title={query || statusFilter !== "all" ? "Eşleşen sipariş yok" : "Henüz sipariş yok"} description={query || statusFilter !== "all" ? "Arama veya durum filtresini değiştirip yeniden dene." : "Siparişler geldikçe burada görünecek."} /></div>
         ) : (
           <div className="divide-y divide-border">
+            <div className={`hidden gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground sm:px-5 lg:grid lg:items-center ${LIST_COLUMNS}`}>
+              <span>Sipariş</span>
+              <span>Tarih</span>
+              <span>Tutar</span>
+              <span>Durum</span>
+              <span className="text-right">İşlem</span>
+            </div>
             {filteredOrders.map((order) => (
-              <article key={order._id} className="grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_110px_150px_auto] lg:items-center">
+              <article key={order._id} className={`grid gap-4 px-4 py-4 sm:px-5 lg:items-center ${LIST_COLUMNS}`}>
                 <div className="min-w-0">
                   <p className="font-mono text-xs font-bold text-muted-foreground">#{order._id.slice(-8).toUpperCase()}</p>
                   <p className="mt-1 truncate text-sm font-semibold text-foreground">{order.customerName}</p>
@@ -225,7 +230,7 @@ function AdminOrdersContent() {
                   <Label htmlFor={`status-${order._id}`} className="sr-only">Sipariş #{order._id.slice(-8)} durumu</Label>
                   <select id={`status-${order._id}`} name={`status-${order._id}`} value={order.status} disabled={updatingId === order._id} onChange={(event) => void updateStatus(order, event.target.value as OrderStatus)} className="h-10 w-full rounded-lg border border-input bg-background px-2.5 text-sm font-medium text-foreground outline-none focus-visible:border-ring disabled:opacity-60">{availableStatusOptions(order).map((status) => <option key={status} value={status}>{orderStatusLabels[status]}</option>)}</select>
                 </div>
-                <Button variant="outline" className="min-h-10" onClick={() => openOrder(order)}>Detay</Button>
+                <Button variant="outline" className="min-h-10 lg:justify-self-end" onClick={() => openOrder(order)}>Detay</Button>
               </article>
             ))}
           </div>
@@ -247,7 +252,6 @@ function AdminOrdersContent() {
 export default function AdminOrdersPage() {
   return (
     <>
-      <AdminPageHeader title="Siparişler" description="Müşteri siparişlerini ve ödeme durumlarını takip edin." />
       <Suspense fallback={<AdminLoading label="Siparişler" variant="table" />}>
         <AdminOrdersContent />
       </Suspense>

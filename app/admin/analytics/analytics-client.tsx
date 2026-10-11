@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
 import { AnalyticsDashboard } from "@/lib/analytics/types";
 import { Card } from "@/components/ui";
@@ -26,24 +26,20 @@ export function AnalyticsPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="E-ticaret analitiği"
-        description="Satın alma hunisi, müşteri değeri ve kampanya performansı."
-        actions={
-          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-            Dönem
-            <select
-              value={days}
-              onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-            >
-              <option value={7}>Son 7 gün</option>
-              <option value={30}>Son 30 gün</option>
-              <option value={90}>Son 90 gün</option>
-            </select>
-          </label>
-        }
-      />
+      <div className="mb-4 flex justify-end">
+        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+          Dönem
+          <select
+            value={days}
+            onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          >
+            <option value={7}>Son 7 gün</option>
+            <option value={30}>Son 30 gün</option>
+            <option value={90}>Son 90 gün</option>
+          </select>
+        </label>
+      </div>
       <Suspense fallback={<AdminLoading label="E-ticaret analitiği" variant="analytics-content" />}>
         <AnalyticsContent days={days} />
       </Suspense>

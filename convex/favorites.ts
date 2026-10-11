@@ -2,8 +2,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { assertAdminApiSecret } from "./adminAuth";
 
 const MAX_FAVORITES = 100;
+// Ürün başına favori sayısı indekslenemediği için sınırlı tarama ile sayılır.
+const FAVORITE_COUNT_SCAN_LIMIT = 2000;
 
 async function requireUserId(ctx: MutationCtx) {
   const userId = await getAuthUserId(ctx);
@@ -101,5 +104,19 @@ export const mergeMyFavorites = mutation({
     }
 
     return acceptedSlugs;
+  },
+});
+
+export const listFavoriteCountsAdmin = query({
+  args: { adminSecret: v.string() },
+  returns: v.array(v.object({ slug: v.string(), count: v.number() })),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    const favorites = await ctx.db.query("favorites").take(FAVORITE_COUNT_SCAN_LIMIT);
+    const counts = new Map<string, number>();
+    for (const favorite of favorites) {
+      counts.set(favorite.productSlug, (counts.get(favorite.productSlug) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([slug, count]) => ({ slug, count }));
   },
 });

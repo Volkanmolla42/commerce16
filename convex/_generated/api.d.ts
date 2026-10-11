@@ -20,6 +20,7 @@ import type * as categories from "../categories.js";
 import type * as categoryAttributePresets from "../categoryAttributePresets.js";
 import type * as coupons from "../coupons.js";
 import type * as crons from "../crons.js";
+import type * as customers from "../customers.js";
 import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
 import type * as legalDocuments from "../legalDocuments.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   categoryAttributePresets: typeof categoryAttributePresets;
   coupons: typeof coupons;
   crons: typeof crons;
+  customers: typeof customers;
   favorites: typeof favorites;
   http: typeof http;
   legalDocuments: typeof legalDocuments;

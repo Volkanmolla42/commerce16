@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,57 +25,10 @@ type SearchOption = {
   maxPrice?: string;
 };
 
-function useScrollDirection() {
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    let lastScrollY = window.scrollY;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const diff = currentScrollY - lastScrollY;
-
-      // Küçük titreşimleri önlemek için eşik değeri
-      if (Math.abs(diff) > 6) {
-        if (diff < 0 && currentScrollY > 40) {
-          setScrollDirection("up");
-          if (timeoutId) clearTimeout(timeoutId);
-          // Yukarı kaydırma durduğunda efektin yumuşak sönümlenmesi
-          timeoutId = setTimeout(() => {
-            setScrollDirection(null);
-          }, 1400);
-        } else {
-          setScrollDirection("down");
-        }
-      } else if (currentScrollY <= 20) {
-        setScrollDirection(null);
-      }
-
-      lastScrollY = currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, []);
-
-  return scrollDirection;
-}
-
 const headerInputClassName =
   "min-h-10 w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-3 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900";
 
-const floatingInputBaseClassName =
-  "h-12 w-full rounded-full border bg-white/95 py-2 pl-10 pr-4 text-sm font-medium text-black backdrop-blur-md transition-[border-color,box-shadow,background-color,color] duration-700 ease-out placeholder:text-neutral-500 focus:outline-hidden dark:bg-neutral-900/95 dark:text-white dark:placeholder:text-neutral-400";
-
-export default function Search({
-  variant = "header",
-}: {
-  variant?: "header" | "floating";
-}) {
+export default function Search() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const componentId = useId();
@@ -85,10 +39,6 @@ export default function Search({
   const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get("q") ?? "");
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-
-  const scrollDirection = useScrollDirection();
-  const isFloating = variant === "floating";
-  const isScrollingUp = isFloating && scrollDirection === "up";
 
   const normalizedQuery = normalizeSearchText(query);
   const normalizedDebouncedQuery = normalizeSearchText(debouncedQuery);
@@ -189,11 +139,10 @@ export default function Search({
         aria-selected={isActive}
         onMouseEnter={() => setActiveIndex(index)}
         onClick={() => setIsOpen(false)}
-        className={`flex min-w-0 items-center gap-3 rounded-xl px-2.5 py-2 text-left transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-500 ${
-          isActive
-            ? "bg-neutral-100 dark:bg-neutral-800"
-            : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        }`}
+        className={`flex min-w-0 items-center gap-3 rounded-xl px-2.5 py-2 text-left transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-500 ${isActive
+          ? "bg-neutral-100 dark:bg-neutral-800"
+          : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          }`}
       >
         {option.kind === "category" ? (
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">
@@ -220,11 +169,10 @@ export default function Search({
           <span className="block text-xs text-neutral-500 dark:text-neutral-400">
             {option.kind === "category"
               ? "Kategori"
-              : `${formatMoney(option.price ?? "0")}${
-                  option.maxPrice && Number(option.maxPrice) !== Number(option.price)
-                    ? ` ile ${formatMoney(option.maxPrice)}`
-                    : ""
-                }`}
+              : `${formatMoney(option.price ?? "0")}${option.maxPrice && Number(option.maxPrice) !== Number(option.price)
+                ? ` ile ${formatMoney(option.maxPrice)}`
+                : ""
+              }`}
           </span>
         </span>
         {option.kind === "category" ? (
@@ -241,12 +189,19 @@ export default function Search({
     .map((option, index) => ({ option, index }))
     .filter(({ option }) => option.kind === "product");
 
-  const floatingClass = isScrollingUp
-    ? `${floatingInputBaseClassName} search-scroll-up-glow border-blue-500/80 shadow-xl`
-    : `${floatingInputBaseClassName} border-neutral-300/80 shadow-lg hover:border-neutral-400 focus:border-neutral-900 focus:bg-white dark:border-neutral-700/80 dark:hover:border-neutral-600 dark:focus:border-white dark:focus:bg-black`;
-
   return (
     <div ref={rootRef} className="relative w-full">
+      {/* Arama odaktayken sayfayı bulanıklaştıran katman; header stack bağlamı (z-40) üstünde kaldığı için keskin kalır. */}
+      {isOpen
+        ? createPortal(
+          <div
+            aria-hidden="true"
+            className="fixed inset-0 z-30 animate-fade-in-slow bg-black/10 backdrop-blur-xs md:hidden dark:bg-black/20"
+          />,
+          document.body,
+        )
+        : null}
+
       <form action="/search" method="get" className="relative w-full" onSubmit={handleSubmit}>
         <label htmlFor={`${componentId}-input`} className="sr-only">
           Ürün veya kategori ara
@@ -255,15 +210,9 @@ export default function Search({
         <button
           type="submit"
           aria-label="Arama yap"
-          className={`absolute inset-y-0 left-0 z-10 flex items-center transition-colors duration-500 cursor-pointer ${
-            isFloating
-              ? isScrollingUp
-                ? "pl-3.5 text-blue-600 dark:text-blue-400"
-                : "pl-3.5 text-neutral-500 dark:text-neutral-400"
-              : "pl-3 text-neutral-400"
-          }`}
+          className="absolute inset-y-0 left-0 z-10 flex cursor-pointer items-center pl-3 text-neutral-400 transition-colors duration-500"
         >
-          <MagnifyingGlassIcon className={isFloating ? "size-5" : "size-4"} aria-hidden="true" />
+          <MagnifyingGlassIcon className="size-4" aria-hidden="true" />
         </button>
 
         <input
@@ -278,7 +227,7 @@ export default function Search({
           aria-activedescendant={
             panelIsVisible && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
           }
-          placeholder={isFloating ? "Ürün veya kategori ara..." : "Ara..."}
+          placeholder="Ürün veya kategori ara..."
           autoComplete="off"
           value={query}
           onFocus={() => setIsOpen(true)}
@@ -288,7 +237,7 @@ export default function Search({
             setIsOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          className={isFloating ? floatingClass : headerInputClassName}
+          className={headerInputClassName}
         />
       </form>
 
@@ -297,11 +246,7 @@ export default function Search({
           id={listboxId}
           role="listbox"
           aria-label="Arama önerileri"
-          className={`absolute z-[60] max-h-[min(65vh,26rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-2xl backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-white ${
-            isFloating
-              ? "bottom-full mb-3 left-0 right-[-3.625rem]"
-              : "top-full mt-2 left-0 right-0"
-          }`}
+          className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[min(65vh,26rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-2xl backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
         >
           {!isQuerySettled ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">

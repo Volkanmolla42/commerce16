@@ -13,7 +13,6 @@ import {
   AdminEmpty,
   AdminLoading,
   AdminNotice,
-  AdminPageHeader,
 } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import type { StoreSettings } from "@/lib/catalog";
@@ -126,21 +125,18 @@ function AdminSettingsContent() {
     }
   };
 
-  const pageHeader = <AdminPageHeader title="Mağaza ayarları" description="Mağaza bilgilerini, iletişim seçeneklerini ve duyuru alanını düzenleyin." />;
-
-  if (loading) return <>{pageHeader}<AdminLoading label="Mağaza ayarları" variant="settings-content" /></>;
+  if (loading) return <AdminLoading label="Mağaza ayarları" variant="settings-content" />;
   if (!data) {
     return (
-      <>{pageHeader}<AdminEmpty
+      <AdminEmpty
           title="Mağaza ayarları yüklenemedi"
           description={error || "Bağlantıyı kontrol edip yeniden deneyebilirsin."}
-        /></>
+        />
     );
   }
 
   return (
     <>
-      {pageHeader}
       {(message || actionError || error) && (
         <div className="mb-5">
           <AdminNotice kind={actionError || error ? "error" : "success"}>

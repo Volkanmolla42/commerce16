@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AdminLoading, AdminPageHeader } from "../../../_components/admin-primitives";
+import { AdminLoading } from "../../../_components/admin-primitives";
 import { ProductEditorRoute } from "../../_components/product-editor";
 
 export default function EditProductPage({
@@ -11,7 +11,6 @@ export default function EditProductPage({
     <Suspense
       fallback={
         <div className="scheme-dark w-full text-foreground">
-          <AdminPageHeader title="Ürün detayları" description="Ürün bilgilerini, görsellerini ve varyantlarını düzenleyin." />
           <AdminLoading label="Ürün formu" variant="form-content" />
         </div>
       }

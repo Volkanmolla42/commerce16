@@ -6,10 +6,10 @@ import Link from "next/link";
 import { useRef } from "react";
 import { useProductCartFeedback } from "./product-cart-feedback";
 
-export function CartButton({ floating = false }: { floating?: boolean }) {
+export function CartButton() {
   const { totalCount } = useCart();
   const target = useRef<HTMLAnchorElement>(null);
-  const confirmed = useProductCartFeedback(target, floating);
+  const confirmed = useProductCartFeedback(target);
 
   return (
     <Link

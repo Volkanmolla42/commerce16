@@ -512,3 +512,21 @@ export const deleteAdmin = mutation({
   },
 });
 
+export const purgeExpired = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const expired = await ctx.db
+      .query("abandonedCarts")
+      .withIndex("by_expires_at", (q) => q.lte("expiresAt", Date.now()))
+      .take(100);
+    for (const cart of expired) {
+      await ctx.db.delete(cart._id);
+    }
+    if (expired.length === 100) {
+      await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.purgeExpired, {});
+    }
+    return null;
+  },
+});
+

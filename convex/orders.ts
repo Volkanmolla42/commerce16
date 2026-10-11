@@ -1,6 +1,5 @@
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { getCheckoutLegalDocuments } from "../lib/legal-documents";
 import schema from "./schema";
 import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -8,9 +7,10 @@ import { assertAdminApiSecret } from "./adminAuth";
 import { getImagesForVariant } from "../lib/catalog/product-images";
 import { components, internal } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
-import type { Id } from "./_generated/dataModel";
+import type { Id, Doc } from "./_generated/dataModel";
 import { getDistrictById, getProvinceById } from "../lib/turkey-provinces";
 import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation } from "./coupons";
+import { patchCatalogProduct } from "./catalogModel";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -141,11 +141,6 @@ export const createOrder = mutation({
     provinceId: v.string(),
     districtId: v.string(),
     shippingAddress: v.optional(v.string()),
-    legalAcceptance: v.object({
-      accepted: v.literal(true),
-      distanceSalesAgreementVersion: v.string(),
-      preInformationFormVersion: v.string(),
-    }),
     saveAddress: v.optional(
       schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1")
         .extend({ isDefault: v.optional(v.boolean()) })
@@ -157,17 +152,16 @@ export const createOrder = mutation({
     const province = getProvinceById(args.provinceId);
     const district = getDistrictById(args.provinceId, args.districtId);
     if (!province || !district) throw new Error("Türkiye il ve ilçe listesinden geçerli bir adres seçin.");
-    if (!args.customerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.customerEmail.trim())) {
-      throw new Error("Ad ve geçerli e-posta gereklidir.");
+    const customerName = args.customerName.trim();
+    const customerEmail = args.customerEmail.trim();
+    if (!customerName || customerName.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || customerEmail.length > 120) {
+      throw new Error("Geçerli bir ad (en fazla 100 karakter) ve e-posta (en fazla 120 karakter) gereklidir.");
     }
-    const { distanceSalesAgreement: agreement, preInformationForm: preInformation } = getCheckoutLegalDocuments();
-    if (!agreement.ready || !preInformation.ready) {
-      throw new Error("Mesafeli satış sözleşmesi ve ön bilgilendirme formu kodda tamamlanmalı.");
+    if (args.customerPhone && args.customerPhone.trim().length > 30) {
+      throw new Error("Telefon numarası en fazla 30 karakter olabilir.");
     }
-    if (args.legalAcceptance.accepted !== true ||
-      args.legalAcceptance.distanceSalesAgreementVersion !== agreement.version ||
-      args.legalAcceptance.preInformationFormVersion !== preInformation.version) {
-      throw new Error("Yasal belgeler değişti veya onaylanmadı. Sayfayı yenileyip tekrar kontrol edin.");
+    if (args.shippingAddress && args.shippingAddress.trim().length > 500) {
+      throw new Error("Teslimat adresi en fazla 500 karakter olabilir.");
     }
     const emailKey = args.customerEmail.trim().toLowerCase();
     const emailLimit = await orderRateLimiter.limit(ctx, "orderByEmail", { key: emailKey });
@@ -266,19 +260,6 @@ export const createOrder = mutation({
       status: "pending",
       ...(analyticsSessionId ? { analyticsSessionId } : {}),
       shippingAddress: args.shippingAddress,
-      legalAcceptance: {
-        acceptedAt: Date.now(),
-        distanceSalesAgreement: {
-          title: agreement.title,
-          version: agreement.version,
-          body: agreement.body,
-        },
-        preInformationForm: {
-          title: preInformation.title,
-          version: preInformation.version,
-          body: preInformation.body,
-        },
-      },
     });
     if (coupon?.valid) {
       const createdOrder = await ctx.db.get(orderId);
@@ -292,6 +273,24 @@ export const createOrder = mutation({
 });
 
 type OrderStatus = "pending" | "paid" | "cancelled";
+
+async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, direction: -1 | 1) {
+  for (const item of order.items) {
+    const productId = ctx.db.normalizeId("products", item.productId);
+    if (!productId) continue;
+    const product = await ctx.db.get(productId);
+    if (!product || !product.variants) continue;
+    const nextVariants = product.variants.map((v) => {
+      const isTarget = item.variantId ? v.id === item.variantId : product.variants.length === 1;
+      if (isTarget) {
+        const nextStock = Math.max(0, v.stockQuantity + direction * item.quantity);
+        return { ...v, stockQuantity: nextStock };
+      }
+      return v;
+    });
+    await patchCatalogProduct(ctx, product, { variants: nextVariants });
+  }
+}
 
 async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: OrderStatus) {
   const order = await ctx.db.get(id);
@@ -311,6 +310,12 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
   if (canceling) await releaseCouponReservation(ctx, order);
   if (!canceling && status !== "pending" && status !== "cancelled") {
     await commitCouponReservation(ctx, order);
+  }
+
+  if (order.status !== "paid" && status === "paid") {
+    await adjustInventoryForOrder(ctx, order, -1);
+  } else if (order.status === "paid" && status === "cancelled") {
+    await adjustInventoryForOrder(ctx, order, 1);
   }
 
   await ctx.db.patch(id, {

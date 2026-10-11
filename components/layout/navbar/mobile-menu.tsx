@@ -28,10 +28,8 @@ import { useFavorites } from "@/components/favorites/favorites-context";
 import { useCart } from "@/components/cart/cart-context";
 import type { Menu } from "@/lib/catalog/types";
 
-import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import StoreInitial from "@/components/store-initial";
 
 function getMenuItemIcon(item: Menu) {
   const normalizedTitle = item.title.trim().toLowerCase();
@@ -49,11 +47,9 @@ function getMenuItemIcon(item: Menu) {
 export default function MobileMenu({
   menu,
   storeName = "Mağaza",
-  logoUrl,
 }: {
   menu: Menu[];
   storeName?: string;
-  logoUrl?: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -73,7 +69,7 @@ export default function MobileMenu({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
+      if (window.innerWidth >= 768) {
         setIsOpen(false);
       }
     };
@@ -99,7 +95,7 @@ export default function MobileMenu({
       <button
         onClick={openMobileMenu}
         aria-label="Mobil menüyü aç"
-        className="flex size-11 shrink-0 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 lg:hidden dark:text-neutral-300 dark:hover:bg-neutral-800"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 md:hidden dark:text-neutral-300 dark:hover:bg-neutral-800"
       >
         <Bars3Icon className="size-5" aria-hidden="true" />
       </button>
@@ -119,36 +115,22 @@ export default function MobileMenu({
           <TransitionChild
             as={Fragment}
             enter="transition-transform ease-out duration-200 motion-reduce:transition-none"
-            enterFrom="translate-x-full"
+            enterFrom="-translate-x-full"
             enterTo="translate-x-0"
             leave="transition-transform ease-in duration-150 motion-reduce:transition-none"
             leaveFrom="translate-x-0"
-            leaveTo="translate-x-full"
+            leaveTo="-translate-x-full"
           >
-            <DialogPanel className="fixed inset-y-0 right-0 flex h-dvh w-[min(22rem,calc(100vw-2rem))] flex-col bg-white shadow-xl dark:bg-black">
-              {/* Üst Kısım: Mağaza Logosu & Adı ve Kapatma Butonu */}
+            <DialogPanel className="fixed inset-y-0 left-0 flex h-dvh w-[min(22rem,calc(100vw-2rem))] flex-col bg-white shadow-xl dark:bg-black">
+              {/* Üst Kısım: Mağaza Adı ve Kapatma Butonu */}
               <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 p-4 dark:border-neutral-800">
                 <Link
                   href="/"
                   prefetch={true}
                   onClick={closeMobileMenu}
-                  className="flex min-w-0 items-center gap-2.5 transition hover:opacity-85"
+                  className="min-w-0 truncate text-xs font-semibold tracking-wider uppercase text-neutral-900 transition hover:opacity-85 dark:text-white"
                 >
-                  {logoUrl ? (
-                    <Image
-                      src={logoUrl}
-                      alt={storeName}
-                      width={40}
-                      height={40}
-                      unoptimized
-                      className="size-9 shrink-0 rounded-xl border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-black"
-                    />
-                  ) : (
-                    <StoreInitial storeName={storeName} size="xs" />
-                  )}
-                  <DialogTitle className="truncate text-xs font-semibold tracking-wider uppercase text-neutral-900 dark:text-white">
-                    {storeName}
-                  </DialogTitle>
+                  <DialogTitle className="truncate">{storeName}</DialogTitle>
                 </Link>
                 <button
                   className="flex size-10 shrink-0 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-200/70 dark:text-neutral-400 dark:hover:bg-neutral-800"

@@ -6,7 +6,6 @@ import {
   ChevronDownIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
-  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, Input } from "@/components/ui";
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -319,7 +318,6 @@ export function FacetedProductGrid({
     }, 250);
     return () => clearTimeout(timer);
   }, [stateKey, searchKey, filters, categoryAttributeFilters, pathname, router]);
-  const currentQuery = searchParams.get("q") ?? query ?? "";
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filterTitleRef = useRef<HTMLHeadingElement>(null);
 
@@ -333,11 +331,11 @@ export function FacetedProductGrid({
     return () => desktop.removeEventListener("change", closeOnDesktop);
   }, [mobileFiltersOpen]);
 
-  const clearAllFiltersAndSearch = () => {
+  const clearAllFilters = () => {
     setFilters(EMPTY_CATALOG_FILTERS);
     setCategoryAttributeFilters({});
     lastSubmitted.current = JSON.stringify([EMPTY_CATALOG_FILTERS, {}]);
-    const params = createCatalogSearchParams(searchKey, EMPTY_CATALOG_FILTERS, {}, "");
+    const params = createCatalogSearchParams(searchKey, EMPTY_CATALOG_FILTERS, {});
     startTransition(() => {
       router.replace(createUrl(pathname, params), { scroll: false });
     });
@@ -366,11 +364,6 @@ export function FacetedProductGrid({
       const filter = current[key] ?? { values: [], min: "", max: "" };
       return { ...current, [key]: { ...filter, ...patch } };
     });
-  };
-
-  const clearAllFilters = () => {
-    setFilters(EMPTY_CATALOG_FILTERS);
-    setCategoryAttributeFilters({});
   };
 
   const panelProps = {
@@ -406,7 +399,7 @@ export function FacetedProductGrid({
                   </span>
                   <button
                     type="button"
-                    onClick={clearAllFiltersAndSearch}
+                    onClick={clearAllFilters}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                   >
                     Temizle
@@ -440,19 +433,6 @@ export function FacetedProductGrid({
             </div>
 
             <FacetControls {...panelProps} inputSuffix="desktop" />
-
-            {activeFilterCount > 0 ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={clearAllFiltersAndSearch}
-                className="w-full rounded-xl text-xs font-medium gap-1.5 cursor-pointer mt-2"
-              >
-                <XMarkIcon className="size-3.5" />
-                <span>Filtreleri temizle ({activeFilterCount})</span>
-              </Button>
-            ) : null}
           </Card>
         </aside>
 

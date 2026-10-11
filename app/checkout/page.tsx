@@ -234,11 +234,6 @@ function CheckoutContent() {
           price: getProductUnitPrice(item.product, item.variantId),
           image: item.product.images[0]?.url,
         })),
-        legalAcceptance: {
-          accepted: true as const,
-          distanceSalesAgreementVersion: legalDocuments.distanceSalesAgreement.version,
-          preInformationFormVersion: legalDocuments.preInformationForm.version,
-        },
         saveAddress: saveAddressPayload,
       });
 

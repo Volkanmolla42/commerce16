@@ -25,7 +25,7 @@ import {
   DialogTitle,
   Input,
 } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 import { adminPath } from "@/lib/admin/routes";
@@ -394,11 +394,6 @@ export default function AdminCartsPage() {
 
   return (
     <div className="space-y-5">
-      <AdminPageHeader
-        title="Sepetler"
-        description="Aktif sepetleri ve terk edilen sepet hatırlatmalarını görüntüleyin."
-      />
-
       {currentError && <AdminNotice kind="error">{currentError}</AdminNotice>}
 
       <div role="group" aria-label="Sepet türü" className="flex gap-5 border-b border-border">
@@ -423,7 +418,7 @@ export default function AdminCartsPage() {
       <Card className="rounded-lg p-3">
         <div className={`grid gap-2 ${view === "active" ? "sm:grid-cols-[minmax(0,1fr)_auto]" : "sm:grid-cols-[minmax(0,1fr)_190px_190px]"}`}>
           <div className="relative min-w-0">
-            <MagnifyingGlassIcon aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Sepetlerde ara" type="search" placeholder={view === "active" ? "Oturum anahtarı veya ürün ara" : "E-posta, oturum veya ürün ara"} value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 pl-9" />
           </div>
           {view === "abandoned" && <>
@@ -454,7 +449,7 @@ export default function AdminCartsPage() {
         />
       ) : (
         <Card className="overflow-hidden rounded-lg">
-          <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_110px_130px_150px_auto] gap-3 border-b border-border bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground md:grid">
+          <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_110px_130px_150px_168px] gap-3 border-b border-border bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground md:grid">
             <span>Ziyaretçi</span><span>Ürünler</span><span>Tutar</span><span>Durum</span><span>Son hareket</span><span className="text-right">İşlemler</span>
           </div>
           <div className="divide-y divide-border">
@@ -462,7 +457,7 @@ export default function AdminCartsPage() {
               const isLiveCart = "updatedAt" in cart;
               const status = isLiveCart ? "active" : cart.status;
               const statusInfo = statusConfig[status] ?? { label: status, className: "border-border bg-muted text-muted-foreground" };
-              return <article key={cart._id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_110px_130px_150px_auto] md:items-center">
+              return <article key={cart._id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_110px_130px_150px_168px] md:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">{isLiveCart ? "Anonim ziyaretçi" : cart.email || "Anonim ziyaretçi"}</p>
                   <p className="truncate font-mono text-xs text-muted-foreground" title={cart.sessionKey}>{cart.sessionKey.slice(0, 12)}…</p>

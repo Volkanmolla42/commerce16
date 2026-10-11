@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 import { getVariantImages } from "@/lib/catalog/product-images";
+import { burstCartConfetti } from "./cart-confetti";
 
 export function AddToCart({
   product,
@@ -33,7 +34,7 @@ export function AddToCart({
   const needsSelection = Boolean(product.variants?.length && !selectedVariant);
   const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
 
-  const handleAdd = () => {
+  const handleAdd = (origin?: HTMLElement) => {
     if (!isAvailable) return;
     const selectedProduct = selectedVariant
       ? { ...product, price: selectedVariant.price.amount, images: getVariantImages(product, selectedVariant), title: getProductVariantTitle(product.title, selectedVariant) }
@@ -44,6 +45,7 @@ export function AddToCart({
     } else {
       addItem(selectedProduct, 1, selectedVariant?.id);
       setReplaced(false);
+      void burstCartConfetti(origin);
     }
     setAdded(true);
     onAdded?.();
@@ -57,7 +59,7 @@ export function AddToCart({
         type="button"
         size="lg"
         variant={buttonVariant}
-        onClick={handleAdd}
+        onClick={(event) => handleAdd(event.currentTarget)}
         disabled={!isAvailable}
         aria-label="Sepete Ekle"
         className="h-12 w-full rounded-xl text-sm font-semibold shadow-none gap-2"

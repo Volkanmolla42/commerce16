@@ -14,6 +14,10 @@ import {
   syncProductSkus,
 } from "./productSkus";
 
+const LOW_STOCK_THRESHOLD = 5;
+// Varyant stoğu ürün dokümanı içinde olduğu için indekslenemez; uyarı listesi sınırlı tarama ile üretilir.
+const LOW_STOCK_SCAN_LIMIT = 300;
+
 const productDocumentValidator = schema.doc("products");
 const productInputValidator = productDocumentValidator.omit(
   "_id", "_creationTime", "updatedAt", "priceValue",
@@ -339,13 +343,31 @@ const stockProductValidator = v.object({
   })),
 });
 
+const stockPageValidator = v.object({
+  page: v.array(stockProductValidator),
+  isDone: v.boolean(),
+  continueCursor: v.string(),
+  threshold: v.number(),
+});
+
+function toLowVariants(variants: Doc<"products">["variants"]) {
+  return variants
+    .filter((variant) => variant.stockQuantity <= LOW_STOCK_THRESHOLD)
+    .map((variant) => ({
+      id: variant.id,
+      title: variant.title,
+      ...(variant.sku ? { sku: variant.sku } : {}),
+      stockQuantity: variant.stockQuantity,
+    }));
+}
+
 export const listStockAdmin = query({
   args: {
     adminSecret: v.string(),
     query: v.string(),
     paginationOpts: paginationOptsValidator,
   },
-  returns: paginationResultValidator(stockProductValidator),
+  returns: stockPageValidator,
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
     if (args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 24) {
@@ -361,7 +383,6 @@ export const listStockAdmin = query({
       ).paginate(args.paginationOpts);
 
     return {
-      ...result,
       page: result.page.map((product) => ({
         productId: product._id,
         title: product.title,
@@ -373,6 +394,39 @@ export const listStockAdmin = query({
           stockQuantity: variant.stockQuantity,
         })),
       })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+      threshold: LOW_STOCK_THRESHOLD,
+    };
+  },
+});
+
+export const lowStockAdmin = query({
+  args: {
+    adminSecret: v.string(),
+  },
+  returns: v.object({
+    threshold: v.number(),
+    productCount: v.number(),
+    variantCount: v.number(),
+    page: v.array(stockProductValidator),
+  }),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+
+    const products = await ctx.db.query("products").order("desc").take(LOW_STOCK_SCAN_LIMIT);
+    const page = products.flatMap((product) => {
+      const variants = toLowVariants(product.variants);
+      return variants.length === 0
+        ? []
+        : [{ productId: product._id, title: product.title, slug: product.slug, variants }];
+    });
+
+    return {
+      threshold: LOW_STOCK_THRESHOLD,
+      productCount: page.length,
+      variantCount: page.reduce((sum, product) => sum + product.variants.length, 0),
+      page,
     };
   },
 });

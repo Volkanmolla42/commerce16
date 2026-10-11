@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Card } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader, OrderStatusBadge } from "./_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "./_components/admin-primitives";
 import { useAdminResource } from "./_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -12,6 +12,7 @@ type AdminOverview = {
   productStats: { total: number; active: number };
   categories: Doc<"categories">[];
   orders: Doc<"orders">[];
+  lowStock: { threshold: number; productCount: number; variantCount: number };
 };
 
 function StatCard({ label, value, note }: { label: string; value: string | number; note: string }) {
@@ -33,11 +34,6 @@ export default function AdminOverviewPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="Genel Bakış"
-        description="Mağazanızın ürün, kategori, sipariş ve ciro özetini takip edin."
-      />
-
       {error && (
         <div className="mb-5">
           <AdminNotice kind="error">{error}</AdminNotice>
@@ -50,7 +46,7 @@ export default function AdminOverviewPage() {
         <AdminEmpty title="Özet yüklenemedi" description="Bağlantıyı kontrol edip yeniden deneyebilirsin." />
       ) : (
         <div className="space-y-6">
-          <section aria-label="Mağaza ölçümleri" className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Mağaza ölçümleri" className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard
               label="Ürün"
               value={data.productStats.total}
@@ -70,6 +66,11 @@ export default function AdminOverviewPage() {
               label="Toplam ciro"
               value={formatMoney(totalRevenue)}
               note="Kayıtlı sipariş toplamı"
+            />
+            <StatCard
+              label="Düşük stok"
+              value={data.lowStock.productCount}
+              note={`${data.lowStock.variantCount} varyant ≤ ${data.lowStock.threshold} adet`}
             />
           </section>
 

@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const { client, adminSecret } = getAdminBackend();
 
     if (resource === "categories") {
-      const categories = await client.mutation(api.categories.listAdmin, { adminSecret });
+      const categories = await client.query(api.categories.listAdmin, { adminSecret });
       return NextResponse.json(categories, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "category-attribute-presets") {
@@ -68,10 +68,34 @@ export async function GET(request: NextRequest) {
     }
 
     if (resource === "products") {
-      const products = await getAdminProductPage(Object.fromEntries(request.nextUrl.searchParams));
-      return NextResponse.json(products, { headers: { "Cache-Control": "no-store" } });
+      const [products, favoriteCounts] = await Promise.all([
+        getAdminProductPage(Object.fromEntries(request.nextUrl.searchParams)),
+        client.query(api.favorites.listFavoriteCountsAdmin, { adminSecret }),
+      ]);
+      const counts = new Map(favoriteCounts.map((row) => [row.slug, row.count]));
+      return NextResponse.json(
+        {
+          ...products,
+          items: products.items.map((item) => ({ ...item, favoriteCount: counts.get(item.slug) ?? 0 })),
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
     if (resource === "inventory") {
+      if (request.nextUrl.searchParams.get("low") === "1") {
+        const lowStock = await client.query(api.products.lowStockAdmin, { adminSecret });
+        return NextResponse.json(
+          {
+            page: lowStock.page,
+            isDone: true,
+            continueCursor: "",
+            threshold: lowStock.threshold,
+            productCount: lowStock.productCount,
+            variantCount: lowStock.variantCount,
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      }
       const inventory = await client.query(api.products.listStockAdmin, {
         adminSecret,
         query: request.nextUrl.searchParams.get("q") ?? "",
@@ -113,14 +137,43 @@ export async function GET(request: NextRequest) {
       }));
       return NextResponse.json(enrichedOrders, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "customers") {
+      const cursor = request.nextUrl.searchParams.get("cursor");
+      const customers = await client.query(api.customers.listAdmin, {
+        adminSecret,
+        query: request.nextUrl.searchParams.get("q") ?? "",
+        numItems: 20,
+        ...(cursor ? { cursor } : {}),
+      });
+      return NextResponse.json(customers, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (resource === "customer") {
+      const userId = request.nextUrl.searchParams.get("userId");
+      const target = await client.query(api.customers.getAdmin, {
+        adminSecret,
+        email: request.nextUrl.searchParams.get("email") ?? "",
+        ...(userId ? { userId } : {}),
+      });
+      return NextResponse.json(target, { headers: { "Cache-Control": "no-store" } });
+    }
     if (resource === "overview") {
-      const [productStats, categories, orders] = await Promise.all([
+      const [productStats, categories, orders, lowStock] = await Promise.all([
         getAdminProductStats(),
         client.query(api.categories.list, {}),
         client.query(api.orders.listAllAdmin, { adminSecret }),
+        client.query(api.products.lowStockAdmin, { adminSecret }),
       ]);
       return NextResponse.json(
-        { productStats, categories, orders },
+        {
+          productStats,
+          categories,
+          orders,
+          lowStock: {
+            threshold: lowStock.threshold,
+            productCount: lowStock.productCount,
+            variantCount: lowStock.variantCount,
+          },
+        },
         { headers: { "Cache-Control": "no-store" } },
       );
     }

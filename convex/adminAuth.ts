@@ -7,10 +7,19 @@ const rateLimiter = new RateLimiter(components.rateLimiter, {
   adminPinAttempts: { kind: "fixed window", rate: 5, period: 15 * MINUTE },
 });
 
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export function assertAdminApiSecret(suppliedSecret: string) {
   const configuredSecret = env.ADMIN_API_SECRET;
 
-  if (!configuredSecret || suppliedSecret !== configuredSecret) {
+  if (!configuredSecret || !constantTimeEqual(suppliedSecret, configuredSecret)) {
     throw new Error("Yönetici işlemi doğrulanamadı.");
   }
 }

@@ -115,14 +115,10 @@ function flyProductImageToCart(target: HTMLElement, onArrive: () => void) {
   return remove;
 }
 
-export function useProductCartFeedback(
-  target: RefObject<HTMLElement | null>,
-  enabled: boolean,
-) {
+export function useProductCartFeedback(target: RefObject<HTMLElement | null>) {
   const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
-    if (!enabled) return;
     let cancelFlight: (() => void) | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const confirm = () => {
@@ -143,7 +139,7 @@ export function useProductCartFeedback(
       cancelFlight?.();
       clearTimeout(timer);
     };
-  }, [enabled, target]);
+  }, [target]);
 
   return confirmed;
 }

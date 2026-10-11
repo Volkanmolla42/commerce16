@@ -9,6 +9,7 @@ import { CookiePreferencesButton } from "@/components/privacy/cookie-consent-man
 export default async function Footer() {
   "use cache";
   cacheTag("store-settings");
+  cacheTag("categories");
   const copyrightDate = new Date().getFullYear();
   const [menu, settings] = await Promise.all([
     getMenu(),
@@ -41,8 +42,16 @@ export default async function Footer() {
             )}
             {[settings.phone, settings.email, settings.address].some(Boolean) && (
               <div className="flex flex-col gap-1 text-sm text-neutral-500 dark:text-neutral-400">
-                {settings.phone && <span>{settings.phone}</span>}
-                {settings.email && <span>{settings.email}</span>}
+                {settings.phone && (
+                  <a href={`tel:${settings.phone}`} className="transition hover:text-black dark:hover:text-white">
+                    {settings.phone}
+                  </a>
+                )}
+                {settings.email && (
+                  <a href={`mailto:${settings.email}`} className="transition hover:text-black dark:hover:text-white">
+                    {settings.email}
+                  </a>
+                )}
                 {settings.address && <span>{settings.address}</span>}
               </div>
             )}

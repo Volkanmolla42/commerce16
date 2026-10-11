@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Input, Label } from "@/components/ui";
 import {
@@ -154,6 +155,7 @@ export function CategoryAttributeLibrary({ onAdd, attributes, disabled, revision
       if (event.key === "Enter" && event.target instanceof HTMLInputElement && event.target.type === "search") event.preventDefault();
     }}>
       <Label htmlFor={searchId} className="sr-only">Kütüphanede ara</Label>
+      <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         id={searchId}
         type="search"
@@ -169,6 +171,7 @@ export function CategoryAttributeLibrary({ onAdd, attributes, disabled, revision
           setNotice("");
         }}
         placeholder="Kütüphanede ara"
+        className="pl-9"
       />
       {open && (
         <section

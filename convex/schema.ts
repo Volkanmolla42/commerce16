@@ -125,19 +125,6 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     analyticsSessionId: v.optional(v.string()),
     shippingAddress: v.optional(v.string()),
-    legalAcceptance: v.optional(v.object({
-      acceptedAt: v.number(),
-      distanceSalesAgreement: v.object({
-        title: v.string(),
-        version: v.string(),
-        body: v.string(),
-      }),
-      preInformationForm: v.object({
-        title: v.string(),
-        version: v.string(),
-        body: v.string(),
-      }),
-    })),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
@@ -232,7 +219,8 @@ export default defineSchema({
     .index("by_session_key", ["sessionKey"])
     .index("by_order", ["orderId"])
     .index("by_unsubscribe_token", ["unsubscribeToken"])
-    .index("by_restore_token", ["restoreToken"]),
+    .index("by_restore_token", ["restoreToken"])
+    .index("by_expires_at", ["expiresAt"]),
 
   activeCarts: defineTable({
     sessionKey: v.string(),

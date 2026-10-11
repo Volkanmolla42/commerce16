@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui";
 import { type CategoryAttributeDefinition } from "@/lib/catalog/attributes";
-import { ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ChevronUpDownIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export function AttributeMultiSelect({
   attribute,
@@ -98,6 +98,7 @@ export function AttributeMultiSelect({
 
       {options.length > 5 && (
         <div className="relative">
+          <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
             value={search}
@@ -106,7 +107,7 @@ export function AttributeMultiSelect({
             autoComplete="off"
             spellCheck={false}
             aria-label={`${attribute.label} seçeneklerinde ara`}
-            className="h-8 w-full rounded-lg border border-border bg-card pl-2.5 pr-8 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-border focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="h-8 w-full rounded-lg border border-border bg-card pl-8 pr-8 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-border focus-visible:ring-2 focus-visible:ring-ring/40"
           />
           {search && (
             <button

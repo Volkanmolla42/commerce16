@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Input, Label } from "@/components/ui";
-import { AdminLoading, AdminNotice, AdminPageHeader } from "../../_components/admin-primitives";
+import { AdminLoading, AdminNotice } from "../../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
 import { adminPath } from "@/lib/admin/routes";
@@ -13,7 +13,6 @@ import { type CategoryAttributeDefinition, type ProductAttribute } from "@/lib/c
 import {
   AdjustmentsHorizontalIcon,
   ArrowPathIcon,
-  ArrowTopRightOnSquareIcon,
   CheckIcon,
   DocumentArrowDownIcon,
   GlobeAltIcon,
@@ -851,6 +850,19 @@ function ProductEditor({
                   Bu kategori için özellik tanımlanmamış.
                 </div>
               ) : null}
+
+              {product ? (
+                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-border pt-4">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <GlobeAltIcon className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">Mağazada yayınla</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">Kapalıyken ürün mağazada satışa sunulmaz.</span>
+                    </span>
+                  </span>
+                  <input type="checkbox" name="availableForSale" checked={availableForSale} onChange={(event) => setAvailableForSale(event.target.checked)} className="size-5 shrink-0 accent-foreground" />
+                </label>
+              ) : null}
             </div>
           </section>
 
@@ -949,33 +961,15 @@ function ProductEditor({
         </div>
 
         {error && <AdminNotice kind="error">{error}</AdminNotice>}
-        <div className="sticky bottom-0 z-20 -mx-4 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:flex-row sm:items-center sm:px-6 lg:-mx-8 lg:px-8">
-          <span className="min-h-5 text-xs text-muted-foreground" role="status">
+        <div className="sticky bottom-0 z-20 -mx-4 flex items-center gap-3 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" role="status">
             {saving ? (pendingImages.length ? "Görseller yükleniyor…" : "Kaydediliyor…") : error ? "Bilgileri kontrol edin" : ""}
           </span>
-          <div className="flex flex-wrap items-center justify-end gap-2.5">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             {product ? (
               <>
-                <Button asChild type="button" variant="outline" size="sm" className="h-10 gap-1.5">
-                  <a href={`/product/${product.slug}`} target="_blank" rel="noopener noreferrer">
-                    <ArrowTopRightOnSquareIcon className="size-4" />
-                    <span>Mağazada Gör</span>
-                  </a>
-                </Button>
-                <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card/70 px-3 text-xs font-medium text-foreground hover:border-border">
-                  <input
-                    type="checkbox"
-                    name="availableForSale"
-                    checked={availableForSale}
-                    onChange={(event) => setAvailableForSale(event.target.checked)}
-                    className="size-4 accent-foreground"
-                  />
-                  <GlobeAltIcon className="size-4 text-muted-foreground" />
-                  <span>Mağazada yayınla</span>
-                </label>
-                <Button type="button" variant="ghost" onClick={onCancel} className="min-h-10 text-muted-foreground">
-                  <XMarkIcon className="mr-1.5 size-4" />
-                  Vazgeç
+                <Button type="button" variant="ghost" size="icon" onClick={onCancel} aria-label="Vazgeç" title="Vazgeç" className="text-muted-foreground [&_svg]:size-5">
+                  <XMarkIcon aria-hidden="true" />
                 </Button>
                 <Button
                   type="submit"
@@ -988,9 +982,8 @@ function ProductEditor({
               </>
             ) : (
               <>
-                <Button type="button" variant="ghost" onClick={onCancel} className="min-h-10 text-muted-foreground">
-                  <XMarkIcon className="mr-1.5 size-4" />
-                  Vazgeç
+                <Button type="button" variant="ghost" size="icon" onClick={onCancel} aria-label="Vazgeç" title="Vazgeç" className="text-muted-foreground [&_svg]:size-5">
+                  <XMarkIcon aria-hidden="true" />
                 </Button>
                 <Button
                   type="button"
@@ -1022,14 +1015,8 @@ function ProductEditor({
 
 
 export function ProductEditorRoute({ productId }: { productId?: string }) {
-  const title = productId ? "Ürün detayları" : "Yeni ürün";
-  const description = productId
-    ? "Ürün bilgilerini, görsellerini ve varyantlarını düzenleyin."
-    : "Yeni ürünün bilgilerini, görsellerini ve varyantlarını tanımlayın.";
-
   return (
     <div className="scheme-dark w-full text-foreground">
-      <AdminPageHeader title={title} description={description} />
       <ProductEditorData productId={productId} />
     </div>
   );

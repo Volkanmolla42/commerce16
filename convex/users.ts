@@ -42,9 +42,18 @@ export const updateProfile = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
 
+    const name = args.name?.trim();
+    const phone = args.phone?.trim();
+    if (name !== undefined && name.length > 100) {
+      throw new Error("İsim en fazla 100 karakter olabilir.");
+    }
+    if (phone !== undefined && phone.length > 30) {
+      throw new Error("Telefon en fazla 30 karakter olabilir.");
+    }
+
     await ctx.db.patch(userId, {
-      ...(args.name !== undefined ? { name: args.name } : {}),
-      ...(args.phone !== undefined ? { phone: args.phone } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(phone !== undefined ? { phone } : {}),
     });
     return null;
   },

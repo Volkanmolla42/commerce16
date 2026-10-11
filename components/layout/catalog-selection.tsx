@@ -18,7 +18,7 @@ function SelectionMenu({ label, value, inline, options, icon: Icon }: {
   icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <DetailsDropdown className="min-w-0">
+    <DetailsDropdown className={inline ? "min-w-0" : "static min-w-0"}>
       <summary
         aria-label={`${label}: ${value}`}
         className={cn(
@@ -34,7 +34,7 @@ function SelectionMenu({ label, value, inline, options, icon: Icon }: {
       </summary>
       <ul className={cn(
         "mt-2 max-h-[min(60dvh,24rem)] overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl",
-        inline ? "absolute left-0 top-full z-40 w-full" : "absolute right-0 top-full z-40 w-60 max-w-[calc(100vw-3.5rem)]",
+        inline ? "absolute left-0 top-full z-40 w-full" : "absolute left-0 right-0 top-full z-40",
       )}>
         {options.map((option) => (
           <li key={option.href}>

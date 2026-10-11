@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Card, Input, Label } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminHeaderAction } from "../_components/admin-header-action";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
+import { adminPath } from "@/lib/admin/routes";
 
 type Coupon = Doc<"coupons">;
 type CouponDraft = {
@@ -176,7 +178,9 @@ function AdminCouponsContent() {
 
   return (
     <>
-      <AdminPageHeader title="Kuponlar" description="İndirim kuralları ve kullanım limitleri" actions={<Button onClick={() => setEditingCoupon(null)}>Kupon ekle</Button>} />
+      <AdminHeaderAction route={adminPath("coupons")}>
+        <Button onClick={() => setEditingCoupon(null)}>Kupon ekle</Button>
+      </AdminHeaderAction>
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
       <Card className="overflow-hidden rounded-lg">
         {loading ? <AdminLoading label="Kuponlar" variant="table" /> : !coupons?.length ? (

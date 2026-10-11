@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Button, Card } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminHeaderAction } from "../_components/admin-header-action";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
+import { adminPath } from "@/lib/admin/routes";
 import { CategoryEditor, type AdminCategory } from "./_components/category-editor";
 
 function AdminCategoriesContent() {
@@ -29,7 +31,9 @@ function AdminCategoriesContent() {
 
   return (
     <>
-      <AdminPageHeader title="Kategoriler" description="Ürünleri mağazada düzenli sunmak için kategorileri yönetin." actions={<Button onClick={() => { setEditorCategory(null); setEditorOpen(true); }}>Kategori ekle</Button>} />
+      <AdminHeaderAction route={adminPath("categories")}>
+        <Button onClick={() => { setEditorCategory(null); setEditorOpen(true); }}>Kategori ekle</Button>
+      </AdminHeaderAction>
       {(message || actionError || error) && (
         <div className="mb-4">
           <AdminNotice kind={actionError || error ? "error" : "success"}>

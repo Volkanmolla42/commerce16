@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button, Input, Card } from "@/components/ui";
-import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
-import { AdminEmpty, AdminLoading, AdminNotice, AdminPageHeader } from "../_components/admin-primitives";
+import { ArrowTopRightOnSquareIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { AdminHeaderAction } from "../_components/admin-header-action";
+import { CsvExportButton } from "../_components/export-button";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -19,8 +21,11 @@ type Product = {
   categorySlug?: string;
   availableForSale: boolean;
   images: string[];
+  favoriteCount?: number;
 };
 type ProductPage = { items: Product[]; continueCursor: string; isDone: boolean };
+
+const LIST_COLUMNS = "lg:grid-cols-[minmax(0,1fr)_130px_110px_90px_80px_230px]";
 
 function AdminProductsContent() {
   const { data: categories } = useAdminResource<Category[]>("categories");
@@ -59,12 +64,17 @@ function AdminProductsContent() {
 
   return (
     <>
-      <AdminPageHeader title="Ürünler" description="Ürün kataloğunu görüntüleyin, filtreleyin ve ürün bilgilerini yönetin." actions={<Button asChild><Link href={adminPath("products/add")}>Yeni ürün ekle</Link></Button>} />
+      <AdminHeaderAction route={adminPath("products")}>
+        <Button asChild><Link href={adminPath("products/add")}>Yeni ürün ekle</Link></Button>
+      </AdminHeaderAction>
       {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
 
       <Card className="overflow-hidden rounded-lg">
         <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-[minmax(200px,1.4fr)_repeat(2,minmax(150px,1fr))_auto] sm:px-5">
-          <Input aria-label="Ürün ara" name="product-search" type="search" placeholder="Ürün veya adres ara" value={query} onChange={(event) => { setQuery(event.target.value); setCursors([null]); }} />
+          <div className="relative min-w-0">
+            <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input aria-label="Ürün ara" name="product-search" type="search" placeholder="Ürün veya adres ara" value={query} onChange={(event) => { setQuery(event.target.value); setCursors([null]); }} className="pl-9" />
+          </div>
           <select aria-label="Kategoriye göre filtrele" name="category-filter" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setCursors([null]); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring">
             <option value="all">Tüm kategoriler</option>
             {categories?.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
@@ -74,7 +84,10 @@ function AdminProductsContent() {
             <option value="active">Satışta</option>
             <option value="inactive">Pasif</option>
           </select>
-          {hasActiveFilters && <Button type="button" variant="outline" className="h-10" onClick={() => { setQuery(""); setCategoryFilter("all"); setAvailabilityFilter("all"); setCursors([null]); }}>Filtreleri temizle</Button>}
+          <div className="flex items-center justify-end gap-2">
+            {hasActiveFilters && <Button type="button" variant="outline" className="h-10" onClick={() => { setQuery(""); setCategoryFilter("all"); setAvailabilityFilter("all"); setCursors([null]); }}>Filtreleri temizle</Button>}
+            <CsvExportButton type="products" label="Ürünleri CSV olarak indir" />
+          </div>
         </div>
 
         <p aria-live="polite" className="px-4 pt-3 text-sm text-muted-foreground">{pending ? "Ürünler yükleniyor…" : `Bu sayfada ${filteredProducts.length} ürün`}</p>
@@ -82,10 +95,18 @@ function AdminProductsContent() {
           <div className="p-5"><AdminEmpty title={!data?.isDone ? "Bu sayfada eşleşen ürün yok" : hasActiveFilters ? "Filtrelere uyan ürün yok" : "Henüz ürün yok"} description={!data?.isDone ? "Sonraki sayfayı inceleyebilirsiniz." : hasActiveFilters ? "Arama ve filtreleri değiştirip yeniden dene." : "İlk ürünü ekleyerek kataloğu oluşturmaya başlayabilirsin."} /></div>
         ) : (
           <div className="divide-y divide-border">
+            <div className={`hidden gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground sm:px-5 lg:grid lg:items-center ${LIST_COLUMNS}`}>
+              <span>Ürün</span>
+              <span>Kategori</span>
+              <span>Fiyat</span>
+              <span>Durum</span>
+              <span>Favori</span>
+              <span className="text-right">İşlem</span>
+            </div>
             {filteredProducts.map((product) => {
               const category = categories?.find((item) => item.slug === product.categorySlug);
               return (
-                <article key={product._id} className="flex flex-col gap-4 px-4 py-4 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1fr)_145px_120px_100px_auto] lg:items-center">
+                <article key={product._id} className={`flex flex-col gap-4 px-4 py-4 sm:px-5 lg:grid lg:items-center ${LIST_COLUMNS}`}>
                   <div className="flex min-w-0 items-center gap-3">
                     {product.images[0] ? (
                       <Image src={product.images[0]} alt="" width={56} height={56} unoptimized className="h-14 w-14 shrink-0 rounded-md border border-border bg-muted object-cover" />
@@ -109,6 +130,7 @@ function AdminProductsContent() {
                   <p className="text-sm text-muted-foreground"><span className="mr-2 text-xs text-muted-foreground lg:hidden">Kategori</span>{category?.title || "Kategorisiz"}</p>
                   <p className="text-sm font-semibold tabular-nums text-foreground"><span className="mr-2 text-xs font-normal text-muted-foreground lg:hidden">Fiyat</span>{formatMoney(product.price)}</p>
                   <p className="text-xs font-semibold"><span className={`mr-2 inline-block h-2 w-2 rounded-full ${product.availableForSale ? "bg-primary" : "bg-muted-foreground"}`} />{product.availableForSale ? "Satışta" : "Pasif"}</p>
+                  <p className="text-sm tabular-nums text-foreground"><span className="mr-2 text-xs text-muted-foreground lg:hidden">Favori</span>{(product.favoriteCount ?? 0).toLocaleString("tr-TR")}</p>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <Button asChild size="sm" variant="outline" className="min-h-10 gap-1.5" title="Ürün sayfasına git">
                       <a href={`/product/${product.slug}`} target="_blank" rel="noopener noreferrer">

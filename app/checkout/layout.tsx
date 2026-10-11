@@ -37,7 +37,7 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
     <CartProvider>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
         {/* Distraction-free Checkout Header */}
-        <header className="sticky top-0 z-30 w-full border-b border-neutral-200/80 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900/80">
+        <header className="sticky top-0 z-30 w-full border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="mx-auto flex max-w-(--breakpoint-2xl) items-center justify-between px-4 py-3 sm:px-6">
             <Link
               href="/"

@@ -7,6 +7,7 @@ import { getImagesForVariant } from "../lib/catalog/product-images";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   sync: { kind: "fixed window", rate: 30, period: 60 * 1000 },
+  globalSyncInserts: { kind: "fixed window", rate: 120, period: 60 * 1000 },
 });
 
 const activeCartItemValidator = v.object({
@@ -71,8 +72,12 @@ export const sync = mutation({
       updatedAt: now,
       expiresAt: now + 48 * 60 * 60 * 1000,
     };
-    if (existing) await ctx.db.patch(existing._id, value);
-    else await ctx.db.insert("activeCarts", { sessionKey: args.sessionKey, ...value });
+    if (existing) {
+      await ctx.db.patch(existing._id, value);
+    } else {
+      await rateLimiter.limit(ctx, "globalSyncInserts", { key: "global", throws: true });
+      await ctx.db.insert("activeCarts", { sessionKey: args.sessionKey, ...value });
+    }
     return null;
   },
 });

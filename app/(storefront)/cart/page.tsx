@@ -152,7 +152,7 @@ function CartContent() {
   }
 
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-8 sm:py-12">
+    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 pt-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pt-12 md:pb-12">
       <div className="border-b border-border/60 pb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
           Sepetim
@@ -289,7 +289,7 @@ function CartContent() {
                 <span className="text-primary">{formatMoney(totalAmount)}</span>
               </div>
 
-              <div className="pt-2">
+              <div className="hidden pt-2 md:block">
                 <Button asChild size="lg" className="w-full rounded-2xl shadow-lg font-semibold gap-2 h-12">
                   <Link href="/checkout">
                     <span>Ödemeye Geç</span>
@@ -318,6 +318,19 @@ function CartContent() {
         </div>
       </div>
       <CartRecommendationShelf />
+
+      {/* Mobil: ürün sayfasındaki satın alma çubuğu gibi sabit ödeme çubuğu */}
+      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-4 border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+        <span className="shrink-0 text-sm font-semibold text-foreground">
+          {formatMoney(totalAmount)}
+        </span>
+        <Button asChild size="lg" className="h-12 min-w-0 flex-1 rounded-xl text-sm font-semibold shadow-none gap-2">
+          <Link href="/checkout">
+            <span>Ödemeye Geç</span>
+            <ArrowRightIcon className="h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }

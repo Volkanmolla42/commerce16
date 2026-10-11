@@ -18,7 +18,7 @@ export function UserNav() {
     return (
       <div
         aria-hidden
-        className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 animate-pulse sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900"
+        className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900"
       >
         <div className="h-5 w-5 rounded-full bg-neutral-200 dark:bg-neutral-800" />
         <div className="hidden sm:block h-3 w-14 rounded bg-neutral-200 dark:bg-neutral-800" />

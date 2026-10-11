@@ -14,16 +14,23 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <Suspense
       fallback={<div role="status" className="p-6 text-sm text-muted-foreground">Yükleniyor...</div>}
     >
-      <AuthenticatedAdminLayout>{children}</AuthenticatedAdminLayout>
+      <AdminChrome>{children}</AdminChrome>
     </Suspense>
   );
 }
 
-async function AuthenticatedAdminLayout({ children }: { children: ReactNode }) {
+async function AdminChrome({ children }: { children: ReactNode }) {
   const isAuthenticated = await hasAdminSession();
 
+  // Oturum olmasa da children her zaman render edilir; aksi halde alt segmentler
+  // prerender'da düşer ve instant-navigation doğrulaması atlanır. Kapı üstünü kaplar.
   if (!isAuthenticated) {
-    return <AdminGate />;
+    return (
+      <>
+        {children}
+        <AdminGate />
+      </>
+    );
   }
 
   const cookieStore = await cookies();

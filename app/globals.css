@@ -28,6 +28,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --animate-fade-in: fade-in 180ms ease-out both;
+  --animate-fade-in-slow: fade-in 200ms ease-out both;
   --animate-blink: blink 1s ease-in-out infinite;
 
   @keyframes fade-in {
@@ -269,25 +270,6 @@ body:has(.admin-theme[data-admin-theme="dark"]) {
     transform: none !important;
   }
 }
-
-/* React View Transitions */
-@media (max-width: 767px) {
-
-  body:has([data-product-purchase-bar]) [data-floating-bar],
-  body:has([data-product-purchase-bar]) [data-floating-cart] {
-    bottom: calc(6rem + env(safe-area-inset-bottom));
-  }
-
-  body:has([data-product-purchase-bar]) {
-    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
-  }
-}
-
-.search-scroll-up-glow {
-  border-color: rgba(99, 102, 241, 0.95) !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 20px 2px rgba(99, 102, 241, 0.6) !important;
-}
-
 
 ::view-transition-group(.product-image-morph) {
   animation-duration: 380ms;
