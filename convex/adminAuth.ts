@@ -5,6 +5,7 @@ import { v } from "convex/values";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   adminPinAttempts: { kind: "fixed window", rate: 5, period: 15 * MINUTE },
+  adminExport: { kind: "fixed window", rate: 10, period: 5 * MINUTE },
 });
 
 function constantTimeEqual(a: string, b: string): boolean {
@@ -40,5 +41,14 @@ export const resetPinAttempts = mutation({
     assertAdminApiSecret(args.adminSecret);
     await rateLimiter.reset(ctx, "adminPinAttempts", { key: args.key });
     return null;
+  },
+});
+
+export const checkExportRateLimit = mutation({
+  args: { adminSecret: v.string(), key: v.string() },
+  returns: v.object({ ok: v.boolean(), retryAfter: v.optional(v.number()) }),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    return await rateLimiter.limit(ctx, "adminExport", { key: args.key });
   },
 });

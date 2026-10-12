@@ -13,11 +13,10 @@ import {
 import {
   LockClosedIcon,
   EnvelopeIcon,
-  ShieldCheckIcon,
   ArrowLeftIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import { ArrowRight01Icon, Door01Icon } from "hugeicons-react";
+import { Door01Icon } from "hugeicons-react";
 
 export default function CustomerLoginPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();

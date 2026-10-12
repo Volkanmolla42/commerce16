@@ -1,5 +1,6 @@
 import { parseAttributeTemplate } from "@/lib/catalog/attributes";
-import { getAdminBackend } from "@/lib/admin/backend";
+import { DEFAULT_LOW_STOCK_THRESHOLD } from "@/lib/catalog/low-stock";
+import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
 import { getAdminProductPage, getAdminProductStats } from "@/lib/catalog/pages";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
@@ -14,28 +15,8 @@ function invalidateCatalog(tag: "products" | "categories") {
   revalidatePath("/sitemap.xml");
 }
 
-function getAdminErrorMessage(error: unknown) {
-  if (!(error instanceof Error)) return "İşlem tamamlanamadı.";
-
-  const rawMessage = error.message.trim();
-  const stackStart = rawMessage.search(/\s+at\s+[^()\r\n]+\([^\r\n)]*:\d+:\d+\)?/);
-  const message = (stackStart >= 0 ? rawMessage.slice(0, stackStart) : rawMessage.split(/\r?\n\s*at\s+/)[0])
-    .replace(/^\s*Server Error\s*/i, "")
-    .replace(/^\s*Uncaught Error:\s*/i, "")
-    .trim();
-
-  return message || "İşlem tamamlanamadı.";
-}
-
 function errorResponse(error: unknown) {
-  const rawMessage = error instanceof Error ? error.message : "";
-  const message = getAdminErrorMessage(error);
-  const unavailable =
-    rawMessage.includes("ADMIN_API_SECRET") ||
-    rawMessage.includes("NEXT_PUBLIC_CONVEX_URL") ||
-    rawMessage.includes("Yönetici işlemi doğrulanamadı");
-  const status = unavailable ? 503 : 400;
-  return NextResponse.json({ error: message }, { status });
+  return adminErrorResponse(error);
 }
 
 export async function GET(request: NextRequest) {
@@ -290,6 +271,7 @@ export async function POST(request: NextRequest) {
         const text = (value: unknown) =>
           typeof value === "string" ? value : "";
         const logoStorageId = text(input.logoStorageId);
+        const lowStockThreshold = Number(input.lowStockThreshold);
         const result = await client.mutation(api.settings.updateStoreSettings, {
           adminSecret,
           storeName,
@@ -300,6 +282,7 @@ export async function POST(request: NextRequest) {
           address: text(input.address),
           announcement: text(input.announcement),
           isOpen: input.isOpen !== false,
+          lowStockThreshold: Number.isSafeInteger(lowStockThreshold) ? lowStockThreshold : DEFAULT_LOW_STOCK_THRESHOLD,
         });
         revalidateTag("store-settings", { expire: 0 });
         revalidatePath("/", "layout");

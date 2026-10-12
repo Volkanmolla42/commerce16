@@ -26,6 +26,7 @@ type TextSettingKey =
   | "announcement";
 type SettingsEdits = Partial<Pick<StoreSettings, TextSettingKey>> & {
   isOpen?: boolean;
+  lowStockThreshold?: number;
 };
 
 function AdminSettingsContent() {
@@ -48,6 +49,7 @@ function AdminSettingsContent() {
 
   const text = (key: TextSettingKey) => edits[key] ?? data?.[key] ?? "";
   const isOpen = edits.isOpen ?? data?.isOpen ?? true;
+  const lowStockThreshold = edits.lowStockThreshold ?? data?.lowStockThreshold ?? 5;
   const logoPreview = pendingLogo?.previewUrl || data?.logoUrl || "";
 
   const set = (key: keyof SettingsEdits) => (
@@ -110,6 +112,7 @@ function AdminSettingsContent() {
         address: text("address"),
         announcement: text("announcement"),
         isOpen,
+        lowStockThreshold,
       });
       setEdits({});
       setPendingLogo(null);
@@ -273,6 +276,32 @@ function AdminSettingsContent() {
                     value={text("announcement")}
                     onChange={set("announcement")}
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg">
+              <CardContent className="space-y-5 p-5 sm:p-6">
+                <h2 className="text-sm font-semibold text-foreground">Stok uyarıları</h2>
+                <div className="space-y-2">
+                  <Label htmlFor="store-low-stock">Düşük stok eşiği (adet)</Label>
+                  <Input
+                    id="store-low-stock"
+                    name="lowStockThreshold"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={1000}
+                    step={1}
+                    value={lowStockThreshold}
+                    onChange={(event) =>
+                      setEdits((current) => ({
+                        ...current,
+                        lowStockThreshold: Math.max(0, Math.trunc(Number(event.target.value) || 0)),
+                      }))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">Stoğu bu adede eşit veya altında olan varyantlar düşük stok olarak işaretlenir.</p>
                 </div>
               </CardContent>
             </Card>

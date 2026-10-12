@@ -35,7 +35,7 @@ import { CartRecommendationShelf } from "@/components/product/recommendation-she
 function CartContent() {
   const router = useRouter();
   const restoreToken = useSearchParams().get("recover");
-  const { items, addItem, updateQuantity, removeItem, totalCount, totalAmount } =
+  const { items, addItem, updateQuantity, removeItem, totalAmount } =
     useCart();
   const restoreHandled = useRef(false);
   const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);

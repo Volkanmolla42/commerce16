@@ -17,7 +17,7 @@ export function isAdminAuthConfigured() {
   return (
     /^\d{6}$/.test(adminPin()) &&
     adminApiSecret().length >= 32 &&
-    Boolean(process.env.NEXT_PUBLIC_CONVEX_URL)
+    Boolean(process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL)
   );
 }
 

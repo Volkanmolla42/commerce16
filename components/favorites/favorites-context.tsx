@@ -5,10 +5,8 @@ import { useConvexAuth } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -46,10 +44,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   const mergeMyFavorites = useMutation(api.favorites.mergeMyFavorites);
   const mergeInProgress = useRef(false);
 
-  const favoriteSlugs = useMemo(
-    () => [...new Set(isAuthenticated ? [...(cloudSlugs ?? []), ...guestSlugs] : guestSlugs)],
-    [cloudSlugs, guestSlugs, isAuthenticated],
-  );
+  const favoriteSlugs = [...new Set(isAuthenticated ? [...(cloudSlugs ?? []), ...guestSlugs] : guestSlugs)];
 
   useEffect(() => {
     if (
@@ -71,7 +66,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
       });
   }, [authLoading, cloudSlugs, guestSlugs, guestStore, guestStoreReady, isAuthenticated, mergeMyFavorites]);
 
-  const toggleFavorite = useCallback(async (productSlug: string) => {
+  const toggleFavorite = async (productSlug: string) => {
     const nextIsFavorite = !favoriteSlugs.includes(productSlug);
     const cloudContainsSlug = cloudSlugs?.includes(productSlug) ?? false;
     const isGuestOnly = guestSlugs.includes(productSlug) && !cloudContainsSlug;
@@ -86,14 +81,14 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
 
     await setMyFavorite({ productSlug, isFavorite: nextIsFavorite });
     guestStore.removeFavorites([productSlug]);
-  }, [authLoading, cloudSlugs, favoriteSlugs, guestSlugs, guestStore, isAuthenticated, setMyFavorite]);
+  };
 
-  const value = useMemo<FavoritesContextValue>(() => ({
+  const value: FavoritesContextValue = {
     favoriteSlugs,
     isReady: guestStoreReady && !authLoading && (!isAuthenticated || cloudSlugs !== undefined),
     isFavorite: (productSlug) => favoriteSlugs.includes(productSlug),
     toggleFavorite,
-  }), [authLoading, cloudSlugs, favoriteSlugs, guestStoreReady, isAuthenticated, toggleFavorite]);
+  };
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>;
 }

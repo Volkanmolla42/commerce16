@@ -1,12 +1,13 @@
 import { CartProvider } from "@/components/cart/cart-context";
 import { CookieConsentManager } from "@/components/privacy/cookie-consent-manager";
+import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import StoreInitial from "@/components/store-initial";
 import { getStoreSettings } from "@/lib/catalog";
 import { LockClosedIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Güvenli Ödeme",
@@ -19,6 +20,9 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
   if (!settings.isOpen) {
     return (
       <>
+        <Suspense fallback={null}>
+          <AnalyticsProvider />
+        </Suspense>
         <main className="mx-auto grid min-h-[100dvh] w-full max-w-xl place-items-center px-4">
           <div className="text-center">
             <h1 className="text-2xl font-semibold tracking-tight">{settings.storeName} şu anda kapalı</h1>
@@ -34,7 +38,11 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
   }
 
   return (
-    <CartProvider>
+    <>
+      <Suspense fallback={null}>
+        <AnalyticsProvider />
+      </Suspense>
+      <CartProvider>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
         {/* Distraction-free Checkout Header */}
         <header className="sticky top-0 z-30 w-full border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -77,5 +85,6 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
       </div>
       <CookieConsentManager />
     </CartProvider>
+  </>
   );
 }

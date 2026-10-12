@@ -28,7 +28,6 @@ import {
 import { OrderStatusBadge } from "./order-status-badge";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
-import { Cancel01Icon } from "hugeicons-react";
 
 function OrderDetailsBackLink() {
   return (

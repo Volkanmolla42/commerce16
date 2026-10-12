@@ -2,7 +2,20 @@
 const DELIMITER = ";";
 
 function escapeCell(value: string) {
-  return /["\n\r;]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  let sanitized = value;
+  // CSV / spreadsheet formula injection (CWE-1236) koruması:
+  // Hücre =, +, -, @ veya tab/satır başı ile başlıyorsa formül/DDE yürütülmesini engellemek için tek tırnak eklenir.
+  if (/^[\s]*[=+\-@\t\r]/.test(sanitized)) {
+    sanitized = `'${sanitized}`;
+  }
+
+  const needsQuotes =
+    sanitized.includes('"') ||
+    sanitized.includes("\n") ||
+    sanitized.includes("\r") ||
+    sanitized.includes(DELIMITER);
+
+  return needsQuotes ? `"${sanitized.replace(/"/g, '""')}"` : sanitized;
 }
 
 export function toCsv(headers: string[], rows: Array<Array<string | number>>) {

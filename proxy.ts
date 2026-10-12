@@ -1,16 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_BASE_PATH } from "@/lib/admin/routes";
+import { getServerAdminBasePath } from "@/lib/admin/routes";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const adminBasePath = getServerAdminBasePath();
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return NextResponse.rewrite(new URL("/_not-found", request.url));
   }
 
-  if (pathname === ADMIN_BASE_PATH || pathname.startsWith(`${ADMIN_BASE_PATH}/`)) {
+  if (pathname === adminBasePath || pathname.startsWith(`${adminBasePath}/`)) {
     const destination = request.nextUrl.clone();
-    destination.pathname = `/admin${pathname.slice(ADMIN_BASE_PATH.length)}`;
+    destination.pathname = `/admin${pathname.slice(adminBasePath.length)}`;
     return NextResponse.rewrite(destination);
   }
 

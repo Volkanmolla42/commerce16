@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ResourceState<T> = {
   data: T | null;
@@ -30,44 +30,62 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
   const [loading, setLoading] = useState(true);
   const paramsKey = JSON.stringify(params);
 
-  const fetchData = useCallback(async (signal?: AbortSignal) => {
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+
+    async function run() {
+      try {
+        const parsedParams = JSON.parse(paramsKey) as Record<string, string>;
+        const search = new URLSearchParams({ resource, ...parsedParams });
+        const payload = await adminRequest<T>(
+          `/api/admin?${search.toString()}`,
+          { cache: "no-store", signal: controller.signal },
+          "Veriler yüklenemedi.",
+        );
+        if (!ignore) {
+          setData(payload);
+          setError(null);
+        }
+      } catch (cause: unknown) {
+        if (!ignore) {
+          setData(null);
+          setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void run();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, [resource, paramsKey]);
+
+  const refresh = async () => {
     setLoading(true);
     try {
       const parsedParams = JSON.parse(paramsKey) as Record<string, string>;
       const search = new URLSearchParams({ resource, ...parsedParams });
       const payload = await adminRequest<T>(
         `/api/admin?${search.toString()}`,
-        { cache: "no-store", signal },
+        { cache: "no-store" },
         "Veriler yüklenemedi.",
       );
-      if (!signal?.aborted) {
-        setData(payload);
-        setError(null);
-      }
+      setData(payload);
+      setError(null);
     } catch (cause: unknown) {
-      if (!signal?.aborted) {
-        setData(null);
-        setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
-      }
+      setData(null);
+      setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
     } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  }, [resource, paramsKey]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchData(controller.signal);
-
-    return () => {
-      controller.abort();
-    };
-  }, [fetchData]);
-
-  const refresh = useCallback(async () => {
-    await fetchData();
-  }, [fetchData]);
+  };
 
   return { data, error, loading, refresh };
 }

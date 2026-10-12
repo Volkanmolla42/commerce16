@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button, Input, Label } from "@/components/ui";
@@ -10,6 +10,10 @@ import {
 } from "@/lib/catalog/attributes";
 import { runAdminAction, useAdminResource } from "../../_components/admin-api";
 import { CategoryAttributeFields } from "./category-attribute-fields";
+
+const emptySubscribe = () => () => {};
+const getNativePopoverSnapshot = () => typeof HTMLElement !== "undefined" && "showPopover" in HTMLElement.prototype;
+const getNativePopoverServerSnapshot = () => false;
 
 export type CategoryAttributePreset = Pick<Doc<"categoryAttributePresets">, "_id" | "label" | "type" | "unit" | "options" | "required">;
 type PresetPage = { page: CategoryAttributePreset[]; continueCursor: string; isDone: boolean };
@@ -29,7 +33,7 @@ export function CategoryAttributeLibrary({ onAdd, attributes, disabled, revision
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [nativePopover, setNativePopover] = useState(false);
+  const nativePopover = useSyncExternalStore(emptySubscribe, getNativePopoverSnapshot, getNativePopoverServerSnapshot);
   const [popoverPosition, setPopoverPosition] = useState<CSSProperties>({});
   const [cursors, setCursors] = useState<string[]>([""]);
   const [version, setVersion] = useState(0);
@@ -46,9 +50,6 @@ export function CategoryAttributeLibrary({ onAdd, attributes, disabled, revision
     onBusyChange(busy || draft !== null || deleteTarget !== null);
     return () => onBusyChange(false);
   }, [busy, draft, deleteTarget, onBusyChange]);
-  useEffect(() => {
-    setNativePopover(typeof HTMLElement !== "undefined" && "showPopover" in HTMLElement.prototype);
-  }, []);
   useEffect(() => {
     if (!open || draft || deleteTarget || busy) return;
     const closeOnOutsideClick = (event: PointerEvent) => {

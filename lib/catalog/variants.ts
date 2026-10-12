@@ -6,7 +6,7 @@ type ProductPriceSource = {
   options?: { name: string; values: string[] }[];
   variants?: {
     price: string | { amount: string };
-    selectedOptions: { name: string; value: string }[];
+    selectedOptions?: { name: string; value: string }[];
   }[];
 };
 
@@ -21,7 +21,7 @@ export function getProductPriceRange(
   if (!params && product.priceRange) return product.priceRange;
   const optionVariants = product.variants ?? [];
   const matchingVariants = params && optionVariants.length > 0
-    ? optionVariants.filter((variant) => variant.selectedOptions.every(({ name, value }) => {
+    ? optionVariants.filter((variant) => (variant.selectedOptions ?? []).every(({ name, value }) => {
         const selected = params.get(optionQueryKey(name));
         return !selected || selected === value;
       }))

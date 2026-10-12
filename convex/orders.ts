@@ -1,5 +1,7 @@
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationResultValidator } from "convex/server";
+import { getCheckoutLegalDocuments } from "../lib/legal-documents";
 import schema from "./schema";
 import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -111,6 +113,22 @@ export const listAllAdmin = query({
   },
 });
 
+export const listForExportAdmin = query({
+  args: {
+    adminSecret: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    limit: v.optional(v.number()),
+  },
+  returns: paginationResultValidator(orderValidator),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    return await ctx.db
+      .query("orders")
+      .order("desc")
+      .paginate({ numItems: Math.min(args.limit ?? 250, 500), cursor: args.cursor });
+  },
+});
+
 export const getOrderById = query({
   args: {
     id: v.id("orders"),
@@ -141,6 +159,11 @@ export const createOrder = mutation({
     provinceId: v.string(),
     districtId: v.string(),
     shippingAddress: v.optional(v.string()),
+    legalAcceptance: v.optional(v.object({
+      accepted: v.literal(true),
+      distanceSalesAgreementVersion: v.optional(v.string()),
+      preInformationFormVersion: v.optional(v.string()),
+    })),
     saveAddress: v.optional(
       schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1")
         .extend({ isDefault: v.optional(v.boolean()) })
@@ -162,6 +185,28 @@ export const createOrder = mutation({
     }
     if (args.shippingAddress && args.shippingAddress.trim().length > 500) {
       throw new Error("Teslimat adresi en fazla 500 karakter olabilir.");
+    }
+    const { distanceSalesAgreement: agreement, preInformationForm: preInformation } = getCheckoutLegalDocuments();
+    let recordedLegalAcceptance = undefined;
+    if (args.legalAcceptance) {
+      if (args.legalAcceptance.accepted !== true ||
+        (args.legalAcceptance.distanceSalesAgreementVersion && args.legalAcceptance.distanceSalesAgreementVersion !== agreement.version) ||
+        (args.legalAcceptance.preInformationFormVersion && args.legalAcceptance.preInformationFormVersion !== preInformation.version)) {
+        throw new Error("Yasal belgeler değişti veya onaylanmadı. Sayfayı yenileyip tekrar kontrol edin.");
+      }
+      recordedLegalAcceptance = {
+        acceptedAt: Date.now(),
+        distanceSalesAgreement: {
+          title: agreement.title,
+          version: agreement.version,
+          body: agreement.body,
+        },
+        preInformationForm: {
+          title: preInformation.title,
+          version: preInformation.version,
+          body: preInformation.body,
+        },
+      };
     }
     const emailKey = args.customerEmail.trim().toLowerCase();
     const emailLimit = await orderRateLimiter.limit(ctx, "orderByEmail", { key: emailKey });
@@ -260,6 +305,7 @@ export const createOrder = mutation({
       status: "pending",
       ...(analyticsSessionId ? { analyticsSessionId } : {}),
       shippingAddress: args.shippingAddress,
+      ...(recordedLegalAcceptance ? { legalAcceptance: recordedLegalAcceptance } : {}),
     });
     if (coupon?.valid) {
       const createdOrder = await ctx.db.get(orderId);

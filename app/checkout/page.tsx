@@ -1,6 +1,6 @@
 "use client";
 
-import { useCart } from "@/components/cart/cart-context";
+import { useCart, type CartItem } from "@/components/cart/cart-context";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -32,6 +32,167 @@ import { clearCartRecoverySessionKey, getCartRecoverySessionKey } from "@/compon
 import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
+
+type CouponPreview = {
+  valid: boolean;
+  code?: string;
+  message?: string;
+  discountKurus?: number;
+} | null | undefined;
+
+function OrderItemsList({ items }: { items: CartItem[] }) {
+  return (
+    <div className="divide-y divide-border/60">
+      {items.map((item) => {
+        const unitPrice = Number(getProductUnitPrice(item.product, item.variantId));
+        const lineTotal = unitPrice * item.quantity;
+        return (
+          <div key={`${item.product.id}:${item.variantId ?? ""}`} className="flex items-center gap-3 py-3">
+            <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+              {item.product.images[0] ? (
+                <Image
+                  src={item.product.images[0].url}
+                  width={56}
+                  height={56}
+                  alt={item.product.title}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center text-muted-foreground">
+                  <ShoppingBagIcon className="size-6" />
+                </div>
+              )}
+              <span className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow-xs">
+                {item.quantity}
+              </span>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="line-clamp-2 text-xs sm:text-sm font-medium leading-snug text-foreground">
+                {item.product.title}
+              </h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {item.quantity} adet × {formatMoney(unitPrice)}
+              </p>
+            </div>
+
+            <div className="shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+              {formatMoney(lineTotal)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CouponSection({
+  idPrefix = "checkout",
+  couponInput,
+  setCouponInput,
+  handleApplyCoupon,
+  couponPreview,
+  appliedCouponCode,
+}: {
+  idPrefix?: string;
+  couponInput: string;
+  setCouponInput: (val: string) => void;
+  handleApplyCoupon: () => void;
+  couponPreview: CouponPreview;
+  appliedCouponCode: string;
+}) {
+  return (
+    <div className="space-y-2 pt-1">
+      <Label htmlFor={`${idPrefix}-coupon`} className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+        <TagIcon className="size-4 text-muted-foreground" />
+        <span>İndirim Kuponu</span>
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          id={`${idPrefix}-coupon`}
+          value={couponInput}
+          onChange={(event) => setCouponInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleApplyCoupon();
+            }
+          }}
+          maxLength={32}
+          autoCapitalize="characters"
+          placeholder="Kupon kodunuz"
+          aria-describedby={`${idPrefix}-coupon-status`}
+          className="h-11 text-sm uppercase placeholder:normal-case font-medium min-w-0 flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!couponInput.trim()}
+          onClick={handleApplyCoupon}
+          className="h-11 px-4 text-sm font-medium shrink-0 cursor-pointer"
+        >
+          Uygula
+        </Button>
+      </div>
+      <p
+        id={`${idPrefix}-coupon-status`}
+        role="status"
+        aria-live="polite"
+        className={`min-h-4 text-xs font-medium ${
+          couponPreview?.valid
+            ? "text-emerald-600 dark:text-emerald-400"
+            : appliedCouponCode
+              ? "text-destructive"
+              : "text-muted-foreground"
+        }`}
+      >
+        {couponPreview?.valid
+          ? `✓ "${couponPreview.code}" kuponu uygulandı.`
+          : couponPreview && !couponPreview.valid
+            ? `✕ ${couponPreview.message}`
+            : appliedCouponCode
+              ? "Kupon kontrol ediliyor…"
+              : ""}
+      </p>
+    </div>
+  );
+}
+
+function PriceSummaryRows({
+  totalAmount,
+  couponDiscountKurus,
+  couponPreview,
+  appliedCouponCode,
+  payableAmount,
+}: {
+  totalAmount: number;
+  couponDiscountKurus: number;
+  couponPreview: CouponPreview;
+  appliedCouponCode: string;
+  payableAmount: number;
+}) {
+  return (
+    <div className="space-y-2 pt-1 text-sm">
+      <div className="flex justify-between text-muted-foreground">
+        <span>Ara Toplam</span>
+        <span className="font-medium tabular-nums text-foreground">{formatMoney(totalAmount)}</span>
+      </div>
+      {couponDiscountKurus > 0 && (
+        <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
+          <span>Kupon İndirimi ({couponPreview?.valid ? couponPreview.code : appliedCouponCode})</span>
+          <span className="tabular-nums">−{formatMoney(couponDiscountKurus / 100)}</span>
+        </div>
+      )}
+      <Separator className="my-2" />
+      <div className="flex items-baseline justify-between pt-1">
+        <span className="text-base font-semibold text-foreground">Toplam</span>
+        <span className="text-lg font-bold tabular-nums text-foreground sm:text-xl">
+          {formatMoney(payableAmount)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function CheckoutContent() {
   const router = useRouter();
@@ -91,6 +252,8 @@ function CheckoutContent() {
     if (items.length > 0) void trackAnalyticsEvent("begin_checkout");
   }, [items.length]);
 
+  const itemsKey = items.map((item) => `${item.product.id}:${item.variantId ?? ""}:${item.quantity}`).join(",");
+
   useEffect(() => {
     if (items.length === 0) return;
     let sessionKey: string | null;
@@ -115,7 +278,8 @@ function CheckoutContent() {
       }).catch(() => undefined);
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [captureRecovery, customerEmail, emailReminderConsent, items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureRecovery, customerEmail, emailReminderConsent, itemsKey]);
 
   const handleAddressSelect = (addressId: string) => {
     setAddressSelection(addressId);
@@ -235,6 +399,11 @@ function CheckoutContent() {
           image: item.product.images[0]?.url,
         })),
         saveAddress: saveAddressPayload,
+        legalAcceptance: {
+          accepted: true as const,
+          distanceSalesAgreementVersion: legalDocuments.distanceSalesAgreement.version,
+          preInformationFormVersion: legalDocuments.preInformationForm.version,
+        },
       });
 
       if (recoverySessionKey && emailReminderConsent) {
@@ -290,130 +459,6 @@ function CheckoutContent() {
     );
   }
 
-  // Ürün listesi
-  const OrderItemsList = () => (
-    <div className="divide-y divide-border/60">
-      {items.map((item) => {
-        const unitPrice = Number(getProductUnitPrice(item.product, item.variantId));
-        const lineTotal = unitPrice * item.quantity;
-        return (
-          <div key={`${item.product.id}:${item.variantId ?? ""}`} className="flex items-center gap-3 py-3">
-            <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
-              {item.product.images[0] ? (
-                <Image
-                  src={item.product.images[0].url}
-                  width={56}
-                  height={56}
-                  alt={item.product.title}
-                  className="size-full object-cover"
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center text-muted-foreground">
-                  <ShoppingBagIcon className="size-6" />
-                </div>
-              )}
-              <span className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow-xs">
-                {item.quantity}
-              </span>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h3 className="line-clamp-2 text-xs sm:text-sm font-medium leading-snug text-foreground">
-                {item.product.title}
-              </h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {item.quantity} adet × {formatMoney(unitPrice)}
-              </p>
-            </div>
-
-            <div className="shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-              {formatMoney(lineTotal)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  // İndirim kuponu
-  const CouponSection = ({ idPrefix = "checkout" }: { idPrefix?: string }) => (
-    <div className="space-y-2 pt-1">
-      <Label htmlFor={`${idPrefix}-coupon`} className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-        <TagIcon className="size-4 text-muted-foreground" />
-        <span>İndirim Kuponu</span>
-      </Label>
-      <div className="flex gap-2">
-        <Input
-          id={`${idPrefix}-coupon`}
-          value={couponInput}
-          onChange={(event) => setCouponInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              handleApplyCoupon();
-            }
-          }}
-          maxLength={32}
-          autoCapitalize="characters"
-          placeholder="Kupon kodunuz"
-          aria-describedby={`${idPrefix}-coupon-status`}
-          className="h-11 text-sm uppercase placeholder:normal-case font-medium min-w-0 flex-1"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!couponInput.trim()}
-          onClick={handleApplyCoupon}
-          className="h-11 px-4 text-sm font-medium shrink-0 cursor-pointer"
-        >
-          Uygula
-        </Button>
-      </div>
-      <p
-        id={`${idPrefix}-coupon-status`}
-        role="status"
-        aria-live="polite"
-        className={`min-h-4 text-xs font-medium ${couponPreview?.valid
-            ? "text-emerald-600 dark:text-emerald-400"
-            : appliedCouponCode
-              ? "text-destructive"
-              : "text-muted-foreground"
-          }`}
-      >
-        {couponPreview?.valid
-          ? `✓ "${couponPreview.code}" kuponu uygulandı.`
-          : couponPreview && !couponPreview.valid
-            ? `✕ ${couponPreview.message}`
-            : appliedCouponCode
-              ? "Kupon kontrol ediliyor…"
-              : ""}
-      </p>
-    </div>
-  );
-
-  // Fiyat özeti satırları
-  const PriceSummaryRows = () => (
-    <div className="space-y-2 pt-1 text-sm">
-      <div className="flex justify-between text-muted-foreground">
-        <span>Ara Toplam</span>
-        <span className="font-medium tabular-nums text-foreground">{formatMoney(totalAmount)}</span>
-      </div>
-      {couponDiscountKurus > 0 && (
-        <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
-          <span>Kupon İndirimi ({couponPreview?.valid ? couponPreview.code : appliedCouponCode})</span>
-          <span className="tabular-nums">−{formatMoney(couponDiscountKurus / 100)}</span>
-        </div>
-      )}
-      <Separator className="my-2" />
-      <div className="flex items-baseline justify-between pt-1">
-        <span className="text-base font-semibold text-foreground">Toplam</span>
-        <span className="text-lg font-bold tabular-nums text-foreground sm:text-xl">
-          {formatMoney(payableAmount)}
-        </span>
-      </div>
-    </div>
-  );
-
   return (
     <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-4 sm:px-6 sm:py-8 pb-28 sm:pb-12 overflow-x-clip">
       {/* SİPARİŞ FORMU */}
@@ -447,17 +492,30 @@ function CheckoutContent() {
             <Separator />
 
             {/* Ürün Listesi */}
-            <OrderItemsList />
+            <OrderItemsList items={items} />
 
             <Separator />
 
             {/* İndirim Kuponu */}
-            <CouponSection idPrefix="mobile" />
+            <CouponSection
+              idPrefix="mobile"
+              couponInput={couponInput}
+              setCouponInput={setCouponInput}
+              handleApplyCoupon={handleApplyCoupon}
+              couponPreview={couponPreview}
+              appliedCouponCode={appliedCouponCode}
+            />
 
             <Separator />
 
             {/* Fiyat Dökümü */}
-            <PriceSummaryRows />
+            <PriceSummaryRows
+              totalAmount={totalAmount}
+              couponDiscountKurus={couponDiscountKurus}
+              couponPreview={couponPreview}
+              appliedCouponCode={appliedCouponCode}
+              payableAmount={payableAmount}
+            />
           </Card>
 
           {/* 1. İletişim Bilgileri */}
@@ -836,14 +894,27 @@ function CheckoutContent() {
             <Separator />
 
             <div className="max-h-80 overflow-y-auto pr-1">
-              <OrderItemsList />
+              <OrderItemsList items={items} />
             </div>
 
             <Separator />
-            <CouponSection idPrefix="desktop" />
+            <CouponSection
+              idPrefix="desktop"
+              couponInput={couponInput}
+              setCouponInput={setCouponInput}
+              handleApplyCoupon={handleApplyCoupon}
+              couponPreview={couponPreview}
+              appliedCouponCode={appliedCouponCode}
+            />
 
             <Separator />
-            <PriceSummaryRows />
+            <PriceSummaryRows
+              totalAmount={totalAmount}
+              couponDiscountKurus={couponDiscountKurus}
+              couponPreview={couponPreview}
+              appliedCouponCode={appliedCouponCode}
+              payableAmount={payableAmount}
+            />
 
             <Button
               type="submit"

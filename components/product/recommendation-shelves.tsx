@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Grid from "@/components/grid";
@@ -132,23 +132,22 @@ export function PersonalizedRecommendationShelf({ products }: { products: Produc
     };
   }, []);
 
-  const recommendations = useMemo(() => {
-    const catalogBySlug = new Map(products.map((product) => [product.slug, product]));
-    const sources = [
-      ...items.map(({ product }) => ({ product, weight: 2.5 })),
-      ...recentSlugs.flatMap((slug, index) => {
-        const product = catalogBySlug.get(slug);
-        return product ? [{ product, weight: Math.max(0.75, 1.8 - index * 0.06) }] : [];
-      }),
-    ];
-    const excluded = [...new Set([...items.map(({ product }) => product.slug), ...recentSlugs.slice(0, 2)])];
-    const personalized = rankProductRecommendations(products, sources, excluded, 8);
-    if (personalized.length > 0) return personalized;
-    return products
-      .filter((product) => product.availableForSale)
-      .toSorted((a, b) => a.title.localeCompare(b.title, "tr"))
-      .slice(0, 8);
-  }, [items, products, recentSlugs]);
+  const catalogBySlug = new Map(products.map((product) => [product.slug, product]));
+  const sources = [
+    ...items.map(({ product }) => ({ product, weight: 2.5 })),
+    ...recentSlugs.flatMap((slug, index) => {
+      const product = catalogBySlug.get(slug);
+      return product ? [{ product, weight: Math.max(0.75, 1.8 - index * 0.06) }] : [];
+    }),
+  ];
+  const excluded = [...new Set([...items.map(({ product }) => product.slug), ...recentSlugs.slice(0, 2)])];
+  const personalized = rankProductRecommendations(products, sources, excluded, 8);
+  const recommendations = personalized.length > 0
+    ? personalized
+    : products
+        .filter((product) => product.availableForSale)
+        .toSorted((a, b) => a.title.localeCompare(b.title, "tr"))
+        .slice(0, 8);
 
   const title = items.length > 0
     ? "Sepetiniz için seçtiklerimiz"
@@ -185,20 +184,19 @@ export function BoughtTogetherShelf({
     sourceIds.length > 0 ? { productIds: sourceIds } : "skip",
   );
 
-  const recommendations = useMemo(() => {
-    const sourceSlugSet = new Set(sources.map((product) => product.slug));
-    const productsById = new Map(products.map((product) => [product.id, product]));
-    const purchasedTogether = (purchasePairs ?? [])
-      .map(({ productId }) => productsById.get(productId))
-      .filter((product): product is Product => Boolean(product?.availableForSale && !sourceSlugSet.has(product.slug)));
-    if (purchasedTogether.length > 0) return purchasedTogether.slice(0, 8);
-    return rankProductRecommendations(
-      products,
-      sources.map((product) => ({ product, weight: 1.5 })),
-      [...sourceSlugSet],
-      8,
-    );
-  }, [products, purchasePairs, sources]);
+  const sourceSlugSet = new Set(sources.map((product) => product.slug));
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const purchasedTogether = (purchasePairs ?? [])
+    .map(({ productId }) => productsById.get(productId))
+    .filter((product): product is Product => Boolean(product?.availableForSale && !sourceSlugSet.has(product.slug)));
+  const recommendations = purchasedTogether.length > 0
+    ? purchasedTogether.slice(0, 8)
+    : rankProductRecommendations(
+        products,
+        sources.map((product) => ({ product, weight: 1.5 })),
+        [...sourceSlugSet],
+        8,
+      );
 
   const hasPurchaseData = Boolean(purchasePairs?.some(({ productId }) => products.some((product) => product.id === productId)));
   return (

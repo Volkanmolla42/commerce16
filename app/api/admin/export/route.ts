@@ -1,5 +1,6 @@
 import { api } from "@/convex/_generated/api";
-import { getAdminBackend } from "@/lib/admin/backend";
+import type { Doc } from "@/convex/_generated/dataModel";
+import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import { toCsv } from "@/lib/admin/csv";
 import { orderStatusLabels } from "@/lib/orders";
@@ -8,6 +9,35 @@ import { NextRequest, NextResponse } from "next/server";
 
 const dateFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" });
 const dateTimeFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" });
+
+type ExportOrder = Doc<"orders">;
+
+type ExportProduct = {
+  slug: string;
+  title: string;
+  categorySlug?: string;
+  availableForSale: boolean;
+  variants: Array<{
+    id: string;
+    title: string;
+    price: string;
+    stockQuantity: number;
+  }>;
+  updatedAt: string;
+};
+
+type ExportCustomer = {
+  key: string;
+  name: string;
+  email: string;
+  phone: string;
+  registeredAt?: number;
+  firstOrderAt?: number;
+  lastOrderAt?: number;
+  orderCount: number;
+  totalSpent: string;
+  addressCount: number;
+};
 
 function csvResponse(filename: string, body: string) {
   return new NextResponse(body, {
@@ -20,6 +50,11 @@ function csvResponse(filename: string, body: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const secFetchSite = request.headers.get("sec-fetch-site");
+  if (secFetchSite === "cross-site") {
+    return NextResponse.json({ error: "Yetkisiz istek kaynağı." }, { status: 403 });
+  }
+
   if (!(await hasAdminSession())) {
     return NextResponse.json({ error: "Yönetici oturumu gerekli." }, { status: 401 });
   }
@@ -29,16 +64,41 @@ export async function GET(request: NextRequest) {
   try {
     const { client, adminSecret } = getAdminBackend();
 
+    const rateLimit = await client.mutation(api.adminAuth.checkExportRateLimit, {
+      adminSecret,
+      key: "admin-csv-export",
+    });
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "Çok sık dışa aktarma isteği yapıldı. Lütfen birkaç dakika sonra tekrar deneyin." },
+        { status: 429 },
+      );
+    }
+
     if (type === "orders") {
-      const orders = await client.query(api.orders.listAllAdmin, { adminSecret });
-      const rows = orders.map((order) => [
+      const allOrders: Array<ExportOrder> = [];
+      let cursor: string | null = null;
+      do {
+        const result: { page: ExportOrder[]; isDone: boolean; continueCursor: string } = await client.query(
+          api.orders.listForExportAdmin,
+          {
+            adminSecret,
+            cursor,
+            limit: 250,
+          },
+        );
+        allOrders.push(...result.page);
+        cursor = result.isDone ? null : result.continueCursor;
+      } while (cursor && allOrders.length < 10000);
+
+      const rows = allOrders.map((order) => [
         `#${order._id.slice(-8).toUpperCase()}`,
         dateTimeFormatter.format(new Date(order._creationTime)),
-        orderStatusLabels[order.status],
+        orderStatusLabels[order.status as keyof typeof orderStatusLabels] ?? order.status,
         order.customerName,
         order.customerEmail,
         order.customerPhone ?? "",
-        order.items.reduce((sum, item) => sum + item.quantity, 0),
+        order.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0),
         order.total,
         order.couponCode ?? "",
         order.couponDiscountKurus ? (order.couponDiscountKurus / 100).toFixed(2) : "",
@@ -54,8 +114,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === "products") {
-      const products = await client.query(api.products.listAllAdmin, { adminSecret });
-      const rows = products.map((product) => {
+      const allProducts: Array<ExportProduct> = [];
+      let cursor: string | null = null;
+      do {
+        const result: { page: ExportProduct[]; isDone: boolean; continueCursor: string } = await client.query(
+          api.products.listForExportAdmin,
+          {
+            adminSecret,
+            cursor,
+            limit: 250,
+          },
+        );
+        allProducts.push(...result.page);
+        cursor = result.isDone ? null : result.continueCursor;
+      } while (cursor && allProducts.length < 10000);
+
+      const rows = allProducts.map((product) => {
         const range = getProductPriceRange({ variants: product.variants });
         return [
           product.slug,
@@ -64,7 +138,7 @@ export async function GET(request: NextRequest) {
           product.availableForSale ? "Evet" : "Hayır",
           range.min === range.max ? range.min : `${range.min} - ${range.max}`,
           product.variants.length,
-          product.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0),
+          product.variants.reduce((sum: number, variant: { stockQuantity: number }) => sum + variant.stockQuantity, 0),
           product.updatedAt,
         ];
       });
@@ -78,8 +152,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === "customers") {
-      const result = await client.query(api.customers.listAdmin, { adminSecret, query: "", numItems: 24, all: true });
-      const rows = result.page.map((customer) => [
+      const allCustomers: Array<ExportCustomer> = [];
+      let cursor: string | null = null;
+      do {
+        const result: { page: ExportCustomer[]; isDone: boolean; continueCursor: string } = await client.query(
+          api.customers.listAdmin,
+          {
+            adminSecret,
+            query: "",
+            numItems: 100,
+            ...(cursor ? { cursor } : {}),
+          },
+        );
+        allCustomers.push(...result.page);
+        cursor = result.isDone ? null : result.continueCursor;
+      } while (cursor && allCustomers.length < 10000);
+
+      const rows = allCustomers.map((customer) => [
         customer.name,
         customer.email,
         customer.phone,
@@ -100,9 +189,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ error: "Bilinmeyen rapor türü." }, { status: 404 });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Rapor oluşturulamadı." },
-      { status: 400 },
-    );
+    return adminErrorResponse(error);
   }
 }

@@ -125,9 +125,23 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     analyticsSessionId: v.optional(v.string()),
     shippingAddress: v.optional(v.string()),
+    legalAcceptance: v.optional(v.object({
+      acceptedAt: v.number(),
+      distanceSalesAgreement: v.object({
+        title: v.string(),
+        version: v.string(),
+        body: v.string(),
+      }),
+      preInformationForm: v.object({
+        title: v.string(),
+        version: v.string(),
+        body: v.string(),
+      }),
+    })),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
+    .index("by_customerEmail", ["customerEmail"])
     .index("by_analytics_session_id", ["analyticsSessionId"]),
 
   analyticsSessions: defineTable({
@@ -246,6 +260,7 @@ export default defineSchema({
     address: v.optional(v.string()),
     announcement: v.optional(v.string()),
     isOpen: v.optional(v.boolean()),
+    lowStockThreshold: v.optional(v.number()),
     updatedAt: v.optional(v.string()),
   }).index("by_key", ["key"]),
 

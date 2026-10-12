@@ -199,7 +199,7 @@ export function createCatalogSearchMatcher(search: string) {
       const synonyms = getSynonyms(term).map(normalizeSearchText);
       return fields.some((field) => field.split(" ").some((word) =>
         word === term || (isFinalTerm && word.startsWith(term)) ||
-        synonyms.some((synonym) => word === synonym || (isFinalTerm && synonym.startsWith(term))),
+        synonyms.some((synonym) => word === synonym || (isFinalTerm && word.startsWith(synonym))),
       ));
     });
   };

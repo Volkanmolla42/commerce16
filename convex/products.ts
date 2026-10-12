@@ -6,6 +6,7 @@ import { v } from "convex/values";
 import schema from "./schema";
 import { insertCatalogProduct, patchCatalogProduct, deleteCatalogProduct, withoutCatalogMetadata } from "./catalogModel";
 import { assertAdminApiSecret } from "./adminAuth";
+import { resolveLowStockThreshold } from "./settings";
 import { getProductPriceRange } from "../lib/catalog/variants";
 import { catalogSearchQuery } from "../lib/catalog/smart-search";
 import {
@@ -14,9 +15,8 @@ import {
   syncProductSkus,
 } from "./productSkus";
 
-const LOW_STOCK_THRESHOLD = 5;
 // Varyant stoğu ürün dokümanı içinde olduğu için indekslenemez; uyarı listesi sınırlı tarama ile üretilir.
-const LOW_STOCK_SCAN_LIMIT = 300;
+const LOW_STOCK_SCAN_LIMIT = 500;
 
 const productDocumentValidator = schema.doc("products");
 const productInputValidator = productDocumentValidator.omit(
@@ -331,6 +331,52 @@ export const listAllAdmin = query({
   },
 });
 
+const exportProductValidator = v.object({
+  slug: v.string(),
+  title: v.string(),
+  categorySlug: v.optional(v.string()),
+  availableForSale: v.boolean(),
+  variants: v.array(v.object({
+    id: v.string(),
+    title: v.string(),
+    price: v.string(),
+    stockQuantity: v.number(),
+  })),
+  updatedAt: v.string(),
+});
+
+export const listForExportAdmin = query({
+  args: {
+    adminSecret: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    limit: v.optional(v.number()),
+  },
+  returns: paginationResultValidator(exportProductValidator),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    const result = await ctx.db
+      .query("products")
+      .order("desc")
+      .paginate({ numItems: Math.min(args.limit ?? 250, 500), cursor: args.cursor });
+    return {
+      ...result,
+      page: result.page.map((item) => ({
+        slug: item.slug,
+        title: item.title,
+        categorySlug: item.categorySlug,
+        availableForSale: item.availableForSale,
+        variants: item.variants.map((v) => ({
+          id: v.id,
+          title: v.title,
+          price: v.price,
+          stockQuantity: v.stockQuantity,
+        })),
+        updatedAt: item.updatedAt,
+      })),
+    };
+  },
+});
+
 const stockProductValidator = v.object({
   productId: v.id("products"),
   title: v.string(),
@@ -343,16 +389,9 @@ const stockProductValidator = v.object({
   })),
 });
 
-const stockPageValidator = v.object({
-  page: v.array(stockProductValidator),
-  isDone: v.boolean(),
-  continueCursor: v.string(),
-  threshold: v.number(),
-});
-
-function toLowVariants(variants: Doc<"products">["variants"]) {
+function toLowVariants(variants: Doc<"products">["variants"], threshold: number) {
   return variants
-    .filter((variant) => variant.stockQuantity <= LOW_STOCK_THRESHOLD)
+    .filter((variant) => variant.stockQuantity <= threshold)
     .map((variant) => ({
       id: variant.id,
       title: variant.title,
@@ -367,9 +406,12 @@ export const listStockAdmin = query({
     query: v.string(),
     paginationOpts: paginationOptsValidator,
   },
-  returns: stockPageValidator,
+  returns: paginationResultValidator(stockProductValidator).extend({
+    threshold: v.number(),
+  }),
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
+    const threshold = await resolveLowStockThreshold(ctx);
     if (args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 24) {
       throw new Error("Stok sayfa boyutu 1-24 arasında olmalı.");
     }
@@ -383,6 +425,7 @@ export const listStockAdmin = query({
       ).paginate(args.paginationOpts);
 
     return {
+      ...result,
       page: result.page.map((product) => ({
         productId: product._id,
         title: product.title,
@@ -394,9 +437,7 @@ export const listStockAdmin = query({
           stockQuantity: variant.stockQuantity,
         })),
       })),
-      isDone: result.isDone,
-      continueCursor: result.continueCursor,
-      threshold: LOW_STOCK_THRESHOLD,
+      threshold,
     };
   },
 });
@@ -413,17 +454,18 @@ export const lowStockAdmin = query({
   }),
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
+    const threshold = await resolveLowStockThreshold(ctx);
 
     const products = await ctx.db.query("products").order("desc").take(LOW_STOCK_SCAN_LIMIT);
     const page = products.flatMap((product) => {
-      const variants = toLowVariants(product.variants);
+      const variants = toLowVariants(product.variants, threshold);
       return variants.length === 0
         ? []
         : [{ productId: product._id, title: product.title, slug: product.slug, variants }];
     });
 
     return {
-      threshold: LOW_STOCK_THRESHOLD,
+      threshold,
       productCount: page.length,
       variantCount: page.reduce((sum, product) => sum + product.variants.length, 0),
       page,

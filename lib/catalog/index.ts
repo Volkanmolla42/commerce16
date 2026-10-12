@@ -24,6 +24,7 @@ export type StoreSettings = {
   address: string;
   announcement: string;
   isOpen: boolean;
+  lowStockThreshold: number;
 };
 
 export async function getStoreSettings(): Promise<StoreSettings> {

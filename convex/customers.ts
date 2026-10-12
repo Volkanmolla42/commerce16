@@ -3,8 +3,9 @@ import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
 import type { Doc, Id } from "./_generated/dataModel";
 
-const MAX_PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 100;
 const ORDER_HISTORY_LIMIT = 50;
+const MAX_CUSTOMER_SCAN_LIMIT = 5000;
 
 const customerSummaryValidator = v.object({
   key: v.string(),
@@ -73,7 +74,6 @@ export const listAdmin = query({
     query: v.string(),
     cursor: v.optional(v.string()),
     numItems: v.number(),
-    all: v.optional(v.boolean()),
   },
   returns: v.object({
     page: v.array(customerSummaryValidator),
@@ -84,13 +84,13 @@ export const listAdmin = query({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
     if (!Number.isInteger(args.numItems) || args.numItems < 1 || args.numItems > MAX_PAGE_SIZE) {
-      throw new Error("Müşteri sayfa boyutu 1-24 arasında olmalı.");
+      throw new Error(`Müşteri sayfa boyutu 1-${MAX_PAGE_SIZE} arasında olmalı.`);
     }
 
     const [users, orders, addresses] = await Promise.all([
-      ctx.db.query("users").collect(),
-      ctx.db.query("orders").collect(),
-      ctx.db.query("addresses").collect(),
+      ctx.db.query("users").order("desc").take(MAX_CUSTOMER_SCAN_LIMIT),
+      ctx.db.query("orders").order("desc").take(MAX_CUSTOMER_SCAN_LIMIT),
+      ctx.db.query("addresses").order("desc").take(MAX_CUSTOMER_SCAN_LIMIT),
     ]);
 
     const addressCounts = new Map<string, number>();
@@ -175,7 +175,7 @@ export const listAdmin = query({
 
     const parsedOffset = Number.parseInt(args.cursor ?? "", 10);
     const start = Number.isSafeInteger(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0;
-    const pageSize = args.all === true ? filtered.length : args.numItems;
+    const pageSize = args.numItems;
     const page = filtered.slice(start, start + pageSize);
     const nextOffset = start + page.length;
 
@@ -219,13 +219,25 @@ export const getAdmin = query({
       ? await ctx.db.query("addresses").withIndex("by_userId", (q) => q.eq("userId", userId)).collect()
       : [];
 
-    const orders = (await ctx.db.query("orders").collect())
-      .filter((order) => {
-        if (userId && order.userId === userId) return true;
-        if (order.userId) return false;
-        return Boolean(accountEmail) && order.customerEmail.trim().toLowerCase() === accountEmail;
-      })
-      .sort((a, b) => b._creationTime - a._creationTime);
+    const userOrders = userId
+      ? await ctx.db
+          .query("orders")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect()
+      : [];
+
+    const emailOrders = accountEmail
+      ? await ctx.db
+          .query("orders")
+          .withIndex("by_customerEmail", (q) => q.eq("customerEmail", accountEmail))
+          .collect()
+      : [];
+
+    const orderMap = new Map<string, Doc<"orders">>();
+    for (const order of [...userOrders, ...emailOrders]) {
+      orderMap.set(order._id, order);
+    }
+    const orders = [...orderMap.values()].sort((a, b) => b._creationTime - a._creationTime);
 
     const latestOrder = orders[0];
 

@@ -119,9 +119,19 @@ export const preInformationForm = {
   `.trim(),
 };
 
+function versionOf(title: string, body: string) {
+  const source = `${title}\n${body}`;
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function checkoutDocument(document: { title: string; slug: string; body: string }) {
   return {
     ...document,
+    version: versionOf(document.title, document.body),
     ready: document.body.trim().length >= 100 && !/\[[^\]]+\]/.test(document.body),
   };
 }

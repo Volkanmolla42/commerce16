@@ -2,8 +2,9 @@ import { CartProvider } from "@/components/cart/cart-context";
 import { FavoritesProvider } from "@/components/favorites/favorites-context";
 import { Navbar } from "@/components/layout/navbar";
 import { CookieConsentManager } from "@/components/privacy/cookie-consent-manager";
+import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { getStoreSettings } from "@/lib/catalog";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 export default async function StorefrontLayout({ children }: { children: ReactNode }) {
   const settings = await getStoreSettings();
@@ -11,6 +12,9 @@ export default async function StorefrontLayout({ children }: { children: ReactNo
   if (!settings.isOpen) {
     return (
       <>
+        <Suspense fallback={null}>
+          <AnalyticsProvider />
+        </Suspense>
         <main className="mx-auto grid min-h-[100dvh] w-full max-w-xl place-items-center px-4">
           <div className="text-center">
             <h1 className="text-2xl font-semibold tracking-tight">{settings.storeName} şu anda kapalı</h1>
@@ -27,6 +31,9 @@ export default async function StorefrontLayout({ children }: { children: ReactNo
 
   return (
     <>
+      <Suspense fallback={null}>
+        <AnalyticsProvider />
+      </Suspense>
       <div>
         <CartProvider>
           <FavoritesProvider>

@@ -1,7 +1,9 @@
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
+import { DEFAULT_LOW_STOCK_THRESHOLD, MAX_LOW_STOCK_THRESHOLD } from "../lib/catalog/low-stock";
 
 const defaultStoreName = "Mağaza";
 
@@ -15,6 +17,7 @@ const settingsShape = v.object({
   address: v.string(),
   announcement: v.string(),
   isOpen: v.boolean(),
+  lowStockThreshold: v.number(),
 });
 
 function withDefaults(settings?: {
@@ -26,6 +29,7 @@ function withDefaults(settings?: {
   address?: string;
   announcement?: string;
   isOpen?: boolean;
+  lowStockThreshold?: number;
 } | null) {
   return {
     storeName: settings?.storeName ?? defaultStoreName,
@@ -37,7 +41,17 @@ function withDefaults(settings?: {
     address: settings?.address ?? "",
     announcement: settings?.announcement ?? "",
     isOpen: settings?.isOpen ?? true,
+    lowStockThreshold: settings?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD,
   };
+}
+
+// Düşük stok eşiği mağaza ayarından okunur; ayarlanmadıysa varsayılana düşer.
+export async function resolveLowStockThreshold(ctx: QueryCtx | MutationCtx) {
+  const settings = await ctx.db
+    .query("storeSettings")
+    .withIndex("by_key", (q) => q.eq("key", "store"))
+    .unique();
+  return settings?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD;
 }
 
 export const getStoreSettings = query({
@@ -74,6 +88,7 @@ export const updateStoreSettings = mutation({
     address: v.string(),
     announcement: v.string(),
     isOpen: v.boolean(),
+    lowStockThreshold: v.number(),
   },
   returns: settingsShape,
   handler: async (ctx, args) => {
@@ -91,6 +106,9 @@ export const updateStoreSettings = mutation({
         throw new Error("Logo görseli bulunamadı.");
       }
     }
+    if (!Number.isSafeInteger(args.lowStockThreshold) || args.lowStockThreshold < 0 || args.lowStockThreshold > MAX_LOW_STOCK_THRESHOLD) {
+      throw new Error(`Düşük stok eşiği 0 ile ${MAX_LOW_STOCK_THRESHOLD} arasında tam sayı olmalı.`);
+    }
     const next = {
       storeName,
       slogan: clean(args.slogan, 140),
@@ -100,6 +118,7 @@ export const updateStoreSettings = mutation({
       address: clean(args.address, 300),
       announcement: clean(args.announcement, 160),
       isOpen: args.isOpen,
+      lowStockThreshold: args.lowStockThreshold,
     };
 
     const existing = await ctx.db
