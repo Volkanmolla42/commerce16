@@ -1,6 +1,8 @@
 import { getMenu, getStoreSettings } from "@/lib/catalog";
 import Link from "next/link";
 import { Suspense } from "react";
+import Image from "next/image";
+import StoreInitial from "@/components/store-initial";
 import MobileMenu from "./mobile-menu";
 import { AllCategoriesMenu } from "./all-categories-menu";
 import Search, { SearchSkeleton } from "./search";
@@ -25,9 +27,23 @@ export async function Navbar() {
             href="/"
             prefetch={true}
             aria-label={settings.storeName}
-            className="min-w-0 truncate text-xs font-semibold tracking-wider uppercase text-black transition hover:opacity-90 sm:text-sm dark:text-white"
+            className="flex min-w-0 items-center gap-2.5 text-xs font-semibold tracking-wider uppercase text-black transition hover:opacity-90 sm:text-sm dark:text-white"
           >
-            {settings.storeName}
+            <span className="hidden md:flex shrink-0 items-center">
+              {settings.logoUrl ? (
+                <Image
+                  src={settings.logoUrl}
+                  alt={settings.storeName}
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="size-8 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-neutral-950"
+                />
+              ) : (
+                <StoreInitial storeName={settings.storeName} size="sm" />
+              )}
+            </span>
+            <span className="truncate">{settings.storeName}</span>
           </Link>
 
           {categories.length ? (

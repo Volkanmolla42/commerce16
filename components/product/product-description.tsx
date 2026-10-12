@@ -218,7 +218,7 @@ export function ProductDescription({ product }: { product: Product }) {
           )}
         </div>
       </div>
-      {!isCartReplacement && !needsVariantSelection && isAvailableForSale && (
+      {!isCartReplacement && !needsVariantSelection && isAvailableForSale && (!variant || variant.availableForSale) && (
         <div className="mt-3">
           <QuickBuyButton
             product={purchaseProduct}

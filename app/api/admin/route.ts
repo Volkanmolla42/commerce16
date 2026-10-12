@@ -295,11 +295,16 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ uploadUrl });
       }
-      case "product.image-url": {
+      case "product.image-upload-urls": {
+        const uploadUrls = await client.mutation(api.products.generateImageUploadUrls, {
+          adminSecret, count: Number(input.count),
+        });
+        return NextResponse.json({ uploadUrls });
+      }
+      case "product.image-discard": {
         const storageId = stringValue(input.storageId, "Görsel kimliği") as Id<"_storage">;
-        const url = await client.query(api.products.getImageUrl, { adminSecret, storageId });
-        if (!url) throw new Error("Yüklenen görsel bulunamadı.");
-        return NextResponse.json({ url });
+        await client.mutation(api.products.discardImageUpload, { adminSecret, storageId });
+        return NextResponse.json({ success: true });
       }
       case "product.create": {
         const result = await client.mutation(api.products.create, {

@@ -1,5 +1,27 @@
 import type { Product, ProductVariant } from "./types";
 
+export const MAX_CART_QUANTITY = 999;
+// Tüm ürünlerin en az bir varyantı olmak zorunda; bu değer yalnızca stockQuantity taşımayan bayat önbellek sepetleri içindir.
+export const UNLIMITED_STOCK = MAX_CART_QUANTITY;
+
+type StockVariant = {
+  id: string;
+  stockQuantity?: number;
+  availableForSale: boolean;
+};
+
+/** Tek stok kuralı: varyant satışta VE stoğu sıfırdan büyük olmalı. */
+export function isVariantSellable(variant: StockVariant): boolean {
+  return variant.availableForSale && (variant.stockQuantity ?? 0) > 0;
+}
+
+export function getVariantStock(product: { variants?: StockVariant[] }, variantId?: string): number {
+  const variant = variantId
+    ? product.variants?.find((candidate) => candidate.id === variantId)
+    : (product.variants?.length === 1 ? product.variants[0] : undefined);
+  return variant?.stockQuantity !== undefined ? Math.max(0, variant.stockQuantity) : UNLIMITED_STOCK;
+}
+
 type ProductPriceSource = {
   price?: string;
   priceRange?: { min: string; max: string };

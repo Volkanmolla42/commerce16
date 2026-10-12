@@ -33,6 +33,7 @@ export type ProductVariant = {
     value: string;
   }[];
   price: Money;
+  stockQuantity?: number;
 };
 
 export type ProductImage = {

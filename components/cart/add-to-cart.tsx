@@ -25,7 +25,7 @@ export function AddToCart({
   onAdded?: () => void;
   hideCartLinkOnMobile?: boolean;
 }) {
-  const { addItem, replaceItem } = useCart();
+  const { addItem, replaceItem, items, getItemMaxStock } = useCart();
   const [added, setAdded] = useState(false);
   const [replaced, setReplaced] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -33,9 +33,15 @@ export function AddToCart({
   const selectedVariant = variant ?? getSelectedVariant(product, new URLSearchParams());
   const needsSelection = Boolean(product.variants?.length && !selectedVariant);
   const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
+  const cartQuantity = items.find(
+    (i) => i.product.id === product.id && i.variantId === selectedVariant?.id
+  )?.quantity ?? 0;
+  const stockLimit = getItemMaxStock(product.id, selectedVariant?.id);
+  const isMaxStockReached = cartQuantity >= stockLimit;
+  const canAdd = isAvailable && !isMaxStockReached;
 
   const handleAdd = (origin?: HTMLElement) => {
-    if (!isAvailable) return;
+    if (!canAdd) return;
     const selectedProduct = selectedVariant
       ? { ...product, price: selectedVariant.price.amount, images: getVariantImages(product, selectedVariant), title: getProductVariantTitle(product.title, selectedVariant) }
       : product;
@@ -60,7 +66,7 @@ export function AddToCart({
         size="lg"
         variant={buttonVariant}
         onClick={(event) => handleAdd(event.currentTarget)}
-        disabled={!isAvailable}
+        disabled={!canAdd}
         aria-label="Sepete Ekle"
         className="h-12 w-full rounded-xl text-sm font-semibold shadow-none gap-2"
       >
@@ -73,6 +79,8 @@ export function AddToCart({
           <span>Seçenekleri seçin</span>
         ) : !isAvailable ? (
           <span>Tükendi</span>
+        ) : isMaxStockReached ? (
+          <span>Maksimum Stok Sepette ({stockLimit} Adet)</span>
         ) : (
           <>
             <ShoppingBagIcon className="h-5 w-5" />

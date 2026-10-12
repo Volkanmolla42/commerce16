@@ -3,9 +3,11 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import type { FunctionReturnType } from "convex/server";
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { insertCatalogProduct, patchCatalogProduct, deleteCatalogProduct } from "./catalogModel";
 import { createCatalogSearchMatcher } from "../lib/catalog/smart-search";
+
+import { RateLimiter } from "@convex-dev/rate-limiter";
 
 const modules = import.meta.glob("./**/*.ts");
 const secret = "catalog-test-secret";
@@ -19,8 +21,14 @@ const product = (index: number, availableForSale = true, price = String(index + 
   availableForSale, updatedAt: "2026-01-01T00:00:00.000Z",
 });
 
-beforeEach(() => vi.stubEnv("ADMIN_API_SECRET", secret));
-afterEach(() => vi.unstubAllEnvs());
+beforeEach(() => {
+  vi.stubEnv("ADMIN_API_SECRET", secret);
+  vi.spyOn(RateLimiter.prototype, "limit").mockResolvedValue({ ok: true } as any);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe("indexed catalog pages", () => {
   it("reaches every product without duplicates using bounded cursor pages", async () => {
@@ -227,5 +235,110 @@ describe("atomic catalog read models", () => {
     })).rejects.toThrow("rollback");
     expect(await t.query(api.catalog.stats, { adminSecret: secret })).toEqual({ total: 0, active: 0 });
     expect((await t.query(api.catalog.page, args)).page).toEqual([]);
+  });
+
+  it("marks out-of-stock variants as not available for sale", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(api.products.create, {
+      title: "Etek", slug: "etek", images: [],
+      options: [{ id: "color", name: "Renk", values: ["Kırmızı", "Siyah"] }],
+      availableForSale: true, adminSecret: secret,
+      variants: [
+        { id: "v1", title: "Kırmızı", selectedOptions: [{ name: "Renk", value: "Kırmızı" }], price: "100", stockQuantity: 0, sku: "SKU-RED", availableForSale: true },
+        { id: "v2", title: "Siyah", selectedOptions: [{ name: "Renk", value: "Siyah" }], price: "100", stockQuantity: 5, sku: "SKU-BLK", availableForSale: true },
+      ],
+    });
+
+    const availability = await t.query(api.products.getAvailability, { productId: id });
+    expect(availability).toEqual({
+      availableForSale: true,
+      variants: [
+        { id: "v1", availableForSale: false },
+        { id: "v2", availableForSale: true },
+      ],
+    });
+
+    const productBySlug = await t.query(api.products.getBySlug, { slug: "etek" });
+    expect(productBySlug?.variants.find((v) => v.id === "v1")?.availableForSale).toBe(false);
+    expect(productBySlug?.variants.find((v) => v.id === "v2")?.availableForSale).toBe(true);
+  });
+});
+
+
+describe("order stock reservation", () => {
+  const stockyProduct = () => {
+    const { updatedAt: _, ...base } = product(0, true, "10");
+    return {
+      ...base,
+      variants: [{ id: "v-0", title: "Ürünün kendisi", selectedOptions: [], price: "10", stockQuantity: 5, availableForSale: true, sku: "TEST-SKU-0" }],
+    };
+  };
+  const orderArgs = (productId: string, variantId: string, quantity: number, email: string) => ({
+    customerEmail: email,
+    customerName: "Test Müşteri",
+    items: [{ productId, variantId, title: "Test ürün", quantity, price: "10" }],
+    total: (10 * quantity).toFixed(2),
+    provinceId: "1",
+    districtId: "1104",
+  });
+  const getStock = (t: ReturnType<typeof convexTest>, productId: string) =>
+    t.run(async (ctx) => (await ctx.db.get(productId as never))!.variants[0].stockQuantity);
+
+  it("reserves stock at order creation and rejects orders exceeding stock", async () => {
+    const t = convexTest(schema, modules);
+    const productId = await t.mutation(api.products.create, { ...stockyProduct(), adminSecret: secret });
+
+    await t.mutation(api.orders.createOrder, orderArgs(productId, "v-0", 2, "first@test.com"));
+    expect(await getStock(t, productId)).toBe(3);
+
+    await t.mutation(api.orders.createOrder, orderArgs(productId, "v-0", 3, "second@test.com"));
+    expect(await getStock(t, productId)).toBe(0);
+
+    await expect(t.mutation(api.orders.createOrder, orderArgs(productId, "v-0", 1, "third@test.com")))
+      .rejects.toThrow("tükendi veya yetersiz stok");
+  });
+
+  it("restores reserved stock when an order is cancelled", async () => {
+    const t = convexTest(schema, modules);
+    const productId = await t.mutation(api.products.create, { ...stockyProduct(), adminSecret: secret });
+    const orderId = await t.mutation(api.orders.createOrder, orderArgs(productId, "v-0", 2, "cancel@test.com"));
+    expect(await getStock(t, productId)).toBe(3);
+
+    await t.mutation(api.orders.updateStatus, { adminSecret: secret, id: orderId, status: "cancelled" });
+    expect(await getStock(t, productId)).toBe(5);
+  });
+
+  it("aggregates duplicate variant lines before validating stock", async () => {
+    const t = convexTest(schema, modules);
+    const productId = await t.mutation(api.products.create, { ...stockyProduct(), adminSecret: secret });
+    const line = { productId, variantId: "v-0", title: "Test ürün", quantity: 3, price: "10" };
+
+    await expect(t.mutation(api.orders.createOrder, {
+      customerEmail: "dup@test.com", customerName: "Test Müşteri",
+      items: [line, { ...line }], total: "60.00",
+      provinceId: "1", districtId: "1104",
+    })).rejects.toThrow("tükendi veya yetersiz stok");
+    expect(await getStock(t, productId)).toBe(5);
+  });
+
+  it("cancels stale pending orders and restores reserved stock", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const productId = await t.mutation(api.products.create, { ...stockyProduct(), adminSecret: secret });
+      const orderId = await t.mutation(api.orders.createOrder, orderArgs(productId, "v-0", 2, "stale@test.com"));
+      expect(await getStock(t, productId)).toBe(3);
+
+      // Zamanı 3 saat ileri alalım
+      vi.setSystemTime(Date.now() + 3 * 60 * 60 * 1000);
+
+      await t.mutation(internal.orders.cancelStalePending, {});
+
+      expect(await getStock(t, productId)).toBe(5);
+      const order = await t.run(async (ctx) => ctx.db.get(orderId));
+      expect(order?.status).toBe("cancelled");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

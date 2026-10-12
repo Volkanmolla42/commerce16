@@ -4,6 +4,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { assertAdminApiSecret } from "./adminAuth";
 import { getImagesForVariant } from "../lib/catalog/product-images";
+import { MAX_CART_QUANTITY, isVariantSellable } from "../lib/catalog/variants";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   sync: { kind: "fixed window", rate: 30, period: 60 * 1000 },
@@ -47,23 +48,31 @@ export const sync = mutation({
     }
 
     const itemMap = new Map<string, { productId: typeof args.items[number]["productId"]; variantId?: string; quantity: number }>();
+
     for (const item of args.items) {
-      if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) {
-        throw new Error("Sepetteki ürün adedi geçersiz.");
+      if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > MAX_CART_QUANTITY) {
+        continue;
       }
       const product = await ctx.db.get(item.productId);
-      if (!product || !product.availableForSale) throw new Error("Sepetinizde satışta olmayan bir ürün var.");
+      if (!product || !product.availableForSale) continue;
       const variants = product.variants ?? [];
       const variantId = item.variantId ?? (variants.length === 1 ? variants[0].id : undefined);
-      if (variants.length > 0 && !variantId) throw new Error("Sepetinizde ürün seçeneği eksik.");
+      if (variants.length > 0 && !variantId) continue;
       const variant = variantId ? variants.find((candidate) => candidate.id === variantId) : undefined;
-      if (variantId && (!variant || !variant.availableForSale)) throw new Error("Sepetinizde satışta olmayan bir ürün seçeneği var.");
+      if (variantId && (!variant || !isVariantSellable(variant))) continue;
 
       const key = `${item.productId}:${variantId ?? ""}`;
       const previous = itemMap.get(key);
-      const quantity = (previous?.quantity ?? 0) + item.quantity;
-      if (quantity > 999) throw new Error("Ürün adedi izin verilen sınırı aşıyor.");
-      itemMap.set(key, { productId: item.productId, ...(variantId ? { variantId } : {}), quantity });
+      const totalRequested = (previous?.quantity ?? 0) + item.quantity;
+      if (totalRequested > MAX_CART_QUANTITY) continue;
+      const finalQuantity = variant ? Math.min(totalRequested, variant.stockQuantity) : totalRequested;
+      if (finalQuantity <= 0) continue;
+      itemMap.set(key, { productId: item.productId, ...(variantId ? { variantId } : {}), quantity: finalQuantity });
+    }
+
+    if (itemMap.size === 0) {
+      if (existing) await ctx.db.delete(existing._id);
+      return null;
     }
 
     const now = Date.now();

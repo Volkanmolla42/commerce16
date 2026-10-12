@@ -1,4 +1,3 @@
-import { CartProvider } from "@/components/cart/cart-context";
 import { CookieConsentManager } from "@/components/privacy/cookie-consent-manager";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import StoreInitial from "@/components/store-initial";
@@ -42,7 +41,6 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
       <Suspense fallback={null}>
         <AnalyticsProvider />
       </Suspense>
-      <CartProvider>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
         {/* Distraction-free Checkout Header */}
         <header className="sticky top-0 z-30 w-full border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -84,7 +82,6 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
         <main>{children}</main>
       </div>
       <CookieConsentManager />
-    </CartProvider>
-  </>
+    </>
   );
 }

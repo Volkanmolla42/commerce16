@@ -7,7 +7,7 @@ import schema from "./schema";
 import { insertCatalogProduct, patchCatalogProduct, deleteCatalogProduct, withoutCatalogMetadata } from "./catalogModel";
 import { assertAdminApiSecret } from "./adminAuth";
 import { resolveLowStockThreshold } from "./settings";
-import { getProductPriceRange } from "../lib/catalog/variants";
+import { getProductPriceRange, isVariantSellable } from "../lib/catalog/variants";
 import { catalogSearchQuery } from "../lib/catalog/smart-search";
 import {
   normalizeVariantSkus,
@@ -37,6 +37,7 @@ const publicVariantValidator = v.object({
   price: v.string(),
   sku: v.optional(v.string()),
   barcode: v.optional(v.string()),
+  stockQuantity: v.optional(v.number()),
 });
 const productValidator = productDocumentValidator.omit(
   "images", "variants", "priceValue",
@@ -151,22 +152,24 @@ async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
     const url = await ctx.storage.getUrl(storageId);
     return url ? { url, ...(selectedOptions ? { selectedOptions } : {}) } : null;
   }));
+  const variants = product.variants.map((variant) => ({
+    ...variant,
+    stockQuantity: Math.max(0, variant.stockQuantity),
+    availableForSale: isVariantSellable(variant),
+  }));
+  const hasInStockVariant = variants.some((variant) => variant.availableForSale);
   return {
     _id: product._id,
     _creationTime: product._creationTime,
     slug: product.slug,
     title: product.title,
     price: getProductPriceRange(product).min,
-    availableForSale: product.availableForSale,
+    availableForSale: product.availableForSale && hasInStockVariant,
     attributes: product.attributes,
     categorySlug: product.categorySlug,
     images: images.filter((image): image is NonNullable<typeof image> => Boolean(image)),
     options: product.options,
-    variants: product.variants.map((variant) => {
-      const { stockQuantity, ...publicVariant } = variant;
-      void stockQuantity;
-      return publicVariant;
-    }),
+    variants,
     updatedAt: product.updatedAt,
   };
 }
@@ -502,9 +505,14 @@ export const getAvailability = query({
   handler: async (ctx, { productId }) => {
     const product = await ctx.db.get(productId);
     if (!product) return null;
+    const variants = product.variants ?? [];
+    const hasInStockVariants = variants.some(isVariantSellable);
     return {
-      availableForSale: product.availableForSale,
-      variants: (product.variants ?? []).map(({ id, availableForSale }) => ({ id, availableForSale })),
+      availableForSale: product.availableForSale && hasInStockVariants,
+      variants: variants.map((variant) => ({
+        id: variant.id,
+        availableForSale: isVariantSellable(variant),
+      })),
     };
   },
 });
@@ -538,6 +546,64 @@ export const getByIds = query({
       if (product?.availableForSale) products.push(await withPublicImageUrls(ctx, product));
     }
     return products;
+  },
+});
+
+export const validateCart = query({
+  args: {
+    items: v.array(v.object({
+      productId: v.id("products"),
+      variantId: v.optional(v.string()),
+    })),
+  },
+  returns: v.array(v.object({
+    productId: v.id("products"),
+    variantId: v.optional(v.string()),
+    available: v.boolean(),
+    stockQuantity: v.number(),
+    title: v.string(),
+  })),
+  handler: async (ctx, { items }) => {
+    if (items.length > 100) throw new Error("En fazla 100 ürün kontrol edilebilir.");
+    const results = [];
+    for (const item of items) {
+      const product = await ctx.db.get(item.productId);
+      if (!product || !product.availableForSale) {
+        results.push({
+          productId: item.productId,
+          variantId: item.variantId,
+          available: false,
+          stockQuantity: 0,
+          title: product?.title ?? "Ürün",
+        });
+        continue;
+      }
+      const variants = product.variants ?? [];
+      const variant = item.variantId
+        ? variants.find((candidate) => candidate.id === item.variantId)
+        : (variants.length === 1 ? variants[0] : undefined);
+      if (!variant) {
+        results.push({
+          productId: item.productId,
+          variantId: item.variantId,
+          available: false,
+          stockQuantity: 0,
+          title: product.title,
+        });
+        continue;
+      }
+      const isAvailable = isVariantSellable(variant);
+      results.push({
+        productId: item.productId,
+        variantId: item.variantId,
+        available: isAvailable,
+        stockQuantity: Math.max(0, variant.stockQuantity),
+        title: variant.selectedOptions.length
+          ? `${product.title} (${variant.selectedOptions.map((o) => o.value).join(", ")})`
+          : product.title,
+      });
+    }
+    return results;
   },
 });
 
@@ -616,6 +682,11 @@ export const remove = mutation({
     assertAdminApiSecret(args.adminSecret);
     const product = await ctx.db.get(args.id);
     if (product) {
+      for (const image of product.images) {
+        if (await ctx.db.system.get("_storage", image.storageId)) {
+          await ctx.storage.delete(image.storageId);
+        }
+      }
       const registry = await ctx.db.query("productSkus")
         .withIndex("by_product", (q) => q.eq("productId", args.id))
         .take(101);
@@ -637,14 +708,40 @@ export const generateImageUploadUrl = mutation({
   },
 });
 
-export const getImageUrl = query({
+export const generateImageUploadUrls = mutation({
+  args: {
+    adminSecret: v.string(),
+    count: v.number(),
+  },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    if (!Number.isInteger(args.count) || args.count < 1 || args.count > 20) {
+      throw new Error("Geçersiz görsel sayısı.");
+    }
+    const urls: string[] = [];
+    for (let i = 0; i < args.count; i++) {
+      urls.push(await ctx.storage.generateUploadUrl());
+    }
+    return urls;
+  },
+});
+
+export const discardImageUpload = mutation({
   args: {
     adminSecret: v.string(),
     storageId: v.id("_storage"),
   },
-  returns: v.union(v.string(), v.null()),
+  returns: v.null(),
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
-    return await ctx.storage.getUrl(args.storageId);
+    for await (const product of ctx.db.query("products")) {
+      if (product.images.some((image) => image.storageId === args.storageId)) {
+        return null;
+      }
+    }
+    await ctx.storage.delete(args.storageId);
+    return null;
   },
 });
+

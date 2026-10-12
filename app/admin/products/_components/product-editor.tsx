@@ -34,7 +34,29 @@ type StoredImage = NonNullable<Doc<"products">["images"]>[number] & {
 };
 export type Product = Omit<Doc<"products">, "priceValue" | "images"> & { images: StoredImage[] };
 export type Category = Doc<"categories">;
-type PendingImage = { id: string; blob: Blob; fileName: string; previewUrl: string; selectedOptions?: { name: string; value: string }[] };
+type ResolvedPendingImage = { storageId: string; fileName: string; selectedOptions?: { name: string; value: string }[] };
+type PendingImage = {
+  id: string;
+  blob: Blob;
+  fileName: string;
+  previewUrl: string;
+  status: "uploading" | "uploaded" | "error";
+  storageId?: string;
+  uploadPromise?: Promise<string | null>;
+  selectedOptions?: { name: string; value: string }[];
+};
+type ExitState = {
+  isExisting: boolean;
+  saved: boolean;
+  title: string;
+  slug: string;
+  categorySlug: string;
+  attributeValues: Record<string, string | string[]>;
+  categoryAttributes: CategoryAttributeDefinition[];
+  variantOptions: { id: string; name: string; values: string[] }[];
+  variantRows: VariantDraft[];
+  pendingImages: PendingImage[];
+};
 type VariantOptionDraft = { id: string; name: string; values: string[] };
 type VariantDraft = {
   id?: string;
@@ -86,6 +108,155 @@ async function convertImageToWebp(file: File) {
 
 function productImageFileName(productTitle: string, index: number) {
   return `${slugify(productTitle) || "urun"}-${index + 1}.webp`;
+}
+
+async function uploadWebpToStorage(uploadUrl: string, blob: Blob) {
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": "image/webp" },
+    body: blob,
+  });
+  if (!response.ok) throw new Error("WebP görsel Convex Storage'a yüklenemedi.");
+  const uploaded: unknown = await response.json();
+  if (
+    typeof uploaded !== "object" || uploaded === null ||
+    !("storageId" in uploaded) || typeof uploaded.storageId !== "string"
+  ) {
+    throw new Error("Yüklenen görselin kimliği alınamadı.");
+  }
+  return uploaded.storageId;
+}
+
+function toResolvedPendingImage(image: PendingImage): ResolvedPendingImage {
+  return {
+    storageId: image.storageId!,
+    fileName: image.fileName,
+    ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
+  };
+}
+
+function imagesPayload(images: { storageId: string; fileName: string; selectedOptions?: { name: string; value: string }[] }[]) {
+  return images.map((image) => ({
+    storageId: image.storageId,
+    fileName: image.fileName,
+    ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
+  }));
+}
+
+function draftAttributes(
+  categoryAttributes: CategoryAttributeDefinition[],
+  attributeValues: Record<string, string | string[]>,
+): ProductAttribute[] {
+  const attributes: ProductAttribute[] = [];
+  for (const definition of categoryAttributes) {
+    const raw = attributeValues[definition.key];
+    if (definition.type === "multiselect") {
+      const list = Array.isArray(raw) ? raw.filter(Boolean) : [];
+      if (list.length > 0) attributes.push({ key: definition.key, value: list });
+    } else if (definition.type === "number") {
+      const str = typeof raw === "string" ? raw.trim() : "";
+      if (str && Number.isFinite(Number(str))) attributes.push({ key: definition.key, value: Number(str) });
+    } else if (definition.type === "boolean") {
+      const str = typeof raw === "string" ? raw.trim() : "";
+      if (str) attributes.push({ key: definition.key, value: str === "true" });
+    } else {
+      const str = typeof raw === "string" ? raw.trim() : "";
+      if (str) attributes.push({ key: definition.key, value: str });
+    }
+  }
+  return attributes;
+}
+
+function minimalDraftPayload(uploaded: ResolvedPendingImage[]) {
+  const slug = `taslak-${Date.now()}`;
+  return {
+    title: "Taslak",
+    slug,
+    categorySlug: "",
+    attributes: [] as ProductAttribute[],
+    images: imagesPayload(uploaded),
+    availableForSale: false,
+    options: [],
+    variants: [{
+      id: createEditorId(),
+      selectedOptions: [],
+      title: "Ürünün kendisi",
+      price: "0",
+      stockQuantity: 0,
+      availableForSale: false,
+      sku: generatedVariantSku(slug, []),
+    }],
+  };
+}
+
+function draftSaveAttempts(state: ExitState, uploaded: ResolvedPendingImage[]) {
+  const slug = state.slug.trim() || `taslak-${Date.now()}`;
+  const full = {
+    title: state.title.trim() || "Taslak",
+    slug,
+    categorySlug: state.categorySlug,
+    attributes: draftAttributes(state.categoryAttributes, state.attributeValues),
+    images: imagesPayload(uploaded),
+    availableForSale: false,
+    options: state.variantOptions
+      .map((option) => ({ id: option.id, name: option.name.trim(), values: option.values.map((value) => value.trim()).filter(Boolean) }))
+      .filter((option) => option.name && option.values.length > 0),
+    variants: state.variantRows.map((variant) => {
+      const selectedOptions = variant.selectedOptions;
+      return {
+        id: variant.id || createEditorId(),
+        sku: variant.sku.trim() || generatedVariantSku(slug, selectedOptions),
+        ...(variant.barcode?.trim() ? { barcode: variant.barcode.trim() } : {}),
+        title: selectedOptions.map(({ value }) => value).join(" / ") || "Ürünün kendisi",
+        selectedOptions,
+        price: /^\d+([.,]\d{1,2})?$/.test(variant.price.trim()) ? variant.price.trim().replace(",", ".") : "0",
+        stockQuantity: Number(variant.stockQuantity) || 0,
+        availableForSale: false,
+      };
+    }),
+  };
+  return [full, minimalDraftPayload(uploaded)];
+}
+
+async function postAdminAction(action: string, input: unknown) {
+  return fetch("/api/admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, input }),
+    keepalive: true,
+  });
+}
+
+async function resolveStatePendingImages(state: ExitState): Promise<ResolvedPendingImage[]> {
+  const uploaded: ResolvedPendingImage[] = [];
+  for (const image of state.pendingImages) {
+    const storageId = image.storageId ?? (image.uploadPromise ? await image.uploadPromise : null);
+    if (storageId) {
+      uploaded.push(toResolvedPendingImage({ ...image, storageId }));
+    }
+  }
+  return uploaded;
+}
+
+// true: yapılacak iş yoktu ya da başarıyla tamamlandı; false: taslak denemeleri başarısız oldu (tekrar denenebilir).
+async function flushExitState(state: ExitState): Promise<boolean> {
+  const uploaded = await resolveStatePendingImages(state);
+  if (uploaded.length === 0) return true;
+  if (state.isExisting) {
+    for (const image of uploaded) {
+      void postAdminAction("product.image-discard", { storageId: image.storageId }).catch(() => {});
+    }
+    return true;
+  }
+  for (const input of draftSaveAttempts(state, uploaded)) {
+    try {
+      const response = await postAdminAction("product.create", input);
+      if (response.ok) return true;
+    } catch {
+      // sonraki deneme
+    }
+  }
+  return false;
 }
 
 function createEditorId() {
@@ -166,6 +337,8 @@ function ProductEditor({
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [processingImages, setProcessingImages] = useState(false);
   const previewUrls = useRef<string[]>([]);
+  const savedRef = useRef(false);
+  const exitStateRef = useRef<ExitState | null>(null);
   const [availableForSale, setAvailableForSale] = useState(product?.availableForSale ?? true);
   const [variantRows, setVariantRows] = useState<VariantDraft[]>(() => {
     const existingVariants = (product?.variants ?? []).map((variant) => ({
@@ -192,6 +365,17 @@ function ProductEditor({
 
   const categoryAttributes = categories.find((category) => category.slug === categorySlug)?.attributes ?? [];
 
+  exitStateRef.current = {
+    isExisting: Boolean(product),
+    saved: savedRef.current,
+    title, slug, categorySlug, attributeValues, categoryAttributes,
+    variantOptions, variantRows, pendingImages,
+  };
+
+  const uploadingCount = pendingImages.filter((image) => image.status === "uploading").length;
+  const uploadedCount = pendingImages.filter((image) => image.status === "uploaded").length;
+  const failedCount = pendingImages.filter((image) => image.status === "error").length;
+
   const changeCategory = (nextSlug: string) => {
     setCategorySlug(nextSlug);
     const nextKeys = new Set(categories.find((category) => category.slug === nextSlug)?.attributes?.map((attribute) => attribute.key) ?? []);
@@ -200,6 +384,41 @@ function ProductEditor({
 
   useEffect(() => () => {
     for (const url of previewUrls.current) URL.revokeObjectURL(url);
+  }, []);
+
+  useEffect(() => {
+    const mountedAt = Date.now();
+    return () => {
+      // StrictMode dev'de efekti çift çalıştırır; koruma yalnızca dev'de, prod tam davranır.
+      if (process.env.NODE_ENV === "development" && Date.now() - mountedAt < 1500) return;
+      const state = exitStateRef.current;
+      if (!state || state.saved) return;
+      void flushExitState(state);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      const state = exitStateRef.current;
+      if (!state || state.saved) return;
+      const uploaded = state.pendingImages.filter((image) => image.storageId).map(toResolvedPendingImage);
+      if (uploaded.length === 0) return;
+      if (state.isExisting) {
+        for (const image of uploaded) {
+          navigator.sendBeacon("/api/admin", new Blob(
+            [JSON.stringify({ action: "product.image-discard", input: { storageId: image.storageId } })],
+            { type: "application/json" },
+          ));
+        }
+        return;
+      }
+      navigator.sendBeacon("/api/admin", new Blob(
+        [JSON.stringify({ action: "product.create", input: minimalDraftPayload(uploaded) })],
+        { type: "application/json" },
+      ));
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
   const addVariantOption = () => {
@@ -427,20 +646,48 @@ function ProductEditor({
     setProcessingImages(true);
     setError(null);
     try {
-      const nextImages: PendingImage[] = [];
-      for (const [index, file] of files.entries()) {
-        const blob = await convertImageToWebp(file);
-        const position = images.length + pendingImages.length + index;
-        const fileName = productImageFileName(title || slug || "urun", position);
+      const blobs = await Promise.all(files.map((file) => convertImageToWebp(file)));
+      const startIndex = images.length + pendingImages.length;
+      const { uploadUrls } = await runAdminAction<{ uploadUrls: string[] }>("product.image-upload-urls", {
+        count: blobs.length,
+      });
+      const nextImages: PendingImage[] = blobs.map((blob, index) => {
+        const id = createEditorId();
+        const fileName = productImageFileName(title || slug || "urun", startIndex + index);
         const previewUrl = URL.createObjectURL(blob);
         previewUrls.current.push(previewUrl);
-        nextImages.push({ id: createEditorId(), blob, fileName, previewUrl });
-      }
+        const uploadPromise = (async () => {
+          try {
+            const storageId = await uploadWebpToStorage(uploadUrls[index], blob);
+            setPendingImages((current) => current.map((item) => item.id === id
+              ? { ...item, status: "uploaded", storageId }
+              : item));
+            return storageId;
+          } catch (cause) {
+            console.error(cause);
+            setPendingImages((current) => current.map((item) => item.id === id
+              ? { ...item, status: "error" }
+              : item));
+            return null;
+          }
+        })();
+        return { id, blob, fileName, previewUrl, status: "uploading" as const, uploadPromise };
+      });
       setPendingImages((current) => [...current, ...nextImages]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Görsel WebP'ye çevrilemedi.");
+      setError(cause instanceof Error ? cause.message : "Görsel yüklenemedi.");
     } finally {
       setProcessingImages(false);
+    }
+  };
+
+  const discardPendingImage = (image: PendingImage) => {
+    if (image.storageId) {
+      void runAdminAction("product.image-discard", { storageId: image.storageId }).catch(() => {});
+    } else if (image.uploadPromise) {
+      void image.uploadPromise.then((storageId) => {
+        if (storageId) void runAdminAction("product.image-discard", { storageId }).catch(() => {});
+      });
     }
   };
 
@@ -448,32 +695,19 @@ function ProductEditor({
     URL.revokeObjectURL(image.previewUrl);
     previewUrls.current = previewUrls.current.filter((url) => url !== image.previewUrl);
     setPendingImages((current) => current.filter((item) => item.id !== image.id));
+    discardPendingImage(image);
   };
 
-  const uploadPendingImage = async (image: PendingImage, fileName: string): Promise<StoredImage> => {
-    const { uploadUrl } = await runAdminAction<{ uploadUrl: string }>("product.image-upload-url");
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": "image/webp" },
-      body: image.blob,
-    });
-    if (!response.ok) throw new Error("WebP görsel Convex Storage'a yüklenemedi.");
-
-    const uploaded: unknown = await response.json();
-    if (
-      typeof uploaded !== "object" || uploaded === null ||
-      !("storageId" in uploaded) || typeof uploaded.storageId !== "string"
-    ) {
-      throw new Error("Yüklenen görselin kimliği alınamadı.");
+  const handleExit = async () => {
+    const state = exitStateRef.current;
+    if (state && !state.saved) {
+      const handled = await flushExitState(state);
+      if (handled) {
+        savedRef.current = true;
+        if (exitStateRef.current) exitStateRef.current.saved = true;
+      }
     }
-
-    const { url } = await runAdminAction<{ url: string }>("product.image-url", {
-      storageId: uploaded.storageId,
-    });
-    return {
-      storageId: uploaded.storageId as StoredImage["storageId"], fileName, url,
-      ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
-    };
+    onCancel();
   };
 
   const save = async (event?: React.FormEvent<HTMLFormElement>, publishStatusOverride?: boolean) => {
@@ -637,21 +871,21 @@ function ProductEditor({
     };
 
     try {
-      const uploadedImages: StoredImage[] = [];
-      for (const [index, image] of pendingImages.entries()) {
-        uploadedImages.push(await uploadPendingImage(
-          image,
-          productImageFileName(title || slug || "urun", images.length + index),
-        ));
+      const uploadedImages: ResolvedPendingImage[] = [];
+      for (const image of pendingImages) {
+        const storageId = image.storageId ?? (image.uploadPromise ? await image.uploadPromise : null);
+        if (!storageId) {
+          setError("Bazı görseller yüklenemedi. Sorunlu görselleri kaldırıp tekrar deneyin.");
+          return;
+        }
+        uploadedImages.push(toResolvedPendingImage({ ...image, storageId }));
       }
       await runAdminAction(product ? "product.update" : "product.create", {
         ...input,
-        images: [...images, ...uploadedImages].map((image) => ({
-          storageId: image.storageId,
-          fileName: image.fileName,
-          ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
-        })),
+        images: imagesPayload([...images, ...uploadedImages]),
       });
+      savedRef.current = true;
+      if (exitStateRef.current) exitStateRef.current.saved = true;
       onSaved();
 
     } catch (cause) {
@@ -667,7 +901,15 @@ function ProductEditor({
         <div className="space-y-5">
           <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-foreground">Görseller</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-foreground">Görseller</h2>
+                {uploadingCount + failedCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground" role="status">
+                    <ArrowPathIcon className={`size-3 ${uploadingCount > 0 ? "animate-spin" : ""}`} aria-hidden="true" />
+                    {uploadedCount}/{pendingImages.length} yüklendi
+                  </span>
+                )}
+              </div>
               <label htmlFor="product-image-upload" className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:bg-muted ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
                 <PlusCircleIcon className="size-4" />
                 <span>{processingImages ? "Hazırlanıyor…" : "Görsel ekle"}</span>
@@ -699,6 +941,8 @@ function ProductEditor({
               {pendingImages.map((image) => <div key={image.id} className="group overflow-hidden rounded-xl border border-border bg-background">
                 <div className="relative aspect-[4/5] overflow-hidden bg-card">
                   <Image src={image.previewUrl} alt={title} width={400} height={500} unoptimized className="size-full object-cover" />
+                  {image.status === "uploading" && <div className="absolute inset-0 grid place-items-center bg-background/60"><ArrowPathIcon className="size-5 animate-spin text-muted-foreground" aria-hidden="true" /></div>}
+                  {image.status === "error" && <div className="absolute inset-x-0 bottom-0 bg-destructive px-2 py-1 text-center text-[10px] font-medium text-white">Yüklenemedi</div>}
                   <Button type="button" size="icon" variant="secondary" aria-label={`Görseli kaldır: ${image.fileName}`} title="Görseli kaldır" disabled={saving} className="absolute right-2 top-2 size-9 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" onClick={() => removePendingImage(image)}>
                     <TrashIcon className="size-4" />
                   </Button>
@@ -968,7 +1212,7 @@ function ProductEditor({
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             {product ? (
               <>
-                <Button type="button" variant="ghost" size="icon" onClick={onCancel} aria-label="Vazgeç" title="Vazgeç" className="text-muted-foreground [&_svg]:size-5">
+                <Button type="button" variant="ghost" size="icon" onClick={() => void handleExit()} aria-label="Vazgeç" title="Vazgeç" className="text-muted-foreground [&_svg]:size-5">
                   <XMarkIcon aria-hidden="true" />
                 </Button>
                 <Button
@@ -982,7 +1226,7 @@ function ProductEditor({
               </>
             ) : (
               <>
-                <Button type="button" variant="ghost" size="icon" onClick={onCancel} aria-label="Vazgeç" title="Vazgeç" className="text-muted-foreground [&_svg]:size-5">
+                <Button type="button" variant="ghost" size="icon" onClick={() => void handleExit()} aria-label="Vazgeç" title="Vazgeç" className="text-muted-foreground [&_svg]:size-5">
                   <XMarkIcon aria-hidden="true" />
                 </Button>
                 <Button

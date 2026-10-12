@@ -35,7 +35,7 @@ import { CartRecommendationShelf } from "@/components/product/recommendation-she
 function CartContent() {
   const router = useRouter();
   const restoreToken = useSearchParams().get("recover");
-  const { items, addItem, updateQuantity, removeItem, totalAmount } =
+  const { items, addItem, updateQuantity, removeItem, totalAmount, getItemMaxStock } =
     useCart();
   const restoreHandled = useRef(false);
   const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
@@ -168,6 +168,7 @@ function CartContent() {
               const lineTotal = (
                 parseFloat(unitPrice || "0") * item.quantity
               ).toFixed(2);
+              const isAtMaxStock = item.quantity >= getItemMaxStock(item.product.id, item.variantId);
 
               return (
                 <div
@@ -229,7 +230,8 @@ function CartContent() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-lg hover:bg-background"
+                        disabled={isAtMaxStock}
+                        className="h-8 w-8 rounded-lg hover:bg-background disabled:opacity-20 disabled:cursor-not-allowed disabled:pointer-events-none"
                         onClick={() =>
                           updateQuantity(item.product.id, item.quantity + 1, item.variantId)
                         }

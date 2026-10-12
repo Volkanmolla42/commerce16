@@ -1,4 +1,4 @@
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationResultValidator } from "convex/server";
 import { getCheckoutLegalDocuments } from "../lib/legal-documents";
@@ -139,7 +139,7 @@ export const getOrderById = query({
     if (!order) return null;
 
     const userId = await getAuthUserId(ctx);
-    if (!userId || order.userId !== userId) {
+    if (order.userId && (!userId || order.userId !== userId)) {
       return null;
     }
 
@@ -218,6 +218,8 @@ export const createOrder = mutation({
     if (args.items.length === 0 || args.items.length > 100) throw new Error("Sipariş 1 ile 100 ürün içermeli.");
     const items = [];
     let totalCents = 0;
+    // Aynı varyant birden fazla satırsa stok talebini toplayarak doğrula.
+    const reservedDemand = new Map<string, number>();
     for (const item of args.items) {
       if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 999) throw new Error("Ürün adedi 1 ile 999 arasında tam sayı olmalı.");
       const productId = ctx.db.normalizeId("products", item.productId);
@@ -227,7 +229,13 @@ export const createOrder = mutation({
       const variant = item.variantId
         ? variants.find((candidate) => candidate.id === item.variantId)
         : variants.length === 1 ? variants[0] : undefined;
-      if ((variants.length > 0 && !variant) || (item.variantId && !variant) || (variant && !variant.availableForSale)) throw new Error("Ürün seçeneği satışa uygun değil.");
+      if (!variant) throw new Error("Ürün seçeneği tükendi veya yetersiz stok.");
+      const demandKey = `${product._id}:${variant.id}`;
+      const reserved = reservedDemand.get(demandKey) ?? 0;
+      if (!variant.availableForSale || variant.stockQuantity < reserved + item.quantity) {
+        throw new Error("Ürün seçeneği tükendi veya yetersiz stok.");
+      }
+      reservedDemand.set(demandKey, reserved + item.quantity);
       const price = variant!.price;
       if (!/^\d+(?:\.\d{1,2})?$/.test(price)) throw new Error("Ürün fiyatı geçersiz.");
       const cents = Math.round(Number(price) * 100);
@@ -307,10 +315,11 @@ export const createOrder = mutation({
       shippingAddress: args.shippingAddress,
       ...(recordedLegalAcceptance ? { legalAcceptance: recordedLegalAcceptance } : {}),
     });
-    if (coupon?.valid) {
-      const createdOrder = await ctx.db.get(orderId);
-      if (createdOrder) await commitCouponReservation(ctx, createdOrder);
-    }
+    const createdOrder = await ctx.db.get(orderId);
+    if (!createdOrder) throw new Error("Sipariş oluşturulamadı.");
+    // Stok sipariş anında rezerve edilir; iptal changeOrderStatus üzerinden geri yükler.
+    await adjustInventoryForOrder(ctx, createdOrder, -1);
+    if (coupon?.valid) await commitCouponReservation(ctx, createdOrder);
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId });
     await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.markConvertedForOrder, { orderId });
 
@@ -321,16 +330,26 @@ export const createOrder = mutation({
 type OrderStatus = "pending" | "paid" | "cancelled";
 
 async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, direction: -1 | 1) {
+  const productDeltas = new Map<string, Map<string, number>>();
   for (const item of order.items) {
     const productId = ctx.db.normalizeId("products", item.productId);
     if (!productId) continue;
-    const product = await ctx.db.get(productId);
+    let variantMap = productDeltas.get(productId);
+    if (!variantMap) {
+      variantMap = new Map();
+      productDeltas.set(productId, variantMap);
+    }
+    const targetKey = item.variantId ?? "";
+    variantMap.set(targetKey, (variantMap.get(targetKey) ?? 0) + item.quantity * direction);
+  }
+
+  for (const [productId, deltas] of productDeltas) {
+    const product = await ctx.db.get(productId as Id<"products">);
     if (!product || !product.variants) continue;
     const nextVariants = product.variants.map((v) => {
-      const isTarget = item.variantId ? v.id === item.variantId : product.variants.length === 1;
-      if (isTarget) {
-        const nextStock = Math.max(0, v.stockQuantity + direction * item.quantity);
-        return { ...v, stockQuantity: nextStock };
+      const delta = deltas.get(v.id) ?? (product.variants.length === 1 ? deltas.get("") : undefined);
+      if (delta !== undefined) {
+        return { ...v, stockQuantity: Math.max(0, v.stockQuantity + delta) };
       }
       return v;
     });
@@ -353,15 +372,13 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
   }
 
   const canceling = order.status !== "cancelled" && status === "cancelled";
-  if (canceling) await releaseCouponReservation(ctx, order);
+  if (canceling) {
+    await releaseCouponReservation(ctx, order);
+    // Stok sipariş oluşturulurken rezerve edilmişti; her iptalde geri yüklenir.
+    await adjustInventoryForOrder(ctx, order, 1);
+  }
   if (!canceling && status !== "pending" && status !== "cancelled") {
     await commitCouponReservation(ctx, order);
-  }
-
-  if (order.status !== "paid" && status === "paid") {
-    await adjustInventoryForOrder(ctx, order, -1);
-  } else if (order.status === "paid" && status === "cancelled") {
-    await adjustInventoryForOrder(ctx, order, 1);
   }
 
   await ctx.db.patch(id, {
@@ -387,5 +404,30 @@ export const updateStatus = mutation({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
     return await changeOrderStatus(ctx, args.id, args.status);
+  },
+});
+
+// Ödemesi bu süre içinde tamamlanmayan bekleyen siparişler otomatik iptal edilir; rezerve edilen stok geri yüklenir.
+const PENDING_ORDER_TTL_MS = 2 * 60 * 60 * 1000;
+
+export const cancelStalePending = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const cutoff = Date.now() - PENDING_ORDER_TTL_MS;
+    const stale = await ctx.db.query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .take(100);
+    let cancelledCount = 0;
+    for (const order of stale) {
+      if (order._creationTime < cutoff) {
+        await changeOrderStatus(ctx, order._id, "cancelled");
+        cancelledCount++;
+      }
+    }
+    if (stale.length === 100 && cancelledCount > 0) {
+      await ctx.scheduler.runAfter(0, internal.orders.cancelStalePending, {});
+    }
+    return null;
   },
 });

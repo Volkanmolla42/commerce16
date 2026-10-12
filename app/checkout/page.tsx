@@ -27,8 +27,8 @@ import {
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
-import { clearQuickBuyItem, useQuickBuyDraft } from "@/components/cart/quick-buy-store";
-import { clearCartRecoverySessionKey, getCartRecoverySessionKey } from "@/components/cart/recovery-store";
+import { useQuickBuyDraft } from "@/components/cart/quick-buy-store";
+import { getCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
@@ -196,7 +196,7 @@ function PriceSummaryRows({
 
 function CheckoutContent() {
   const router = useRouter();
-  const { items: cartItems, clearCart } = useCart();
+  const { items: cartItems } = useCart();
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
   const quickBuy = useQuickBuyDraft();
   const items = isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems;
@@ -410,14 +410,7 @@ function CheckoutContent() {
         await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
       }
 
-      clearCart();
-      clearQuickBuyItem();
-      try {
-        clearCartRecoverySessionKey();
-      } catch {
-        // Ignored
-      }
-      router.push("/checkout/result?status=success");
+      router.push(`/checkout/success/${orderId}`);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
     } finally {

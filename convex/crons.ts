@@ -24,4 +24,11 @@ crons.cron(
   {},
 );
 
+crons.interval(
+  "cancel stale pending orders",
+  { minutes: 15 },
+  internal.orders.cancelStalePending,
+  {},
+);
+
 export default crons;
