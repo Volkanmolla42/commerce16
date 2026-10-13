@@ -2,7 +2,23 @@
 
 import { useState } from "react";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { Button, Card, Input, Label } from "@/components/ui";
+import {
+  MagnifyingGlassIcon,
+  PlusIcon,
+  PencilSquareIcon,
+  NoSymbolIcon,
+} from "@heroicons/react/24/outline";
+import {
+  Button,
+  Card,
+  Input,
+  Label,
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
@@ -40,7 +56,7 @@ function toDateTimeInput(timestamp?: number) {
 
 function toKurus(value: string, label: string): number | null {
   if (!value.trim()) return null;
-  if (!/^\d+(?:[.,]\d{1,2})?$/.test(value.trim())) throw new Error(`${label} geçerli bir TL tutarı olmalı.`);
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(value.trim())) throw new Error(`${label} geçerli bir TL tutarı olmalıdır.`);
   const kurus = Math.round(Number(value.replace(",", ".")) * 100);
   if (!Number.isSafeInteger(kurus)) throw new Error(`${label} geçersiz.`);
   return kurus;
@@ -50,7 +66,8 @@ function draftFromCoupon(coupon: Coupon): CouponDraft {
   return {
     code: coupon.code,
     discountType: coupon.discountType,
-    discountValue: coupon.discountType === "fixed" ? (coupon.discountValue / 100).toFixed(2) : String(coupon.discountValue),
+    discountValue:
+      coupon.discountType === "fixed" ? (coupon.discountValue / 100).toFixed(2) : String(coupon.discountValue),
     minOrderAmount: coupon.minOrderAmountKurus === undefined ? "" : (coupon.minOrderAmountKurus / 100).toFixed(2),
     maxDiscount: coupon.maxDiscountKurus === undefined ? "" : (coupon.maxDiscountKurus / 100).toFixed(2),
     usageLimit: coupon.usageLimit === undefined ? "" : String(coupon.usageLimit),
@@ -77,10 +94,11 @@ function CouponEditor({
     setSaving(true);
     setError(null);
     try {
-      const fixedAmount = draft.discountType === "fixed" ? toKurus(draft.discountValue, "İndirim") : null;
+      const fixedAmount = draft.discountType === "fixed" ? toKurus(draft.discountValue, "İndirim tutarı") : null;
       if (draft.discountType === "fixed" && fixedAmount === null) throw new Error("İndirim tutarını girin.");
       const usageLimit = draft.usageLimit.trim() ? Number(draft.usageLimit) : null;
       if (usageLimit !== null && !Number.isSafeInteger(usageLimit)) throw new Error("Kullanım limiti tam sayı olmalı.");
+
       const input = {
         ...(coupon ? { id: coupon._id } : {}),
         code: draft.code.trim().toLocaleUpperCase("en-US"),
@@ -92,6 +110,7 @@ function CouponEditor({
         expiresAt: draft.expiresAt ? new Date(draft.expiresAt).getTime() : null,
         isActive: draft.isActive,
       };
+
       await runAdminAction(coupon ? "coupon.update" : "coupon.create", input);
       await onSaved();
       onClose();
@@ -103,73 +122,179 @@ function CouponEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="coupon-editor-title" className="mx-auto my-8 w-full max-w-xl rounded-lg border border-border bg-card p-5 shadow-xl sm:p-6">
-        <h2 id="coupon-editor-title" className="text-lg font-semibold text-foreground">{coupon ? "Kuponu düzenle" : "Yeni kupon"}</h2>
-        <form onSubmit={save} className="mt-5 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="coupon-code">Kupon kodu</Label>
-              <Input id="coupon-code" required minLength={3} maxLength={32} pattern="[A-Za-z0-9_-]+" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} placeholder="YAZINDIRIM" />
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-lg p-5 sm:p-6">
+        <DialogHeader className="border-b border-border pb-3">
+          <DialogTitle className="text-base font-bold text-foreground">
+            {coupon ? "Kuponu Düzenle" : "Yeni Kupon Oluştur"}
+          </DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={save} className="mt-3 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="coupon-code" className="text-xs">
+                Kupon Kodu
+              </Label>
+              <Input
+                id="coupon-code"
+                required
+                minLength={3}
+                maxLength={32}
+                pattern="[A-Za-z0-9_-]+"
+                value={draft.code}
+                onChange={(e) => setDraft({ ...draft, code: e.target.value })}
+                placeholder="Örn: YAZINDIRIM"
+                className="font-mono text-sm uppercase h-10"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="coupon-type">İndirim türü</Label>
-              <select id="coupon-type" value={draft.discountType} onChange={(event) => setDraft({ ...draft, discountType: event.target.value as CouponDraft["discountType"], discountValue: event.target.value === "percentage" ? "10" : "" })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring">
+
+            <div className="space-y-1">
+              <Label htmlFor="coupon-type" className="text-xs">
+                İndirim Türü
+              </Label>
+              <select
+                id="coupon-type"
+                value={draft.discountType}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    discountType: e.target.value as CouponDraft["discountType"],
+                    discountValue: e.target.value === "percentage" ? "10" : "",
+                  })
+                }
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring cursor-pointer"
+              >
                 <option value="percentage">Yüzde (%)</option>
-                <option value="fixed">Sabit TL tutarı</option>
+                <option value="fixed">Sabit TL Tutarı</option>
               </select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="coupon-value">{draft.discountType === "percentage" ? "İndirim yüzdesi" : "İndirim tutarı (TL)"}</Label>
-              <Input id="coupon-value" required type="number" min={draft.discountType === "percentage" ? 1 : 0.01} max={draft.discountType === "percentage" ? 100 : undefined} step={draft.discountType === "percentage" ? 1 : 0.01} value={draft.discountValue} onChange={(event) => setDraft({ ...draft, discountValue: event.target.value })} />
+
+            <div className="space-y-1">
+              <Label htmlFor="coupon-value" className="text-xs">
+                {draft.discountType === "percentage" ? "Oran (%)" : "Tutar (TL)"}
+              </Label>
+              <Input
+                id="coupon-value"
+                required
+                type="number"
+                min={draft.discountType === "percentage" ? 1 : 0.01}
+                max={draft.discountType === "percentage" ? 100 : undefined}
+                step={draft.discountType === "percentage" ? 1 : 0.01}
+                value={draft.discountValue}
+                onChange={(e) => setDraft({ ...draft, discountValue: e.target.value })}
+                className="h-10 text-sm"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="coupon-minimum">Asgari sepet tutarı (TL)</Label>
-              <Input id="coupon-minimum" type="number" min="0" step="0.01" value={draft.minOrderAmount} onChange={(event) => setDraft({ ...draft, minOrderAmount: event.target.value })} placeholder="Sınır yok" />
+
+            <div className="space-y-1">
+              <Label htmlFor="coupon-minimum" className="text-xs">
+                Asgari Sepet Tutarı (TL)
+              </Label>
+              <Input
+                id="coupon-minimum"
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.minOrderAmount}
+                onChange={(e) => setDraft({ ...draft, minOrderAmount: e.target.value })}
+                placeholder="Sınır yok"
+                className="h-10 text-sm"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="coupon-maximum">Maksimum indirim (TL)</Label>
-              <Input id="coupon-maximum" type="number" min="0.01" step="0.01" value={draft.maxDiscount} onChange={(event) => setDraft({ ...draft, maxDiscount: event.target.value })} placeholder="Tavan yok" />
+
+            <div className="space-y-1">
+              <Label htmlFor="coupon-maximum" className="text-xs">
+                Maksimum İndirim (TL)
+              </Label>
+              <Input
+                id="coupon-maximum"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={draft.maxDiscount}
+                onChange={(e) => setDraft({ ...draft, maxDiscount: e.target.value })}
+                placeholder="Tavan yok"
+                className="h-10 text-sm"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="coupon-usage-limit">Toplam kullanım limiti</Label>
-              <Input id="coupon-usage-limit" type="number" min="1" step="1" value={draft.usageLimit} onChange={(event) => setDraft({ ...draft, usageLimit: event.target.value })} placeholder="Sınırsız" />
+
+            <div className="space-y-1">
+              <Label htmlFor="coupon-usage-limit" className="text-xs">
+                Toplam Kullanım Limiti
+              </Label>
+              <Input
+                id="coupon-usage-limit"
+                type="number"
+                min="1"
+                step="1"
+                value={draft.usageLimit}
+                onChange={(e) => setDraft({ ...draft, usageLimit: e.target.value })}
+                placeholder="Sınırsız"
+                className="h-10 text-sm"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="coupon-expiry">Son kullanma tarihi</Label>
-              <Input id="coupon-expiry" type="datetime-local" value={draft.expiresAt} onChange={(event) => setDraft({ ...draft, expiresAt: event.target.value })} />
+
+            <div className="space-y-1">
+              <Label htmlFor="coupon-expiry" className="text-xs">
+                Son Kullanma Tarihi
+              </Label>
+              <Input
+                id="coupon-expiry"
+                type="datetime-local"
+                value={draft.expiresAt}
+                onChange={(e) => setDraft({ ...draft, expiresAt: e.target.value })}
+                className="h-10 text-sm"
+              />
             </div>
-            <label className="flex min-h-10 items-center gap-2 text-sm text-foreground sm:col-span-2">
-              <input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} className="size-4 accent-primary" />
-              Kuponu kullanıma aç
+
+            <label className="flex min-h-10 items-center gap-2 text-xs font-medium text-foreground sm:col-span-2 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                checked={draft.isActive}
+                onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+                className="size-4 rounded accent-primary cursor-pointer"
+              />
+              <span>Kuponu hemen kullanıma aç</span>
             </label>
           </div>
+
           {error && <AdminNotice kind="error">{error}</AdminNotice>}
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>Vazgeç</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
+
+          <div className="flex justify-end gap-2 border-t border-border pt-3">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="cursor-pointer">
+              Vazgeç
+            </Button>
+            <Button type="submit" size="sm" disabled={saving} className="cursor-pointer">
+              {saving ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function AdminCouponsContent() {
+export default function AdminCouponsPage() {
   const { data: coupons, error, loading, refresh } = useAdminResource<Coupon[]>("coupons");
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null | undefined>(undefined);
+  const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const term = query.trim().toLocaleLowerCase("tr-TR");
+  const filteredCoupons = (coupons || []).filter((c) => {
+    if (!term) return true;
+    return `${c.code}`.toLocaleLowerCase("tr-TR").includes(term);
+  });
+
   const disableCoupon = async (coupon: Coupon) => {
-    if (!window.confirm(`“${coupon.code}” kuponunu devre dışı bırakmak istiyor musun?`)) return;
+    if (!window.confirm(`“${coupon.code}” kuponunu devre dışı bırakmak istediğinize emin misiniz?`)) return;
     setActionError(null);
     setMessage(null);
     try {
       await runAdminAction("coupon.disable", undefined, coupon._id);
-      setMessage("Kupon devre dışı bırakıldı.");
+      setMessage(`“${coupon.code}” devre dışı bırakıldı.`);
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Kupon devre dışı bırakılamadı.");
@@ -179,49 +304,157 @@ function AdminCouponsContent() {
   return (
     <>
       <AdminHeaderAction route={adminPath("coupons")}>
-        <Button onClick={() => setEditingCoupon(null)}>Kupon ekle</Button>
+        <Button
+          size="sm"
+          className="h-9 gap-1.5 cursor-pointer"
+          onClick={() => setEditingCoupon(null)}
+        >
+          <PlusIcon className="size-4" />
+          <span>Yeni Kupon Ekle</span>
+        </Button>
       </AdminHeaderAction>
-      {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
+
+      {(message || actionError || error) && (
+        <div className="mb-4">
+          <AdminNotice kind={actionError || error ? "error" : "success"}>
+            {actionError || error || message}
+          </AdminNotice>
+        </div>
+      )}
+
       <Card className="overflow-hidden rounded-lg">
-        {loading ? <AdminLoading label="Kuponlar" variant="table" /> : !coupons?.length ? (
-          <div className="p-5"><AdminEmpty title="Henüz kupon yok" description="Yeni kupon oluşturarak müşterilerinize indirim tanımlayın." /></div>
+        {/* Arama & İstatistik Çubuğu */}
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-5 sm:items-center">
+          <div className="relative min-w-0">
+            <Label htmlFor="coupon-search" className="sr-only">
+              Kupon ara
+            </Label>
+            <MagnifyingGlassIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id="coupon-search"
+              name="coupon-search"
+              type="search"
+              placeholder="Kupon kodu ara..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9 h-10 text-sm font-mono uppercase"
+            />
+          </div>
+
+          <div className="text-xs text-muted-foreground font-mono text-right">
+            Toplam {coupons?.length ?? 0} kupon
+          </div>
+        </div>
+
+        {/* Kupon Listesi */}
+        {loading ? (
+          <AdminLoading label="Kuponlar" variant="table" />
+        ) : filteredCoupons.length === 0 ? (
+          <div className="p-5">
+            <AdminEmpty
+              title={query ? "Eşleşen kupon bulunamadı" : "Henüz kupon yok"}
+              description={
+                query
+                  ? "Arama kriterini değiştirip tekrar deneyin."
+                  : "Yeni kupon oluşturarak müşterilerinize indirim sunun."
+              }
+            />
+          </div>
         ) : (
           <div className="divide-y divide-border">
-            {coupons.map((coupon) => {
-              return (
-                <article key={coupon._id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-mono text-sm font-semibold text-foreground">{coupon.code}</h2>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {coupon.isActive ? "Açık" : "Kapalı"}
+            {filteredCoupons.map((coupon) => (
+              <article
+                key={coupon._id}
+                className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-mono text-sm font-bold text-foreground">
+                      {coupon.code}
+                    </h2>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-medium ${
+                        coupon.isActive
+                          ? "border-transparent bg-primary text-primary-foreground"
+                          : "border-border bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {coupon.isActive ? "Aktif" : "Pasif"}
+                    </Badge>
+                  </div>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <strong className="text-foreground">
+                      {coupon.discountType === "percentage"
+                        ? `%${coupon.discountValue}`
+                        : formatMoney(coupon.discountValue / 100)}{" "}
+                      indirim
+                    </strong>
+                    {coupon.minOrderAmountKurus !== undefined &&
+                      ` · Min. Sepet: ${formatMoney(coupon.minOrderAmountKurus / 100)}`}
+                    {coupon.maxDiscountKurus !== undefined &&
+                      ` · Maks. İndirim: ${formatMoney(coupon.maxDiscountKurus / 100)}`}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-muted-foreground">
+                    <span>
+                      Kullanım: <strong>{coupon.usedCount}</strong> / {coupon.usageLimit ?? "∞"}
+                    </span>
+                    {coupon.expiresAt !== undefined && (
+                      <span>
+                        Son Tarih:{" "}
+                        {new Intl.DateTimeFormat("tr-TR", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(coupon.expiresAt)}
                       </span>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {coupon.discountType === "percentage" ? `%${coupon.discountValue}` : formatMoney(coupon.discountValue / 100)} indirim
-                      {coupon.minOrderAmountKurus !== undefined ? ` · Min. ${formatMoney(coupon.minOrderAmountKurus / 100)}` : ""}
-                      {coupon.maxDiscountKurus !== undefined ? ` · En çok ${formatMoney(coupon.maxDiscountKurus / 100)}` : ""}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {coupon.usedCount} / {coupon.usageLimit ?? "∞"} kullanım
-                      {coupon.expiresAt !== undefined ? ` · Son tarih ${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(coupon.expiresAt)}` : ""}
-                    </p>
+                    )}
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setEditingCoupon(coupon)}>Düzenle</Button>
-                    {coupon.isActive && <Button variant="outline" size="sm" onClick={() => void disableCoupon(coupon)}>Kapat</Button>}
-                  </div>
-                </article>
-              );
-            })}
+                </div>
+
+                <div className="flex items-center justify-end gap-1.5 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs cursor-pointer"
+                    onClick={() => setEditingCoupon(coupon)}
+                  >
+                    <PencilSquareIcon className="size-3.5" />
+                    <span>Düzenle</span>
+                  </Button>
+                  {coupon.isActive && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                      onClick={() => void disableCoupon(coupon)}
+                      title="Devre Dışı Bırak"
+                    >
+                      <NoSymbolIcon className="size-3.5" />
+                      <span>Kapat</span>
+                    </Button>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </Card>
-      {editingCoupon !== undefined && <CouponEditor coupon={editingCoupon} onClose={() => setEditingCoupon(undefined)} onSaved={async () => { setMessage(editingCoupon ? "Kupon güncellendi." : "Kupon eklendi."); await refresh(); }} />}
+
+      {editingCoupon !== undefined && (
+        <CouponEditor
+          coupon={editingCoupon}
+          onClose={() => setEditingCoupon(undefined)}
+          onSaved={async () => {
+            setMessage(editingCoupon ? "Kupon güncellendi." : "Kupon oluşturuldu.");
+            await refresh();
+          }}
+        />
+      )}
     </>
   );
-}
-
-export default function AdminCouponsPage() {
-  return <AdminCouponsContent />;
 }

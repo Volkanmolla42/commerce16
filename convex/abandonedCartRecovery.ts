@@ -38,14 +38,19 @@ function cleanEmail(value: string) {
 }
 
 function siteUrl() {
-  const value = env.CART_RECOVERY_SITE_URL;
-  if (!value) return null;
+  const value = env.CART_RECOVERY_SITE_URL || "http://localhost:3000";
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.hostname === "localhost" ? parsed : null;
+    return parsed.protocol === "https:" || parsed.hostname === "localhost" ? parsed : new URL("http://localhost:3000");
   } catch {
-    return null;
+    return new URL("http://localhost:3000");
   }
+}
+
+function formatTRY(value: string | number) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "₺0,00";
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(amount);
 }
 
 function emailFrom() {
@@ -56,15 +61,7 @@ function emailEnabled() {
   return Boolean(siteUrl() && env.RESEND_API_KEY && emailFrom());
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character]!);
-}
+import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
 
 export const getAvailability = query({
   args: {},
@@ -264,7 +261,7 @@ export const restoreCart = mutation({
 });
 
 export const claimReminder = internalMutation({
-  args: { cartId: v.id("abandonedCarts"), notificationId: v.string() },
+  args: { cartId: v.id("abandonedCarts"), notificationId: v.string(), force: v.optional(v.boolean()) },
   returns: v.union(
     v.object({
       cartId: v.id("abandonedCarts"),
@@ -272,19 +269,29 @@ export const claimReminder = internalMutation({
       email: v.string(),
       unsubscribeToken: v.string(),
       restoreToken: v.string(),
-      items: v.array(v.object({ title: v.string(), slug: v.string() })),
+      storeName: v.string(),
+      items: v.array(
+        v.object({
+          title: v.string(),
+          slug: v.string(),
+          price: v.string(),
+          quantity: v.number(),
+          variantTitle: v.optional(v.string()),
+          imageUrl: v.optional(v.string()),
+        })
+      ),
     }),
     v.null(),
   ),
-  handler: async (ctx, { cartId, notificationId }) => {
+  handler: async (ctx, { cartId, notificationId, force }) => {
     const cart = await ctx.db.get(cartId);
-    if (!cart || cart.notificationId !== notificationId || cart.status !== "active") return null;
+    if (!cart || cart.notificationId !== notificationId || (cart.status !== "active" && !force)) return null;
     const now = Date.now();
-    if (cart.expiresAt <= now) {
+    if (cart.expiresAt <= now && !force) {
       await ctx.db.patch(cartId, { items: [], status: "expired", email: undefined, reminderScheduled: false });
       return null;
     }
-    if (cart.lastActivityAt + reminderDelayMs > now) {
+    if (!force && cart.lastActivityAt + reminderDelayMs > now) {
       await ctx.scheduler.runAfter(cart.lastActivityAt + reminderDelayMs - now, internal.abandonedCartRecovery.processReminder, {
         cartId,
         notificationId,
@@ -310,7 +317,20 @@ export const claimReminder = internalMutation({
       if (variants.length && !variantId) continue;
       if (variantId && !variant) continue;
       if (variant && !variant.availableForSale) continue;
-      items.push({ title: product.title, slug: product.slug });
+
+      const firstImage = product.images?.[0];
+      const imageUrl = firstImage ? await ctx.storage.getUrl(firstImage.storageId) : null;
+      const price = variant?.price ?? product.variants?.[0]?.price ?? "0";
+      const variantTitle = variant?.title && variant.title !== "Default Title" ? variant.title : undefined;
+
+      items.push({
+        title: product.title,
+        slug: product.slug,
+        price,
+        quantity: item.quantity,
+        variantTitle,
+        imageUrl: imageUrl ?? undefined,
+      });
     }
     if (items.length === 0 || !cart.emailConsent) {
       await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
@@ -322,6 +342,13 @@ export const claimReminder = internalMutation({
       await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
       return null;
     }
+
+    const settings = await ctx.db
+      .query("storeSettings")
+      .withIndex("by_key", (q) => q.eq("key", "store"))
+      .first();
+    const storeName = settings?.storeName?.trim() || "Mağazamız";
+
     await ctx.db.patch(cartId, { status: "sending" });
     return {
       cartId,
@@ -329,6 +356,7 @@ export const claimReminder = internalMutation({
       email,
       unsubscribeToken: cart.unsubscribeToken,
       restoreToken: cart.restoreToken,
+      storeName,
       items,
     };
   },
@@ -355,7 +383,7 @@ export const finishReminder = internalMutation({
 });
 
 export const processReminder = internalAction({
-  args: { cartId: v.id("abandonedCarts"), notificationId: v.string() },
+  args: { cartId: v.id("abandonedCarts"), notificationId: v.string(), force: v.optional(v.boolean()) },
   returns: v.null(),
   handler: async (ctx, args) => {
     const reminder = await ctx.runMutation(internal.abandonedCartRecovery.claimReminder, args);
@@ -363,7 +391,8 @@ export const processReminder = internalAction({
     const base = siteUrl();
     if (!base) {
       await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
-        ...args,
+        cartId: args.cartId,
+        notificationId: args.notificationId,
         emailSent: false,
       });
       return null;
@@ -377,34 +406,212 @@ export const processReminder = internalAction({
 
     if (reminder.email && env.RESEND_API_KEY && emailFrom()) {
       try {
-        const itemsHtml = reminder.items.map((item) => {
-          const productUrl = new URL(`/product/${encodeURIComponent(item.slug)}`, base).toString();
-          return `<li><a href="${productUrl}">${escapeHtml(item.title)}</a></li>`;
+        const storeName = reminder.storeName;
+        const subject = `Sepetinizde ürünler kaldı! Alışverişinizi tamamlayın | ${storeName}`;
+
+        const totalKurus = reminder.items.reduce((sum, item) => sum + Math.round(Number(item.price) * 100) * item.quantity, 0);
+        const totalText = formatTRY(totalKurus / 100);
+
+        // Plain text
+        const textLines = reminder.items.map(
+          (i) => `• ${i.title}${i.variantTitle ? ` (${i.variantTitle})` : ""} - ${i.quantity} adet × ${formatTRY(i.price)}`
+        );
+        const text = [
+          `${storeName.toUpperCase()} — SEPETİNİZ SİZİ BEKLİYOR`,
+          `----------------------------------------`,
+          `Merhaba,`,
+          ``,
+          `Sepetinizde bıraktığınız ürünler tükenmeden alışverişinizi kolayca tamamlayabilirsiniz.`,
+          ``,
+          `Sepetinizdeki Ürünler:`,
+          ...textLines,
+          ``,
+          `Tahmini Toplam: ${totalText}`,
+          ``,
+          `Sepetinizi geri yüklemek ve alışverişinizi tamamlamak için tıklayın:`,
+          cartUrl.toString(),
+          ``,
+          `----------------------------------------`,
+          `Sepet hatırlatma e-postalarını almak istemiyorsanız:`,
+          unsubscribeUrl.toString(),
+          `----------------------------------------`,
+          `© ${storeName}`,
+        ].join("\n");
+
+        // HTML Ürün Satırları
+        const itemRowsHtml = reminder.items.map((item) => {
+          const itemTotal = Number(item.price) * item.quantity;
+          const imageHtml = item.imageUrl
+            ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" width="56" height="56" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;margin-right:12px;" />`
+            : `<div style="width:56px;height:56px;border-radius:8px;background-color:#f3f4f6;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;margin-right:12px;text-align:center;line-height:56px;">Görsel Yok</div>`;
+
+          return `
+            <tr>
+              <td style="padding:12px 0;border-bottom:1px solid #f3f4f6;vertical-align:middle;">
+                <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+                  <tr>
+                    <td style="width:68px;vertical-align:middle;">
+                      ${imageHtml}
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:14px;font-weight:600;color:#111827;line-height:1.4;">${escapeHtml(item.title)}</div>
+                      ${item.variantTitle ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(item.variantTitle)}</div>` : ""}
+                      <div style="font-size:13px;color:#4b5563;margin-top:2px;">${item.quantity} adet × ${escapeHtml(formatTRY(item.price))}</div>
+                    </td>
+                    <td style="vertical-align:middle;text-align:right;font-size:14px;font-weight:600;color:#111827;">
+                      ${escapeHtml(formatTRY(itemTotal))}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          `;
         }).join("");
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-            "Idempotency-Key": `cart-recovery/${reminder.notificationId}/email`,
-          },
-          body: JSON.stringify({
-            from: emailFrom(),
-            to: [reminder.email],
-            subject: "Sepetiniz sizi bekliyor",
-            html: `<p>Sepetinizdeki ürünleri tamamlamak için mağazamıza dönebilirsiniz.</p><ul>${itemsHtml}</ul><p><a href="${cartUrl.toString()}">Sepetime dön</a></p><p><a href="${unsubscribeUrl.toString()}">Sepet hatırlatmalarını durdur</a></p>`,
-          }),
-          signal: AbortSignal.timeout(15_000),
+
+        const html = `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;line-height:1.5;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          
+          <!-- Üst Bar / Marka -->
+          <tr>
+            <td style="padding:24px 32px;border-bottom:1px solid #f3f4f6;">
+              <span style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.03em;">${escapeHtml(storeName)}</span>
+            </td>
+          </tr>
+
+          <!-- Karşılama & Başlık -->
+          <tr>
+            <td style="padding:32px 32px 16px 32px;text-align:center;">
+              <div style="display:inline-block;padding:6px 14px;background-color:#eff6ff;color:#1d4ed8;border-radius:9999px;font-size:13px;font-weight:700;margin-bottom:16px;border:1px solid #bfdbfe;">
+                🛒 SEPETİNİZ SİZİ BEKLİYOR
+              </div>
+              <h1 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:#111827;letter-spacing:-0.02em;">
+                Bir Şeyler Unutmuş Olabilirsiniz!
+              </h1>
+              <p style="margin:0;font-size:15px;color:#4b5563;line-height:1.6;">
+                Sepetinizde seçtiğiniz harika ürünler duruyor. Stoklar tükenmeden siparişinizi tek tıkla tamamlayabilirsiniz.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Ürün Listesi Tablosu -->
+          <tr>
+            <td style="padding:10px 32px 20px 32px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;padding:16px 20px;">
+                <tr>
+                  <td>
+                    <div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
+                      Sepetinizdeki Ürünler
+                    </div>
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                      ${itemRowsHtml}
+                    </table>
+                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                        <tr>
+                          <td style="font-size:14px;font-weight:600;color:#374151;">Tahmini Toplam</td>
+                          <td style="text-align:right;font-size:16px;font-weight:800;color:#111827;">${escapeHtml(totalText)}</td>
+                        </tr>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA Butonu -->
+          <tr>
+            <td style="padding:10px 32px 32px 32px;text-align:center;">
+              <a href="${escapeHtml(cartUrl.toString())}" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;max-width:320px;padding:14px 28px;background-color:#111827;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.1);text-align:center;">
+                Sepetime Dön ve Siparişi Tamamla &rarr;
+              </a>
+            </td>
+          </tr>
+
+          <!-- Alt Bilgi / Unsubscribe -->
+          <tr>
+            <td style="padding:24px 32px;background-color:#f9fafb;border-top:1px solid #f3f4f6;text-align:center;font-size:12px;color:#9ca3af;">
+              <p style="margin:0 0 8px 0;">
+                Bu e-posta, <strong>${escapeHtml(storeName)}</strong> mağazasında alışveriş sepeti hatırlatması onayınız bulunduğu için gönderilmiştir.
+              </p>
+              <p style="margin:0;">
+                Artık sepet hatırlatma e-postaları almak istemiyorsanız <a href="${escapeHtml(unsubscribeUrl.toString())}" target="_blank" rel="noopener noreferrer" style="color:#6b7280;text-decoration:underline;">buraya tıklayarak abonelikten çıkabilirsiniz</a>.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+        `;
+
+        const from = formatSender(storeName, emailFrom());
+        const result = await sendResendEmail({
+          to: reminder.email,
+          subject,
+          text,
+          html,
+          from,
+          idempotencyKey: `cart-recovery/${reminder.notificationId}/email`,
         });
-        emailSent = response.ok;
-      } catch {
+
+        await ctx.runMutation(internal.emailTemplates.recordEmailLog, {
+          templateKey: "abandoned_cart_recovery",
+          recipient: reminder.email,
+          subject,
+          status: result.ok ? "sent" : "failed",
+          error: result.error,
+          metadata: {
+            cartId: args.cartId,
+            notificationId: args.notificationId,
+            itemCount: reminder.items.length,
+          },
+        });
+
+        emailSent = result.ok;
+      } catch (err) {
+        console.error("Abandoned cart email send failed:", err);
         emailSent = false;
       }
     }
 
     await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
-      ...args,
+      cartId: args.cartId,
+      notificationId: args.notificationId,
       emailSent,
+    });
+    return null;
+  },
+});
+
+export const triggerReminderAdmin = mutation({
+  args: {
+    adminSecret: v.string(),
+    cartId: v.id("abandonedCarts"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    const cart = await ctx.db.get(args.cartId);
+    if (!cart) throw new Error("Sepet bulunamadı.");
+    await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.processReminder, {
+      cartId: args.cartId,
+      notificationId: cart.notificationId,
+      force: true,
     });
     return null;
   },

@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Button, Input, Card } from "@/components/ui";
-import { ArrowTopRightOnSquareIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowTopRightOnSquareIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  PlusIcon,
+  PhotoIcon,
+} from "@heroicons/react/24/outline";
+import { Button, Input, Card, Badge, Label } from "@/components/ui";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { CsvExportButton } from "../_components/export-button";
@@ -23,39 +30,62 @@ type Product = {
   images: string[];
   favoriteCount?: number;
 };
-type ProductPage = { items: Product[]; continueCursor: string; isDone: boolean };
 
-const LIST_COLUMNS = "lg:grid-cols-[minmax(0,1fr)_130px_110px_90px_80px_230px]";
+type ProductPage = {
+  items: Product[];
+  continueCursor: string;
+  isDone: boolean;
+};
 
-function AdminProductsContent() {
+const LIST_COLUMNS = "lg:grid-cols-[minmax(0,1.5fr)_140px_110px_90px_70px_130px]";
+
+export default function AdminProductsPage() {
   const { data: categories } = useAdminResource<Category[]>("categories");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "active" | "inactive">("all");
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
   const hasActiveFilters = Boolean(query.trim()) || categoryFilter !== "all" || availabilityFilter !== "all";
   const [cursors, setCursors] = useState<Array<string | null>>([null]);
   const cursor = cursors[cursors.length - 1] ?? "";
-  const [requestParams, setRequestParams] = useState<Record<string, string>>({ q: "", category: "all", availability: "all", cursor: "" });
+
+  const [requestParams, setRequestParams] = useState<Record<string, string>>({
+    q: "",
+    category: "all",
+    availability: "all",
+    cursor: "",
+  });
+
   useEffect(() => {
-    const timer = setTimeout(() => setRequestParams({
-      q: query, category: categoryFilter, availability: availabilityFilter, cursor,
-    }), 250);
+    const timer = setTimeout(() => {
+      setRequestParams({
+        q: query,
+        category: categoryFilter,
+        availability: availabilityFilter,
+        cursor,
+      });
+    }, 250);
     return () => clearTimeout(timer);
   }, [query, categoryFilter, availabilityFilter, cursor]);
+
   const { data, error, loading, refresh } = useAdminResource<ProductPage>("products", requestParams);
   const filteredProducts = data?.items ?? [];
-  const pending = loading || requestParams.q !== query || requestParams.category !== categoryFilter ||
-    requestParams.availability !== availabilityFilter || requestParams.cursor !== cursor;
+  const pending =
+    loading ||
+    requestParams.q !== query ||
+    requestParams.category !== categoryFilter ||
+    requestParams.availability !== availabilityFilter ||
+    requestParams.cursor !== cursor;
 
   const handleDelete = async (product: Product) => {
-    if (!window.confirm(`“${product.title}” ürününü silmek istiyor musun?`)) return;
+    if (!window.confirm(`“${product.title}” ürününü silmek istediğinize emin misiniz?`)) return;
     setActionError(null);
     setMessage(null);
     try {
       await runAdminAction("product.delete", undefined, product._id);
-      setMessage("Ürün silindi.");
+      setMessage(`“${product.title}” silindi.`);
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Ürün silinemedi.");
@@ -65,37 +95,131 @@ function AdminProductsContent() {
   return (
     <>
       <AdminHeaderAction route={adminPath("products")}>
-        <Button asChild><Link href={adminPath("products/add")}>Yeni ürün ekle</Link></Button>
+        <Button asChild size="sm" className="h-9 gap-1.5 cursor-pointer">
+          <Link href={adminPath("products/add")}>
+            <PlusIcon className="size-4" />
+            <span>Yeni Ürün Ekle</span>
+          </Link>
+        </Button>
       </AdminHeaderAction>
-      {(message || actionError || error) && <div className="mb-4"><AdminNotice kind={actionError || error ? "error" : "success"}>{actionError || error || message}</AdminNotice></div>}
+
+      {(message || actionError || error) && (
+        <div className="mb-4">
+          <AdminNotice kind={actionError || error ? "error" : "success"}>
+            {actionError || error || message}
+          </AdminNotice>
+        </div>
+      )}
 
       <Card className="overflow-hidden rounded-lg">
-        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-[minmax(200px,1.4fr)_repeat(2,minmax(150px,1fr))_auto] sm:px-5">
+        {/* Filtre ve Arama Barı */}
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_160px_140px_auto] sm:px-5 sm:items-center">
           <div className="relative min-w-0">
-            <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Ürün ara" name="product-search" type="search" placeholder="Ürün veya adres ara" value={query} onChange={(event) => { setQuery(event.target.value); setCursors([null]); }} className="pl-9" />
+            <Label htmlFor="product-search" className="sr-only">
+              Ürün ara
+            </Label>
+            <MagnifyingGlassIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id="product-search"
+              name="product-search"
+              type="search"
+              placeholder="Ürün adı veya bağlantı ara..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setCursors([null]);
+              }}
+              className="pl-9 h-10 text-sm"
+            />
           </div>
-          <select aria-label="Kategoriye göre filtrele" name="category-filter" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setCursors([null]); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring">
-            <option value="all">Tüm kategoriler</option>
-            {categories?.map((category) => <option key={category._id} value={category.slug}>{category.title}</option>)}
-          </select>
-          <select aria-label="Yayın durumuna göre filtrele" name="availability-filter" value={availabilityFilter} onChange={(event) => { setAvailabilityFilter(event.target.value as typeof availabilityFilter); setCursors([null]); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring">
-            <option value="all">Tüm yayın durumları</option>
-            <option value="active">Satışta</option>
-            <option value="inactive">Pasif</option>
-          </select>
+
+          <div>
+            <Label htmlFor="category-select" className="sr-only">
+              Kategori
+            </Label>
+            <select
+              id="category-select"
+              name="category-select"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCursors([null]);
+              }}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring cursor-pointer"
+            >
+              <option value="all">Tüm kategoriler</option>
+              {categories?.map((c) => (
+                <option key={c._id} value={c.slug}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="availability-select" className="sr-only">
+              Yayın Durumu
+            </Label>
+            <select
+              id="availability-select"
+              name="availability-select"
+              value={availabilityFilter}
+              onChange={(e) => {
+                setAvailabilityFilter(e.target.value as typeof availabilityFilter);
+                setCursors([null]);
+              }}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring cursor-pointer"
+            >
+              <option value="all">Tüm durumlar</option>
+              <option value="active">Satışta</option>
+              <option value="inactive">Pasif</option>
+            </select>
+          </div>
+
           <div className="flex items-center justify-end gap-2">
-            {hasActiveFilters && <Button type="button" variant="outline" className="h-10" onClick={() => { setQuery(""); setCategoryFilter("all"); setAvailabilityFilter("all"); setCursors([null]); }}>Filtreleri temizle</Button>}
-            <CsvExportButton type="products" label="Ürünleri CSV olarak indir" />
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 text-xs cursor-pointer"
+                onClick={() => {
+                  setQuery("");
+                  setCategoryFilter("all");
+                  setAvailabilityFilter("all");
+                  setCursors([null]);
+                }}
+              >
+                Filtreleri Temizle
+              </Button>
+            )}
+            <CsvExportButton type="products" label="CSV İndir" />
           </div>
         </div>
 
-        <p aria-live="polite" className="px-4 pt-3 text-sm text-muted-foreground">{pending ? "Ürünler yükleniyor…" : `Bu sayfada ${filteredProducts.length} ürün`}</p>
-        {loading ? <AdminLoading label="Ürünler" variant="table" /> : filteredProducts.length === 0 ? (
-          <div className="p-5"><AdminEmpty title={!data?.isDone ? "Bu sayfada eşleşen ürün yok" : hasActiveFilters ? "Filtrelere uyan ürün yok" : "Henüz ürün yok"} description={!data?.isDone ? "Sonraki sayfayı inceleyebilirsiniz." : hasActiveFilters ? "Arama ve filtreleri değiştirip yeniden dene." : "İlk ürünü ekleyerek kataloğu oluşturmaya başlayabilirsin."} /></div>
+        {/* Ürün Listesi */}
+        {loading ? (
+          <AdminLoading label="Ürünler" variant="table" />
+        ) : filteredProducts.length === 0 ? (
+          <div className="p-5">
+            <AdminEmpty
+              title={hasActiveFilters ? "Eşleşen ürün bulunamadı" : "Henüz ürün yok"}
+              description={
+                hasActiveFilters
+                  ? "Arama veya filtre kriterlerini değiştirip deneyin."
+                  : "İlk ürünü ekleyerek kataloğunuzu oluşturun."
+              }
+            />
+          </div>
         ) : (
           <div className="divide-y divide-border">
-            <div className={`hidden gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground sm:px-5 lg:grid lg:items-center ${LIST_COLUMNS}`}>
+            {/* Masaüstü Başlık */}
+            <div
+              className={`hidden gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground sm:px-5 lg:grid lg:items-center ${LIST_COLUMNS}`}
+            >
               <span>Ürün</span>
               <span>Kategori</span>
               <span>Fiyat</span>
@@ -103,61 +227,145 @@ function AdminProductsContent() {
               <span>Favori</span>
               <span className="text-right">İşlem</span>
             </div>
+
+            {/* Satırlar */}
             {filteredProducts.map((product) => {
               const category = categories?.find((item) => item.slug === product.categorySlug);
               return (
-                <article key={product._id} className={`flex flex-col gap-4 px-4 py-4 sm:px-5 lg:grid lg:items-center ${LIST_COLUMNS}`}>
+                <article
+                  key={product._id}
+                  className={`grid gap-4 px-4 py-3.5 sm:px-5 lg:items-center ${LIST_COLUMNS} hover:bg-muted/30 transition-colors`}
+                >
+                  {/* Ürün Görsel & Başlık */}
                   <div className="flex min-w-0 items-center gap-3">
                     {product.images[0] ? (
-                      <Image src={product.images[0]} alt="" width={56} height={56} unoptimized className="h-14 w-14 shrink-0 rounded-md border border-border bg-muted object-cover" />
+                      <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                        <Image
+                          src={product.images[0]}
+                          alt={product.title}
+                          fill
+                          sizes="48px"
+                          unoptimized
+                          className="object-cover"
+                        />
+                      </div>
                     ) : (
-                      <div aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-md border border-border bg-muted text-sm font-semibold text-muted-foreground">Ü</div>
+                      <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                        <PhotoIcon className="size-5 opacity-40" />
+                      </div>
                     )}
+
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-foreground">{product.title}</h3>
-                      <a
-                        href={`/product/${product.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 inline-flex items-center gap-1 truncate font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        title="Ürün sayfasına git"
-                      >
-                        <span>/product/{product.slug}</span>
-                        <ArrowTopRightOnSquareIcon className="size-3 shrink-0" />
-                      </a>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="truncate text-sm font-semibold text-foreground">
+                          {product.title}
+                        </h3>
+                        <a
+                          href={`/product/${product.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                          title="Mağazada Gör"
+                        >
+                          <ArrowTopRightOnSquareIcon className="size-3.5" />
+                        </a>
+                      </div>
+                      <p className="font-mono text-xs text-muted-foreground truncate">
+                        /{product.slug}
+                      </p>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground"><span className="mr-2 text-xs text-muted-foreground lg:hidden">Kategori</span>{category?.title || "Kategorisiz"}</p>
-                  <p className="text-sm font-semibold tabular-nums text-foreground"><span className="mr-2 text-xs font-normal text-muted-foreground lg:hidden">Fiyat</span>{formatMoney(product.price)}</p>
-                  <p className="text-xs font-semibold"><span className={`mr-2 inline-block h-2 w-2 rounded-full ${product.availableForSale ? "bg-primary" : "bg-muted-foreground"}`} />{product.availableForSale ? "Satışta" : "Pasif"}</p>
-                  <p className="text-sm tabular-nums text-foreground"><span className="mr-2 text-xs text-muted-foreground lg:hidden">Favori</span>{(product.favoriteCount ?? 0).toLocaleString("tr-TR")}</p>
-                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <Button asChild size="sm" variant="outline" className="min-h-10 gap-1.5" title="Ürün sayfasına git">
-                      <a href={`/product/${product.slug}`} target="_blank" rel="noopener noreferrer">
-                        <ArrowTopRightOnSquareIcon className="size-4" />
-                        <span>Görüntüle</span>
-                      </a>
+
+                  {/* Kategori */}
+                  <div className="min-w-0">
+                    <span className="text-xs text-muted-foreground truncate">
+                      {category?.title || "—"}
+                    </span>
+                  </div>
+
+                  {/* Fiyat */}
+                  <div>
+                    <span className="text-sm font-semibold tabular-nums text-foreground">
+                      {formatMoney(product.price)}
+                    </span>
+                  </div>
+
+                  {/* Durum Rozeti */}
+                  <div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-medium ${
+                        product.availableForSale
+                          ? "border-transparent bg-primary text-primary-foreground"
+                          : "border-border bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {product.availableForSale ? "Satışta" : "Pasif"}
+                    </Badge>
+                  </div>
+
+                  {/* Favori Sayısı */}
+                  <div>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {product.favoriteCount ?? 0}
+                    </span>
+                  </div>
+
+                  {/* Aksiyon Butonları */}
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button asChild size="sm" variant="outline" className="h-8 text-xs cursor-pointer">
+                      <Link href={adminPath(`products/${product._id}/edit`)}>
+                        <PencilSquareIcon className="size-3.5" />
+                        <span>Düzenle</span>
+                      </Link>
                     </Button>
-                    <Button asChild size="sm" variant="outline" className="min-h-10"><Link href={adminPath(`products/${product._id}/edit`)}>Düzenle</Link></Button>
-                    <Button size="sm" variant="ghost" className="min-h-10 text-muted-foreground hover:text-destructive" onClick={() => void handleDelete(product)}>Sil</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                      onClick={() => void handleDelete(product)}
+                      title="Sil"
+                    >
+                      <TrashIcon className="size-3.5" />
+                    </Button>
                   </div>
                 </article>
               );
             })}
           </div>
         )}
-        {data && (cursors.length > 1 || !data.isDone) && <nav aria-label="Ürün sayfaları" className="flex items-center justify-between gap-3 border-t border-border p-4">
-          <Button variant="outline" disabled={pending || cursors.length <= 1} onClick={() => setCursors((current) => current.slice(0, -1))}>Önceki</Button>
-          <span className="text-sm text-muted-foreground">Sayfa {cursors.length}</span>
-          <Button variant="outline" disabled={pending || data.isDone} onClick={() => setCursors((current) => [...current, data.continueCursor])}>Sonraki</Button>
-        </nav>}
+
+        {/* Sayfalama */}
+        {data && (cursors.length > 1 || !data.isDone) && (
+          <nav aria-label="Sayfalama" className="flex items-center justify-between border-t border-border p-4">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending || cursors.length <= 1}
+              onClick={() => setCursors((current) => current.slice(0, -1))}
+              className="cursor-pointer"
+            >
+              Önceki Sayfa
+            </Button>
+            <span className="text-xs text-muted-foreground font-mono">
+              Sayfa {cursors.length}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending || data.isDone || !data.continueCursor}
+              onClick={() => {
+                if (data.continueCursor) {
+                  setCursors((current) => [...current, data.continueCursor]);
+                }
+              }}
+              className="cursor-pointer"
+            >
+              Sonraki Sayfa
+            </Button>
+          </nav>
+        )}
       </Card>
-
-
     </>
   );
-}
-
-export default function AdminProductsPage() {
-  return <AdminProductsContent />;
 }

@@ -4,7 +4,6 @@ import {
   productDetailsClassName,
 } from "@/components/product/product-layout";
 import { GridTileImage } from "@/components/grid/tile";
-import Footer from "@/components/layout/footer";
 import { Gallery } from "@/components/product/gallery";
 import { ProductDescription } from "@/components/product/product-description";
 import {
@@ -210,7 +209,6 @@ async function ProductContent({
           <ProductMerchandising product={product} />
         </Suspense>
       </div>
-      <Footer />
     </>
   );
 }

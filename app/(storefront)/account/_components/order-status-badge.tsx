@@ -14,7 +14,7 @@ export function OrderStatusBadge({ status }: { status: Doc<"orders">["status"] }
       );
     case "cancelled":
       return (
-        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 gap-1.5 font-medium">
+        <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 gap-1.5 font-medium">
           <XCircleIcon className="h-3.5 w-3.5" />
           {orderStatusLabels[status]}
         </Badge>

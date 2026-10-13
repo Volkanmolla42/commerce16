@@ -26,6 +26,7 @@ import {
   Squares2X2Icon,
   TagIcon,
   UsersIcon,
+  EnvelopeIcon,
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui";
 import { useQuery } from "convex/react";
@@ -43,6 +44,7 @@ const navigation = [
   { label: "Siparişler", href: adminPath("orders"), icon: ShoppingBagIcon },
   { label: "Müşteriler", href: adminPath("customers"), icon: UsersIcon },
   { label: "Sepetler", href: adminPath("carts"), icon: ShoppingCartIcon },
+  { label: "E-Postalar", href: adminPath("emails"), icon: EnvelopeIcon },
   { label: "Analitik", href: adminPath("analytics"), icon: ChartBarIcon },
   { label: "Mağaza ayarları", href: adminPath("settings"), icon: Cog6ToothIcon },
 ];
@@ -155,7 +157,7 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
 
   return (
     <AdminHeaderContext.Provider value={{ route: pathname, slot: actionSlot }}>
-    <div data-admin-theme={theme} className="admin-theme min-h-[100dvh] bg-background text-foreground">
+    <div data-admin-theme={theme} className={`admin-theme min-h-[100dvh] bg-background text-foreground ${theme === "dark" ? "dark" : ""}`}>
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
         <div className="mb-8 flex items-center gap-3 px-2">
           <Link href={adminPath()} aria-label="Yönetim paneli ana sayfası" className="shrink-0">

@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -667,6 +668,42 @@ export const update = mutation({
       variants: next.variants,
       images: nextImages,
       updatedAt: new Date().toISOString(),
+    });
+
+    // Stok artışı olan veya yeniden satışa açılan varyantlar için Gelince Haber Ver bildirimini tetikle
+    if (next.availableForSale) {
+      for (const nextVariant of next.variants) {
+        const prevVariant = current.variants?.find((v) => v.id === nextVariant.id);
+        const prevStock = prevVariant?.stockQuantity ?? 0;
+        const nextStock = nextVariant.stockQuantity ?? 0;
+        const prevSellable = prevVariant ? isVariantSellable(prevVariant) : false;
+        const nextSellable = isVariantSellable(nextVariant);
+
+        if ((!prevSellable || prevStock <= 0) && nextSellable && nextStock > 0) {
+          await ctx.scheduler.runAfter(0, internal.restock.triggerRestockCheck, {
+            productId: id,
+            variantId: nextVariant.id,
+          });
+        }
+      }
+    }
+
+    return null;
+  },
+});
+
+export const triggerRestockAdmin = mutation({
+  args: {
+    adminSecret: v.string(),
+    productId: v.id("products"),
+    variantId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    await ctx.scheduler.runAfter(0, internal.restock.triggerRestockCheck, {
+      productId: args.productId,
+      variantId: args.variantId,
     });
     return null;
   },

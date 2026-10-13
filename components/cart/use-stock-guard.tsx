@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, startTransition } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -27,29 +27,26 @@ export function useStockGuard(items: CartItem[], store: CartStore) {
     : "skip";
   const liveValidation = useQuery(api.products.validateCart, validationArgs);
 
-  const stockMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const entry of liveValidation ?? []) {
-      map.set(cartLineKey(entry.productId, entry.variantId), Math.max(0, entry.stockQuantity));
-    }
-    return map;
-  }, [liveValidation]);
+  const stockMap = new Map<string, number>();
+  for (const entry of liveValidation ?? []) {
+    stockMap.set(cartLineKey(entry.productId, entry.variantId), Math.max(0, entry.stockQuantity));
+  }
 
-  const getItemMaxStock = useCallback((productId: string, variantId?: string) => {
+  function getItemMaxStock(productId: string, variantId?: string) {
     const liveStock = stockMap.get(cartLineKey(productId, variantId));
     if (liveStock !== undefined) return liveStock;
     const matching = items.find((item) => item.product.id === productId && item.variantId === variantId);
     return matching ? getVariantStock(matching.product, variantId) : UNLIMITED_STOCK;
-  }, [stockMap, items]);
+  }
 
   // Kullanıcı ürünü yeniden sepete eklediyse veya sepeti temizlediyse otomatik kaldırma hafızasını bırak.
-  const releaseStockKey = useCallback((productId: string, variantId?: string) => {
+  function releaseStockKey(productId: string, variantId?: string) {
     autoRemovedKeys.current.delete(cartLineKey(productId, variantId));
-  }, []);
+  }
 
-  const clearAllStockKeys = useCallback(() => {
+  function clearAllStockKeys() {
     autoRemovedKeys.current.clear();
-  }, []);
+  }
 
   useEffect(() => {
     if (!liveValidation) return;
@@ -83,15 +80,17 @@ export function useStockGuard(items: CartItem[], store: CartStore) {
       }
     }
     if (toAlert.length > 0) {
-      setAlertItems((prev) => [...prev, ...toAlert]);
-      setIsAlertOpen(true);
+      startTransition(() => {
+        setAlertItems((prev) => [...prev, ...toAlert]);
+        setIsAlertOpen(true);
+      });
     }
   }, [liveValidation, items, store]);
 
-  const dismissAlert = useCallback(() => {
+  function dismissAlert() {
     setIsAlertOpen(false);
     setAlertItems([]);
-  }, []);
+  }
 
   const alert = (
     <CartStockAlertModal open={isAlertOpen} onClose={dismissAlert} items={alertItems} />

@@ -120,9 +120,16 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"),
       v.literal("paid"),
+      v.literal("shipped"),
+      v.literal("delivered"),
       v.literal("cancelled")
     ),
     paidAt: v.optional(v.number()),
+    shippedAt: v.optional(v.number()),
+    deliveredAt: v.optional(v.number()),
+    carrier: v.optional(v.string()),
+    trackingNumber: v.optional(v.string()),
+    trackingUrl: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
     shippingAddress: v.optional(v.string()),
     legalAcceptance: v.optional(v.object({
@@ -178,7 +185,13 @@ export default defineSchema({
 
   orderEmailEvents: defineTable({
     orderId: v.id("orders"),
-    event: v.literal("payment_confirmation"),
+    event: v.union(
+      v.literal("payment_confirmation"),
+      v.literal("order_shipped"),
+      v.literal("order_cancelled"),
+      v.literal("order_delivered"),
+      v.literal("admin_new_order")
+    ),
     status: v.union(
       v.literal("processing"),
       v.literal("sent"),
@@ -284,4 +297,57 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_slug", ["userId", "productSlug"]),
 
+  restockSubscriptions: defineTable({
+    email: v.string(),
+    productId: v.id("products"),
+    variantId: v.optional(v.string()),
+    status: v.union(v.literal("pending"), v.literal("notified"), v.literal("cancelled")),
+    unsubscribeToken: v.string(),
+    notifiedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_product_and_variant", ["productId", "variantId"])
+    .index("by_email_and_product", ["email", "productId"])
+    .index("by_unsubscribe_token", ["unsubscribeToken"])
+    .index("by_status", ["status"]),
+
+  lowStockAlerts: defineTable({
+    productId: v.id("products"),
+    variantId: v.optional(v.string()),
+    stockQuantity: v.number(),
+    threshold: v.number(),
+    sentAt: v.number(),
+  })
+    .index("by_product_and_variant", ["productId", "variantId"]),
+
+  contactMessages: defineTable({
+    name: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    subject: v.string(),
+    message: v.string(),
+    status: v.union(v.literal("new"), v.literal("read"), v.literal("replied")),
+    emailSent: v.boolean(),
+    emailError: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_created_at", ["createdAt"])
+    .index("by_status", ["status"]),
+
+  emailLogs: defineTable({
+    templateKey: v.string(),
+    recipient: v.string(),
+    subject: v.string(),
+    htmlBody: v.optional(v.string()),
+    textBody: v.optional(v.string()),
+    status: v.union(v.literal("sent"), v.literal("failed")),
+    resendId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_created_at", ["createdAt"])
+    .index("by_recipient", ["recipient"])
+    .index("by_template_key", ["templateKey"])
+    .index("by_status", ["status"]),
 });

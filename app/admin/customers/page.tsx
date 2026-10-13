@@ -64,7 +64,7 @@ type CustomerDetail = {
   orders: CustomerOrder[];
 };
 
-const LIST_COLUMNS = "lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_90px_120px_88px]";
+const LIST_COLUMNS = "lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_90px_130px_90px]";
 
 const dateFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
 const dateTimeFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" });
@@ -96,7 +96,14 @@ function CustomerDetailsDialog({ customer, onClose }: { customer: Customer; onCl
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="truncate">{customerLabel(customer)}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle className="truncate">{customerLabel(customer)}</DialogTitle>
+            {customer.userId ? (
+              <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Kayıtlı Müşteri</span>
+            ) : (
+              <span className="rounded bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">Misafir</span>
+            )}
+          </div>
         </DialogHeader>
 
         {loading && !data ? (
@@ -105,62 +112,76 @@ function CustomerDetailsDialog({ customer, onClose }: { customer: Customer; onCl
           <AdminNotice kind="error">{error || "Müşteri bilgileri yüklenemedi."}</AdminNotice>
         ) : (
           <div className="space-y-6">
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">İletişim</h3>
-              <p className="mt-2 font-semibold text-foreground">{customerLabel(data)}</p>
-              {data.email ? <p className="mt-1 text-sm text-muted-foreground">{data.email}</p> : null}
-              {data.phone ? <p className="mt-1 text-sm text-muted-foreground">{data.phone}</p> : null}
-              <p className="mt-2 text-xs text-muted-foreground">
-                {data.registeredAt ? "Kayıtlı hesap" : "Misafir sipariş"}
-              </p>
-            </section>
-
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Özet</h3>
-              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SummaryTile label="Sipariş" value={String(data.orderCount)} />
-                <SummaryTile label="Toplam" value={formatMoney(data.totalSpent)} />
-                <SummaryTile label={data.registeredAt ? "Kayıt" : "İlk sipariş"} value={formatDate(data.registeredAt ?? data.firstOrderAt)} />
-                <SummaryTile label="Son sipariş" value={formatDate(data.lastOrderAt)} />
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">İletişim</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {data.email ? (
+                  <a
+                    href={`mailto:${data.email}`}
+                    className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/40"
+                  >
+                    <span className="truncate text-foreground">{data.email}</span>
+                    <span className="shrink-0 text-xs text-primary font-medium">E-posta Gönder</span>
+                  </a>
+                ) : null}
+                {data.phone ? (
+                  <a
+                    href={`tel:${data.phone}`}
+                    className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/40"
+                  >
+                    <span className="truncate text-foreground">{data.phone}</span>
+                    <span className="shrink-0 text-xs text-primary font-medium">Ara</span>
+                  </a>
+                ) : null}
               </div>
             </section>
 
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Adresler</h3>
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Genel Bakış</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SummaryTile label="Sipariş Sayısı" value={String(data.orderCount)} />
+                <SummaryTile label="Toplam Harcama" value={formatMoney(data.totalSpent)} />
+                <SummaryTile label={data.registeredAt ? "Kayıt Tarihi" : "İlk Sipariş"} value={formatDate(data.registeredAt ?? data.firstOrderAt)} />
+                <SummaryTile label="Son Sipariş" value={formatDate(data.lastOrderAt)} />
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Kayıtlı Adresler ({data.addresses.length})</h3>
               {data.addresses.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">Kayıtlı adres yok.</p>
+                <p className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">Kayıtlı adres bulunmuyor.</p>
               ) : (
-                <div className="mt-2 divide-y divide-border rounded-md border border-border">
+                <div className="divide-y divide-border rounded-lg border border-border bg-card">
                   {data.addresses.map((address) => (
-                    <div key={address._id} className="space-y-1 px-4 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{address.title}</span>
-                        {address.isDefault ? <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">Varsayılan</span> : null}
+                    <div key={address._id} className="space-y-1.5 p-4 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-foreground">{address.title}</span>
+                        {address.isDefault ? <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">Varsayılan</span> : null}
                       </div>
                       <p className="text-muted-foreground">{address.fullName} · {address.phone}</p>
-                      <p className="whitespace-pre-wrap leading-6 text-muted-foreground">{address.addressLine1}, {address.district}/{address.city}</p>
+                      <p className="leading-relaxed text-foreground">{address.addressLine1}, {address.district} / {address.city}</p>
                     </div>
                   ))}
                 </div>
               )}
             </section>
 
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Siparişler</h3>
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sipariş Geçmişi ({data.orders.length})</h3>
               {data.orders.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">Bu müşterinin siparişi yok.</p>
+                <p className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">Henüz verilmiş bir sipariş bulunmuyor.</p>
               ) : (
-                <div className="mt-2 divide-y divide-border rounded-md border border-border">
+                <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">
                   {data.orders.map((order) => (
                     <Link
                       key={order._id}
                       href={`${adminPath("orders")}?order=${encodeURIComponent(order._id)}`}
-                      className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                      className="flex items-center justify-between gap-3 p-4 transition-colors hover:bg-muted/40"
                     >
                       <div className="min-w-0">
-                        <p className="font-mono text-xs font-bold text-muted-foreground">#{order._id.slice(-8).toUpperCase()}</p>
+                        <p className="font-mono text-xs font-bold text-foreground">#{order._id.slice(-8).toUpperCase()}</p>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {dateTimeFormatter.format(new Date(order._creationTime))} · {order.itemCount} ürün
+                          {dateTimeFormatter.format(new Date(order._creationTime))} · {order.itemCount} adet ürün
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
@@ -232,7 +253,7 @@ export default function AdminCustomersPage() {
               <span className="text-right">İşlem</span>
             </div>
             {customers.map((customer) => (
-              <article key={customer.key} className={`grid gap-4 px-4 py-4 sm:px-5 lg:items-center ${LIST_COLUMNS}`}>
+              <article key={customer.key} className={`grid gap-4 px-4 py-4 sm:px-5 lg:items-center hover:bg-muted/30 transition-colors ${LIST_COLUMNS}`}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold text-foreground">{customerLabel(customer)}</p>
@@ -242,12 +263,12 @@ export default function AdminCustomersPage() {
                   {customer.phone ? <p className="truncate text-xs text-muted-foreground">{customer.phone}</p> : null}
                 </div>
                 <div className="space-y-1 text-xs text-muted-foreground">
-                  <p><span className="mr-2 font-medium lg:hidden">Kayıt</span>{formatDate(customer.registeredAt ?? customer.firstOrderAt)}</p>
-                  <p><span className="mr-2 font-medium lg:hidden">Son sipariş</span>{formatDate(customer.lastOrderAt)}</p>
+                  <p><span className="mr-2 font-medium lg:hidden">Kayıt:</span>{formatDate(customer.registeredAt ?? customer.firstOrderAt)}</p>
+                  <p><span className="mr-2 font-medium lg:hidden">Son Sipariş:</span>{formatDate(customer.lastOrderAt)}</p>
                 </div>
-                <p className="text-sm text-foreground"><span className="mr-2 font-medium text-muted-foreground lg:hidden">Sipariş</span>{customer.orderCount}</p>
+                <p className="text-sm text-foreground"><span className="mr-2 font-medium text-muted-foreground lg:hidden">Sipariş:</span>{customer.orderCount}</p>
                 <p className="text-sm font-semibold tabular-nums text-foreground">{formatMoney(customer.totalSpent)}</p>
-                <Button variant="outline" className="min-h-10 lg:justify-self-end" onClick={() => setSelected(customer)}>Detay</Button>
+                <Button variant="outline" size="sm" className="min-h-9 lg:justify-self-end" onClick={() => setSelected(customer)}>Detay</Button>
               </article>
             ))}
           </div>

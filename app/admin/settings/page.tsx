@@ -148,84 +148,114 @@ function AdminSettingsContent() {
         </div>
       )}
 
-      <form onSubmit={save}>
-        <div className="grid items-start gap-4 xl:grid-cols-2">
-          <Card className="rounded-lg">
-            <CardContent className="space-y-5 p-5 sm:p-6">
-              <h2 className="text-sm font-semibold text-foreground">Genel</h2>
-              <div className="space-y-2">
-                <Label htmlFor="store-name">Mağaza adı</Label>
-                <Input
-                  id="store-name"
-                  name="storeName"
-                  autoComplete="organization"
-                  required
-                  minLength={2}
-                  maxLength={80}
-                  value={text("storeName")}
-                  onChange={set("storeName")}
-                />
+      <form onSubmit={save} className="space-y-6">
+        <div className="grid items-start gap-6 xl:grid-cols-2">
+          {/* Sol Kolon: Genel Bilgiler */}
+          <div className="space-y-6">
+            <Card className="rounded-lg overflow-hidden">
+              <div className="border-b border-border p-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-foreground">Genel Mağaza Bilgileri</h2>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="store-slogan">Slogan</Label>
-                <Input
-                  id="store-slogan"
-                  name="slogan"
-                  maxLength={140}
-                  value={text("slogan")}
-                  onChange={set("slogan")}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="store-logo">Logo</Label>
-                {logoPreview && (
-                  <div className="flex items-center gap-3">
-                    <Image src={logoPreview} alt="Mağaza logosu" width={64} height={64} unoptimized className="h-16 w-16 rounded-md border border-border bg-muted object-contain" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={saving}
-                      onClick={() => {
-                        setPendingLogo(null);
-                        setLogoEdit(null);
-                      }}
-                    >
-                      Kaldır
-                    </Button>
-                  </div>
-                )}
-                <input
-                  id="store-logo"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  disabled={saving || uploadingLogo}
-                  onChange={handleLogoSelection}
-                  className="block min-h-11 w-full rounded-md border border-input bg-background text-sm text-muted-foreground file:mr-3 file:min-h-11 file:border-0 file:bg-muted file:px-4 file:font-medium"
-                />
-                {uploadingLogo && <p role="status" className="text-sm text-muted-foreground">Logo yükleniyor…</p>}
-              </div>
-              <label className="flex min-h-11 items-center gap-3 rounded-md border border-border px-3 text-sm font-medium text-foreground">
-                <input
-                  type="checkbox"
-                  name="isOpen"
-                  checked={isOpen}
-                  onChange={(event) =>
-                    setEdits((current) => ({ ...current, isOpen: event.target.checked }))
-                  }
-                  className="h-4 w-4"
-                />
-                Mağaza açık (kapalıysa vitrin yerine bilgi ekranı gösterilir)
-              </label>
-            </CardContent>
-          </Card>
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="store-name">Mağaza Adı</Label>
+                  <Input
+                    id="store-name"
+                    name="storeName"
+                    autoComplete="organization"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                    value={text("storeName")}
+                    onChange={set("storeName")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="store-slogan">Slogan</Label>
+                  <Input
+                    id="store-slogan"
+                    name="slogan"
+                    maxLength={140}
+                    placeholder="Örn: En taze lezzetler kapınızda"
+                    value={text("slogan")}
+                    onChange={set("slogan")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="store-logo">Mağaza Logosu</Label>
+                  {logoPreview && (
+                    <div className="flex items-center gap-3 mb-2 p-3 rounded-lg border border-border bg-card">
+                      <Image src={logoPreview} alt="Mağaza logosu" width={48} height={48} unoptimized className="size-12 rounded-md border border-border bg-muted object-contain" />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={saving}
+                        onClick={() => {
+                          setPendingLogo(null);
+                          setLogoEdit(null);
+                        }}
+                        className="text-xs text-destructive hover:text-destructive"
+                      >
+                        Logoyu Kaldır
+                      </Button>
+                    </div>
+                  )}
+                  <input
+                    id="store-logo"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={saving || uploadingLogo}
+                    onChange={handleLogoSelection}
+                    className="block min-h-10 w-full rounded-md border border-input bg-background text-xs text-muted-foreground file:mr-3 file:min-h-10 file:border-0 file:bg-muted file:px-4 file:text-xs file:font-semibold"
+                  />
+                  {uploadingLogo && <p role="status" className="text-xs text-primary font-medium">Logo yükleniyor…</p>}
+                </div>
+                <label className="flex items-center justify-between rounded-lg border border-border p-3 text-sm font-medium text-foreground cursor-pointer hover:bg-muted/30 transition-colors">
+                  <span>Mağaza Durumu (Açık / Satışa Hazır)</span>
+                  <input
+                    type="checkbox"
+                    name="isOpen"
+                    checked={isOpen}
+                    onChange={(event) =>
+                      setEdits((current) => ({ ...current, isOpen: event.target.checked }))
+                    }
+                    className="size-4 accent-primary rounded"
+                  />
+                </label>
+              </CardContent>
+            </Card>
 
-          <div className="grid gap-4">
-            <Card className="rounded-lg">
-              <CardContent className="space-y-5 p-5 sm:p-6">
-                <h2 className="text-sm font-semibold text-foreground">İletişim</h2>
+            <Card className="rounded-lg overflow-hidden">
+              <div className="border-b border-border p-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-foreground">Duyuru Çubuğu</h2>
+              </div>
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="store-announcement">Üst Bant Duyurusu</Label>
+                  <Input
+                    id="store-announcement"
+                    name="announcement"
+                    maxLength={160}
+                    placeholder="Örn: 500 TL üzeri kargo bedava!"
+                    value={text("announcement")}
+                    onChange={set("announcement")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sağ Kolon: İletişim ve Operasyon */}
+          <div className="space-y-6">
+            <Card className="rounded-lg overflow-hidden">
+              <div className="border-b border-border p-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-foreground">İletişim Bilgileri</h2>
+              </div>
+              <CardContent className="space-y-4 p-4 sm:p-5">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="store-phone">Telefon</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="store-phone">Telefon Numarası</Label>
                     <Input
                       id="store-phone"
                       name="phone"
@@ -235,8 +265,8 @@ function AdminSettingsContent() {
                       onChange={set("phone")}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="store-email">E-posta</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="store-email">E-posta Adresi</Label>
                     <Input
                       id="store-email"
                       name="email"
@@ -248,8 +278,8 @@ function AdminSettingsContent() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="store-address">Adres</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="store-address">Mağaza / Şirket Adresi</Label>
                   <textarea
                     id="store-address"
                     name="address"
@@ -257,34 +287,19 @@ function AdminSettingsContent() {
                     maxLength={300}
                     value={text("address")}
                     onChange={set("address")}
-                    className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2.5 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                    className="min-h-20 w-full rounded-md border border-input bg-background p-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
                   />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="rounded-lg">
-              <CardContent className="space-y-5 p-5 sm:p-6">
-                <h2 className="text-sm font-semibold text-foreground">Duyuru çubuğu</h2>
-                <div className="space-y-2">
-                  <Label htmlFor="store-announcement">Duyuru metni</Label>
-                  <Input
-                    id="store-announcement"
-                    name="announcement"
-                    maxLength={160}
-                    placeholder="Boş bırakılırsa çubuk gösterilmez"
-                    value={text("announcement")}
-                    onChange={set("announcement")}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-lg">
-              <CardContent className="space-y-5 p-5 sm:p-6">
-                <h2 className="text-sm font-semibold text-foreground">Stok uyarıları</h2>
-                <div className="space-y-2">
-                  <Label htmlFor="store-low-stock">Düşük stok eşiği (adet)</Label>
+            <Card className="rounded-lg overflow-hidden">
+              <div className="border-b border-border p-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-foreground">Stok Uyarı Eşiği</h2>
+              </div>
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="store-low-stock">Kritik Stok Sınırı (Adet)</Label>
                   <Input
                     id="store-low-stock"
                     name="lowStockThreshold"
@@ -301,21 +316,19 @@ function AdminSettingsContent() {
                       }))
                     }
                   />
-                  <p className="text-xs text-muted-foreground">Stoğu bu adede eşit veya altında olan varyantlar düşük stok olarak işaretlenir.</p>
                 </div>
               </CardContent>
             </Card>
-
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-end pt-2">
           <Button
             type="submit"
             disabled={saving || uploadingLogo || text("storeName").trim().length < 2}
-            className="h-11 px-5"
+            className="min-h-10 px-6 font-semibold"
           >
-            {saving ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
+            {saving ? "Kaydediliyor…" : "Ayarları Kaydet"}
           </Button>
         </div>
       </form>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 import { getVariantImages } from "@/lib/catalog/product-images";
 import { burstCartConfetti } from "./cart-confetti";
+import { RestockNotificationDialog } from "@/components/product/restock-notification-dialog";
 
 export function AddToCart({
   product,
@@ -101,6 +102,15 @@ export function AddToCart({
             <ArrowRightIcon className="h-4 w-4" />
           </Link>
         </Button>
+      )}
+
+      {!isAvailable && !needsSelection && (
+        <RestockNotificationDialog
+          productId={product.id}
+          variantId={selectedVariant?.id}
+          productTitle={product.title}
+          variantTitle={selectedVariant?.title}
+        />
       )}
     </div>
   );

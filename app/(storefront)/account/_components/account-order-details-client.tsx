@@ -261,7 +261,7 @@ export default function AccountOrderDetailsClient({
       {/* Durum İlerleme Çubuğu */}
       <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
         {isCancelled ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-destructive/10 p-4 text-destructive">
+          <div className="flex items-center gap-3 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 dark:text-red-400">
             <XCircleIcon className="h-6 w-6 shrink-0" />
             <div>
               <p className="font-bold text-sm">Bu sipariş iptal edilmiştir.</p>

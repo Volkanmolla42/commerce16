@@ -23,7 +23,7 @@ const product = (index: number, availableForSale = true, price = String(index + 
 
 beforeEach(() => {
   vi.stubEnv("ADMIN_API_SECRET", secret);
-  vi.spyOn(RateLimiter.prototype, "limit").mockResolvedValue({ ok: true } as any);
+  vi.spyOn(RateLimiter.prototype, "limit").mockResolvedValue({ ok: true } as unknown as Awaited<ReturnType<RateLimiter["limit"]>>);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

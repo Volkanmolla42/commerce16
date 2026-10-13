@@ -47,6 +47,14 @@ export async function GET(request: NextRequest) {
       const coupons = await client.query(api.coupons.listAdmin, { adminSecret });
       return NextResponse.json(coupons, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "email-templates") {
+      const templates = await client.query(api.emailTemplates.listTemplatesAdmin, { adminSecret });
+      return NextResponse.json(templates, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (resource === "sent-emails") {
+      const sent = await client.query(api.adminEmails.listSentEmailsAdmin, { adminSecret, limit: 100 });
+      return NextResponse.json(sent, { headers: { "Cache-Control": "no-store" } });
+    }
 
     if (resource === "products") {
       const [products, favoriteCounts] = await Promise.all([
@@ -153,6 +161,7 @@ export async function GET(request: NextRequest) {
             threshold: lowStock.threshold,
             productCount: lowStock.productCount,
             variantCount: lowStock.variantCount,
+            items: lowStock.page.slice(0, 5),
           },
         },
         { headers: { "Cache-Control": "no-store" } },
@@ -388,28 +397,39 @@ export async function POST(request: NextRequest) {
         if (
           status !== "pending" &&
           status !== "paid" &&
+          status !== "shipped" &&
+          status !== "delivered" &&
           status !== "cancelled"
         ) {
           throw new Error("Sipariş durumu geçersiz.");
         }
+        const carrier = typeof input.carrier === "string" ? input.carrier.trim() : undefined;
+        const trackingNumber = typeof input.trackingNumber === "string" ? input.trackingNumber.trim() : undefined;
+        const trackingUrl = typeof input.trackingUrl === "string" ? input.trackingUrl.trim() : undefined;
+
         const result = await client.mutation(api.orders.updateStatus, {
           adminSecret,
           id: stringValue(input.id, "Sipariş") as Id<"orders">,
           status,
+          ...(carrier ? { carrier } : {}),
+          ...(trackingNumber ? { trackingNumber } : {}),
+          ...(trackingUrl ? { trackingUrl } : {}),
         });
         return NextResponse.json({ success: true, result });
       }
 
       case "email.retry": {
         const event = stringValue(input.event, "E-posta türü");
-        if (event !== "payment_confirmation") throw new Error("E-posta türü geçersiz.");
+        const validEvents = ["payment_confirmation", "order_shipped", "order_cancelled", "order_delivered"];
+        if (!validEvents.includes(event)) throw new Error("E-posta türü geçersiz.");
         const result = await client.mutation(api.notifications.retry, {
           adminSecret,
           orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-          event,
+          event: event as "payment_confirmation" | "order_shipped" | "order_cancelled" | "order_delivered",
         });
         return NextResponse.json({ success: true, result });
       }
+
       default:
         return NextResponse.json({ error: "Desteklenmeyen işlem." }, { status: 400 });
     }

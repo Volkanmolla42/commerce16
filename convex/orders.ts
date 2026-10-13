@@ -327,7 +327,7 @@ export const createOrder = mutation({
   },
 });
 
-type OrderStatus = "pending" | "paid" | "cancelled";
+type OrderStatus = "pending" | "paid" | "shipped" | "delivered" | "cancelled";
 
 async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, direction: -1 | 1) {
   const productDeltas = new Map<string, Map<string, number>>();
@@ -354,17 +354,37 @@ async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, d
       return v;
     });
     await patchCatalogProduct(ctx, product, { variants: nextVariants });
+
+    // Stok düşüşü olduğunda kritik stok uyarısı kontrolü
+    for (const v of nextVariants) {
+      const prevV = product.variants.find((cand) => cand.id === v.id);
+      if (prevV && v.stockQuantity < prevV.stockQuantity) {
+        await ctx.scheduler.runAfter(0, internal.lowStock.checkLowStockForVariant, {
+          productId: product._id,
+          variantId: v.id,
+          currentStock: v.stockQuantity,
+          previousStock: prevV.stockQuantity,
+        });
+      }
+    }
   }
 }
 
-async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: OrderStatus) {
+async function changeOrderStatus(
+  ctx: MutationCtx,
+  id: Id<"orders">,
+  status: OrderStatus,
+  shippingInfo?: { carrier?: string; trackingNumber?: string; trackingUrl?: string }
+) {
   const order = await ctx.db.get(id);
   if (!order) throw new Error("Sipariş bulunamadı.");
   if (order.status === status) return null;
 
   const transitions: Record<OrderStatus, readonly OrderStatus[]> = {
     pending: ["paid", "cancelled"],
-    paid: ["cancelled"],
+    paid: ["shipped", "cancelled"],
+    shipped: ["delivered", "cancelled"],
+    delivered: [],
     cancelled: [],
   };
   if (!transitions[order.status].includes(status)) {
@@ -381,15 +401,35 @@ async function changeOrderStatus(ctx: MutationCtx, id: Id<"orders">, status: Ord
     await commitCouponReservation(ctx, order);
   }
 
-  await ctx.db.patch(id, {
+  const patchData: Record<string, unknown> = {
     status,
     ...(status === "paid" && !order.paidAt ? { paidAt: Date.now() } : {}),
-  });
+    ...(status === "shipped" && !order.shippedAt ? { shippedAt: Date.now() } : {}),
+    ...(status === "delivered" && !order.deliveredAt ? { deliveredAt: Date.now() } : {}),
+  };
+
+  if (shippingInfo?.carrier !== undefined) patchData.carrier = shippingInfo.carrier;
+  if (shippingInfo?.trackingNumber !== undefined) patchData.trackingNumber = shippingInfo.trackingNumber;
+  if (shippingInfo?.trackingUrl !== undefined) patchData.trackingUrl = shippingInfo.trackingUrl;
+
+  await ctx.db.patch(id, patchData);
+
   if (order.status !== status) {
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId: id });
   }
+
   if (order.status !== "paid" && status === "paid") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmation" });
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "admin_new_order" });
+  }
+  if (order.status !== "shipped" && status === "shipped") {
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_shipped" });
+  }
+  if (order.status !== "cancelled" && status === "cancelled") {
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_cancelled" });
+  }
+  if (order.status !== "delivered" && status === "delivered") {
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_delivered" });
   }
   return null;
 }
@@ -399,11 +439,18 @@ export const updateStatus = mutation({
     adminSecret: v.string(),
     id: v.id("orders"),
     status: orderStatusValidator,
+    carrier: v.optional(v.string()),
+    trackingNumber: v.optional(v.string()),
+    trackingUrl: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
-    return await changeOrderStatus(ctx, args.id, args.status);
+    return await changeOrderStatus(ctx, args.id, args.status, {
+      carrier: args.carrier,
+      trackingNumber: args.trackingNumber,
+      trackingUrl: args.trackingUrl,
+    });
   },
 });
 

@@ -365,12 +365,20 @@ function ProductEditor({
 
   const categoryAttributes = categories.find((category) => category.slug === categorySlug)?.attributes ?? [];
 
-  exitStateRef.current = {
-    isExisting: Boolean(product),
-    saved: savedRef.current,
-    title, slug, categorySlug, attributeValues, categoryAttributes,
-    variantOptions, variantRows, pendingImages,
-  };
+  useEffect(() => {
+    exitStateRef.current = {
+      isExisting: Boolean(product),
+      saved: savedRef.current,
+      title,
+      slug,
+      categorySlug,
+      attributeValues,
+      categoryAttributes,
+      variantOptions,
+      variantRows,
+      pendingImages,
+    };
+  });
 
   const uploadingCount = pendingImages.filter((image) => image.status === "uploading").length;
   const uploadedCount = pendingImages.filter((image) => image.status === "uploaded").length;

@@ -139,6 +139,11 @@ export default async function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/contact" className="transition-colors hover:text-black dark:hover:text-white">
+                  İletişim
+                </Link>
+              </li>
+              <li>
                 <Link href="/terms-conditions" className="transition-colors hover:text-black dark:hover:text-white">
                   Kullanım Koşulları
                 </Link>

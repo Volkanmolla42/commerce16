@@ -35,7 +35,13 @@ const addressValidator = v.object({
 const customerOrderValidator = v.object({
   _id: v.id("orders"),
   _creationTime: v.number(),
-  status: v.union(v.literal("pending"), v.literal("paid"), v.literal("cancelled")),
+  status: v.union(
+    v.literal("pending"),
+    v.literal("paid"),
+    v.literal("shipped"),
+    v.literal("delivered"),
+    v.literal("cancelled")
+  ),
   total: v.string(),
   itemCount: v.number(),
 });
