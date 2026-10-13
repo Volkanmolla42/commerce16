@@ -1,4 +1,3 @@
-import { connection } from "next/server";
 import { getGoogleShoppingProducts, getStoreSettings } from "@/lib/catalog";
 import { baseUrl } from "@/lib/utils";
 
@@ -24,7 +23,6 @@ function getProductDescription(title: string, price: string, attributes?: { key:
 }
 
 export async function GET() {
-  await connection();
   const [settings, products] = await Promise.all([
     getStoreSettings(),
     getGoogleShoppingProducts(),
