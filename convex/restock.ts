@@ -27,11 +27,11 @@ function cleanEmail(value: string) {
 }
 
 import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
+import { buildRestockNotificationEmail } from "./emailTemplates";
+import { formatMoney } from "../lib/format-money";
 
 function formatTRY(value: string | number) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return "₺0,00";
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(amount);
+  return formatMoney(value);
 }
 
 // 1. Müşterinin stok bildirimi kaydı oluşturması
@@ -251,90 +251,12 @@ export const sendRestockEmailAction = internalAction({
     ].join("\n");
 
     // Modern HTML Şablonu
-    const imageHtml = imageUrl
-      ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.title)}" style="max-width:180px;height:auto;border-radius:12px;border:1px solid #e5e7eb;margin-bottom:16px;display:block;" />`
-      : "";
-
-    const html = `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;line-height:1.5;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-          
-          <!-- Üst Bar / Marka -->
-          <tr>
-            <td style="padding:24px 32px;border-bottom:1px solid #f3f4f6;">
-              <span style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.03em;">${escapeHtml(storeName)}</span>
-            </td>
-          </tr>
-
-          <!-- Karşılama & Müjde -->
-          <tr>
-            <td style="padding:32px 32px 20px 32px;text-align:center;">
-              <div style="display:inline-block;padding:6px 14px;background-color:#ecfdf5;color:#047857;border-radius:9999px;font-size:13px;font-weight:700;margin-bottom:16px;border:1px solid #a7f3d0;">
-                ✨ TEKRAR STOKTA!
-              </div>
-              <h1 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:#111827;letter-spacing:-0.02em;">
-                Beklediğiniz Ürün Geldi!
-              </h1>
-              <p style="margin:0;font-size:15px;color:#4b5563;line-height:1.6;">
-                Haber vermemizi istediğiniz <strong>${escapeHtml(product.title)}</strong> ürünümüz yeniden stoklarımıza eklendi. Yoğun talep nedeniyle hızla tükenebilir!
-              </p>
-            </td>
-          </tr>
-
-          <!-- Ürün Kartı -->
-          <tr>
-            <td style="padding:10px 32px 24px 32px;" align="center">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;padding:24px;text-align:center;">
-                <tr>
-                  <td align="center">
-                    ${imageHtml}
-                    <div style="font-size:17px;font-weight:700;color:#111827;margin-bottom:6px;">
-                      ${escapeHtml(product.title)}
-                    </div>
-                    ${variantTitle ? `<div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Seçenek: <strong>${escapeHtml(variantTitle)}</strong></div>` : ""}
-                    <div style="font-size:20px;font-weight:800;color:#16a34a;margin-bottom:20px;">
-                      ${escapeHtml(priceText)}
-                    </div>
-                    <div>
-                      <a href="${escapeHtml(productUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 28px;background-color:#111827;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        Hemen İncele & Satın Al &rarr;
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Alt Bilgi / Unsubscribe -->
-          <tr>
-            <td style="padding:24px 32px;background-color:#f9fafb;border-top:1px solid #f3f4f6;text-align:center;font-size:12px;color:#9ca3af;">
-              <p style="margin:0 0 8px 0;">
-                Bu e-posta, <strong>${escapeHtml(storeName)}</strong> mağazasında stok bildirim talebinde bulunduğunuz için gönderilmiştir.
-              </p>
-              <p style="margin:0;">
-                Artık bu ürün için bildirim almak istemiyorsanız <a href="${escapeHtml(unsubscribeUrl)}" target="_blank" rel="noopener noreferrer" style="color:#6b7280;text-decoration:underline;">buraya tıklayarak bildirim aboneliğinizi sonlandırabilirsiniz</a>.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
+    const html = buildRestockNotificationEmail({
+      storeName,
+      productTitle: `${product.title}${variantTitle ? ` (${variantTitle})` : ""}`,
+      productUrl,
+      unsubscribeUrl,
+    });
 
     const result = await sendResendEmail({
       to: sub.email,

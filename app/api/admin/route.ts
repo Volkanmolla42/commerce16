@@ -47,6 +47,10 @@ export async function GET(request: NextRequest) {
       const coupons = await client.query(api.coupons.listAdmin, { adminSecret });
       return NextResponse.json(coupons, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "payments") {
+      const payments = await client.query(api.payments.getPaymentSettings, {});
+      return NextResponse.json(payments, { headers: { "Cache-Control": "no-store" } });
+    }
     if (resource === "email-templates") {
       const templates = await client.query(api.emailTemplates.listTemplatesAdmin, { adminSecret });
       return NextResponse.json(templates, { headers: { "Cache-Control": "no-store" } });
@@ -296,6 +300,43 @@ export async function POST(request: NextRequest) {
         revalidateTag("store-settings", { expire: 0 });
         revalidatePath("/", "layout");
         revalidatePath("/opengraph-image");
+        return NextResponse.json({ success: true, ...result });
+      }
+      case "payments.update": {
+        const cashOnDelivery = isRecord(input.cashOnDelivery) ? input.cashOnDelivery : {};
+        const bankTransfer = isRecord(input.bankTransfer) ? input.bankTransfer : {};
+        const paytr = isRecord(input.paytr) ? input.paytr : {};
+
+        const accounts = Array.isArray(bankTransfer.accounts)
+          ? bankTransfer.accounts.filter(isRecord).map((acc) => ({
+              id: typeof acc.id === "string" ? acc.id : "",
+              bankName: typeof acc.bankName === "string" ? acc.bankName : "",
+              accountHolder: typeof acc.accountHolder === "string" ? acc.accountHolder : "",
+              iban: typeof acc.iban === "string" ? acc.iban : "",
+            }))
+          : [];
+
+        const result = await client.mutation(api.payments.updatePaymentSettings, {
+          adminSecret,
+          cashOnDelivery: {
+            enabled: cashOnDelivery.enabled !== false,
+            fee: typeof cashOnDelivery.fee === "number" ? Math.max(0, cashOnDelivery.fee) : 0,
+            description: typeof cashOnDelivery.description === "string" ? cashOnDelivery.description : "",
+          },
+          bankTransfer: {
+            enabled: bankTransfer.enabled !== false,
+            description: typeof bankTransfer.description === "string" ? bankTransfer.description : "",
+            accounts,
+          },
+          paytr: {
+            enabled: paytr.enabled !== false,
+            testMode: paytr.testMode !== false,
+            merchantId: typeof paytr.merchantId === "string" ? paytr.merchantId : "",
+            merchantKey: typeof paytr.merchantKey === "string" ? paytr.merchantKey : "",
+            merchantSalt: typeof paytr.merchantSalt === "string" ? paytr.merchantSalt : "",
+            description: typeof paytr.description === "string" ? paytr.description : "",
+          },
+        });
         return NextResponse.json({ success: true, ...result });
       }
       case "product.image-upload-url": {

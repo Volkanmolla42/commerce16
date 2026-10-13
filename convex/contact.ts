@@ -3,6 +3,9 @@ import { internal } from "./_generated/api";
 import { env, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { assertAdminApiSecret } from "./adminAuth";
 import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
+import { buildContactFormEmail } from "./emailTemplates";
+import { formatDateTime } from "../lib/format-date";
+import { formatPhone } from "../lib/orders";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -143,10 +146,10 @@ export const sendContactAlertAction = internalAction({
     const { message, storeName, storeEmail } = data;
     const toEmail = process.env.ADMIN_ALERT_EMAIL || storeEmail || "delivered@resend.dev";
 
-    const formattedDate = new Intl.DateTimeFormat("tr-TR", {
+    const formattedDate = formatDateTime(message.createdAt, {
       dateStyle: "full",
       timeStyle: "short",
-    }).format(new Date(message.createdAt));
+    });
 
     const subject = `📩 Yeni İletişim Mesajı: ${message.subject} (${message.name}) | ${storeName}`;
 
@@ -157,7 +160,7 @@ export const sendContactAlertAction = internalAction({
       `Tarih: ${formattedDate}`,
       `Gönderen: ${message.name}`,
       `E-posta: ${message.email}`,
-      ...(message.phone ? [`Telefon: ${message.phone}`] : []),
+      ...(message.phone ? [`Telefon: ${formatPhone(message.phone)}`] : []),
       `Konu: ${message.subject}`,
       ``,
       `Mesaj:`,
@@ -167,102 +170,15 @@ export const sendContactAlertAction = internalAction({
     ].join("\n");
 
     // HTML Şablonu
-    const html = `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:24px;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.6;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-    <tr>
-      <td>
-        <!-- Üst Başlık Barı -->
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#0f172a;color:#ffffff;padding:24px 32px;">
-          <tr>
-            <td>
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:6px;">
-                📬 MÜŞTERİ İLETİŞİM FORMU
-              </div>
-              <h1 style="margin:0;font-size:20px;font-weight:700;line-height:1.3;color:#ffffff;">
-                Yeni İletişim Formu Mesajı
-              </h1>
-              <div style="font-size:12px;color:#64748b;margin-top:4px;">
-                ${escapeHtml(formattedDate)}
-              </div>
-            </td>
-          </tr>
-        </table>
-
-        <!-- İçerik Alanı -->
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding:32px;">
-          <tr>
-            <td style="padding:0 32px 24px 32px;">
-              <!-- Gönderen Bilgileri Kartı -->
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f1f5f9;border-radius:8px;padding:16px 20px;margin-bottom:24px;">
-                <tr>
-                  <td>
-                    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;">
-                      <tr>
-                        <td style="width:100px;color:#64748b;font-weight:600;padding:4px 0;">Gönderen:</td>
-                        <td style="color:#0f172a;font-weight:700;padding:4px 0;">${escapeHtml(message.name)}</td>
-                      </tr>
-                      <tr>
-                        <td style="color:#64748b;font-weight:600;padding:4px 0;">E-posta:</td>
-                        <td style="padding:4px 0;">
-                          <a href="mailto:${escapeHtml(message.email)}" style="color:#2563eb;text-decoration:none;font-weight:600;">
-                            ${escapeHtml(message.email)}
-                          </a>
-                        </td>
-                      </tr>
-                      ${message.phone ? `
-                      <tr>
-                        <td style="color:#64748b;font-weight:600;padding:4px 0;">Telefon:</td>
-                        <td style="color:#0f172a;padding:4px 0;">${escapeHtml(message.phone)}</td>
-                      </tr>
-                      ` : ""}
-                      <tr>
-                        <td style="color:#64748b;font-weight:600;padding:4px 0;">Konu:</td>
-                        <td style="color:#0f172a;font-weight:600;padding:4px 0;">${escapeHtml(message.subject)}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Mesaj Gövdesi -->
-              <div style="font-size:13px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:8px;letter-spacing:0.5px;">
-                Mesaj İçeriği:
-              </div>
-              <div style="background-color:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:20px;font-size:14px;color:#1e293b;line-height:1.7;white-space:pre-wrap;margin-bottom:24px;">${escapeHtml(message.message)}</div>
-
-              <!-- Hızlı Yanıt Bilgisi -->
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;">
-                <tr>
-                  <td>
-                    <div style="font-size:13px;color:#1e40af;line-height:1.5;">
-                      💡 <strong>İpucu:</strong> Bu e-postaya "Yanıtla" (Reply) diyerek doğrudan müşteriye e-posta cevabınızı iletebilirsiniz.
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Alt Bilgi -->
-          <tr>
-            <td style="padding:20px 32px;background-color:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;color:#94a3b8;">
-              © ${escapeHtml(storeName)} — İletişim Formu Bildirim Servisi
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
+    const html = buildContactFormEmail({
+      storeName,
+      senderName: message.name,
+      senderEmail: message.email,
+      senderPhone: message.phone,
+      subject: message.subject,
+      message: message.message,
+      formattedDate,
+    });
 
     const result = await sendResendEmail({
       to: toEmail,

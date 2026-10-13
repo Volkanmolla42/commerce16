@@ -5,6 +5,12 @@ import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { assertAdminApiSecret } from "./adminAuth";
 import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
+import { EMAIL_ICONS } from "./emailTemplates";
+import { defaultPaymentSettings } from "./payments";
+import { formatOrderCode, getOrderCode, resolveCarrierTrackingUrl } from "../lib/orders";
+import { formatMoney } from "../lib/format-money";
+import { formatDateTime } from "../lib/format-date";
+import { formatIban } from "../lib/iban";
 
 export const eventValidator = v.union(
   v.literal("payment_confirmation"),
@@ -21,6 +27,12 @@ const emailItemValidator = v.object({
   price: v.string(),
   image: v.union(v.string(), v.null()),
   sku: v.union(v.string(), v.null()),
+});
+
+const bankAccountEmailValidator = v.object({
+  bankName: v.string(),
+  accountHolder: v.string(),
+  iban: v.string(),
 });
 
 const emailPayloadValidator = v.object({
@@ -43,6 +55,12 @@ const emailPayloadValidator = v.object({
   storeName: v.string(),
   storeEmail: v.union(v.string(), v.null()),
   storePhone: v.union(v.string(), v.null()),
+  paymentMethod: v.optional(v.union(v.literal("cash_on_delivery"), v.literal("bank_transfer"), v.literal("paytr"), v.null())),
+  paymentMethodTitle: v.optional(v.union(v.string(), v.null())),
+  paymentFee: v.optional(v.union(v.number(), v.null())),
+  orderStatus: v.optional(v.string()),
+  bankAccounts: v.optional(v.array(bankAccountEmailValidator)),
+  bankTransferInstructions: v.optional(v.union(v.string(), v.null())),
 });
 
 export type EmailEvent = "payment_confirmation" | "order_shipped" | "order_cancelled" | "order_delivered" | "admin_new_order";
@@ -73,39 +91,15 @@ type EmailPayload = {
   storeName: string;
   storeEmail: string | null;
   storePhone: string | null;
+  paymentMethod?: "cash_on_delivery" | "bank_transfer" | "paytr" | null;
+  paymentMethodTitle?: string | null;
+  paymentFee?: number | null;
+  orderStatus?: string;
+  bankAccounts?: Array<{ bankName: string; accountHolder: string; iban: string }>;
+  bankTransferInstructions?: string | null;
 };
 
-export function resolveCarrierTrackingUrl(carrier?: string | null, trackingNumber?: string | null): string | null {
-  if (!trackingNumber?.trim()) return null;
-  const num = encodeURIComponent(trackingNumber.trim());
-  const name = carrier?.trim().toLowerCase() || "";
-
-  if (name.includes("yurtiçi") || name.includes("yurtici")) {
-    return `https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code=${num}`;
-  }
-  if (name.includes("aras")) {
-    return `https://kargotakip.araskargo.com.tr/mainpage.aspx?code=${num}`;
-  }
-  if (name.includes("mng")) {
-    return `https://service.mngkargo.com.tr/iactive/popup/kargotakip.asp?k=${num}`;
-  }
-  if (name.includes("ptt")) {
-    return `https://gonderitakip.ptt.gov.tr/Track/Verify?q=${num}`;
-  }
-  if (name.includes("sürat") || name.includes("surat")) {
-    return `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${num}`;
-  }
-  if (name.includes("hepsijet") || name.includes("hepsi jet")) {
-    return `https://hepsijet.com/gonderi-takibi/${num}`;
-  }
-  if (name.includes("trendyol")) {
-    return `https://kargotakip.trendyol.com/?trackingNumber=${num}`;
-  }
-  if (name.includes("kolay gelsin") || name.includes("kolaygelsin")) {
-    return `https://esube.kolaygelsin.com/shipments?trackingId=${num}`;
-  }
-  return null;
-}
+export { resolveCarrierTrackingUrl };
 
 export const getOrderEmailPayload = internalQuery({
   args: { orderId: v.id("orders"), event: eventValidator },
@@ -115,7 +109,8 @@ export const getOrderEmailPayload = internalQuery({
     if (!order) return null;
 
     // Durum kontrolü: Her bildirim kendi geçerli sipariş statüsünde gönderilir
-    if (event === "payment_confirmation" && order.status === "pending") return null;
+    // payment_confirmation: Hem ödenmiş siparişler hem de havale/kapıda ödeme ile beklemedeki siparişler için sipariş alındı onayıdır
+    if (event === "payment_confirmation" && order.status === "cancelled") return null;
     if (event === "order_shipped" && order.status !== "shipped" && order.status !== "delivered") return null;
     if (event === "order_cancelled" && order.status !== "cancelled") return null;
     if (event === "order_delivered" && order.status !== "delivered") return null;
@@ -130,6 +125,25 @@ export const getOrderEmailPayload = internalQuery({
     const storePhone = settings?.phone?.trim() || null;
 
     const trackingUrl = order.trackingUrl?.trim() || resolveCarrierTrackingUrl(order.carrier, order.trackingNumber);
+
+    let bankAccounts: Array<{ bankName: string; accountHolder: string; iban: string }> | undefined = undefined;
+    let bankTransferInstructions: string | null = null;
+
+    if (order.paymentMethod === "bank_transfer") {
+      const paymentSettingsDoc = await ctx.db
+        .query("paymentSettings")
+        .withIndex("by_key", (q) => q.eq("key", "payment"))
+        .unique();
+      const accounts = paymentSettingsDoc?.bankTransfer?.accounts ?? defaultPaymentSettings.bankTransfer.accounts;
+      bankAccounts = accounts.map((acc) => ({
+        bankName: acc.bankName,
+        accountHolder: acc.accountHolder,
+        iban: acc.iban,
+      }));
+      bankTransferInstructions =
+        paymentSettingsDoc?.bankTransfer?.description ||
+        defaultPaymentSettings.bankTransfer.description;
+    }
 
     return {
       orderId,
@@ -157,6 +171,12 @@ export const getOrderEmailPayload = internalQuery({
       storeName,
       storeEmail,
       storePhone,
+      paymentMethod: order.paymentMethod ?? null,
+      paymentMethodTitle: order.paymentMethodTitle ?? null,
+      paymentFee: order.paymentFee ?? null,
+      orderStatus: order.status,
+      bankAccounts,
+      bankTransferInstructions,
     };
   },
 });
@@ -215,7 +235,7 @@ export const recordSendResult = internalMutation({
 
     if (args.status === "sent" || args.status === "failed") {
       const order = await ctx.db.get(event.orderId);
-      const orderNumber = order ? ("orderNumber" in order && order.orderNumber ? String(order.orderNumber) : order._id.slice(-8).toUpperCase()) : "";
+      const orderNumber = getOrderCode(order);
       const recipient = event.event === "admin_new_order"
         ? (process.env.ADMIN_ALERT_EMAIL || "delivered@resend.dev")
         : (order?.customerEmail || "Müşteri");
@@ -256,77 +276,105 @@ export const listForOrdersAdmin = query({
 
 
 function formatTRY(value: string | number) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return "₺0,00";
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(amount);
+  return formatMoney(value);
 }
 
 function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat("tr-TR", {
+  return formatDateTime(timestamp, {
     day: "numeric",
     month: "long",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(timestamp));
+  });
 }
 
 function buildEmail(payload: EmailPayload) {
-  const shortOrderId = String(payload.orderId).slice(-8).toUpperCase();
+  const shortOrderId = formatOrderCode(payload.orderId);
   const discountAmount = payload.couponDiscountKurus ? payload.couponDiscountKurus / 100 : 0;
   const itemsSubtotal = payload.items.reduce((acc, item) => acc + Number(item.price) * item.quantity, 0);
 
-  // Etkinliğe göre başlık, rozet ve karşılama metinleri
+  // Etkinliğe göre başlık, ikon ve karşılama metinleri
   let subject = `Siparişiniz Alındı — #${shortOrderId} | ${payload.storeName}`;
-  let badgeText = "Sipariş Onaylandı";
-  let badgeBg = "#ecfdf5";
-  let badgeColor = "#047857";
-  let badgeBorder = "#a7f3d0";
-  let mainTitle = "Siparişiniz Alındı!";
-  let heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, alışverişiniz için teşekkür ederiz. Siparişiniz başarıyla alındı ve ödemeniz onaylandı.`;
-  let nextStepTitle = "📦 Sırada Ne Var?";
-  let nextStepMessage = "Siparişiniz hazırlandığında ve kargoya verildiğinde, takip numarası ile birlikte yeni bir bilgilendirme e-postası alacaksınız.";
+  let iconSvg = EMAIL_ICONS.checkCircle;
+  let mainTitle = "Siparişiniz Alındı";
+  let heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişiniz başarıyla alındı ve ödemeniz onaylandı.`;
+  let nextStepTitle = "Sırada Ne Var?";
+  let nextStepMessage = "Siparişiniz hazırlandığında ve kargoya verildiğinde takip numarası ile birlikte yeni bir bilgilendirme e-postası alacaksınız.";
 
-  if (payload.event === "order_shipped") {
+  let badgeText = "Sipariş Alındı";
+  let badgeBg = "#ecfdf5";
+  let badgeColor = "#059669";
+  let badgeBorder = "#a7f3d0";
+
+  if (payload.event === "payment_confirmation") {
+    if (payload.paymentMethod === "bank_transfer") {
+      subject = `Siparişiniz Alındı (Havale/EFT Bekleniyor) — #${shortOrderId} | ${payload.storeName}`;
+      mainTitle = "Siparişiniz Alındı — Ödeme Bekleniyor";
+      heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, #${shortOrderId} numaralı siparişiniz oluşturuldu. Siparişinizin onaylanıp kargoya hazırlanması için lütfen aşağıdaki banka hesabımıza havale/EFT yapınız.`;
+      nextStepTitle = "Havale / EFT Talimatı";
+      nextStepMessage = `${payload.bankTransferInstructions || "Lütfen havale yaparken açıklama kısmına sipariş numaranızı yazınız."} (Sipariş No: #${shortOrderId})`;
+      badgeText = "Ödeme Bekleniyor";
+      badgeBg = "#fffbeb";
+      badgeColor = "#b45309";
+      badgeBorder = "#fde68a";
+    } else if (payload.paymentMethod === "cash_on_delivery") {
+      subject = `Siparişiniz Alındı (Kapıda Ödeme) — #${shortOrderId} | ${payload.storeName}`;
+      mainTitle = "Siparişiniz Alındı";
+      heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişiniz başarıyla alındı. Teslimat sırasında nakit veya kartla kapıda ödeyebilirsiniz.`;
+      nextStepTitle = "Teslimat ve Ödeme";
+      nextStepMessage = "Siparişiniz paketlenip kargoya verilecektir. Kargo teslimatı anında nakit veya kart ile ödemenizi yapabilirsiniz.";
+      badgeText = "Kapıda Ödeme";
+      badgeBg = "#f0fdf4";
+      badgeColor = "#16a34a";
+      badgeBorder = "#bbf7d0";
+    } else {
+      badgeText = "Ödeme Onaylandı";
+    }
+  } else if (payload.event === "order_shipped") {
     subject = `Siparişiniz Kargoya Verildi — #${shortOrderId} | ${payload.storeName}`;
-    badgeText = "Kargoya Verildi";
-    badgeBg = "#eff6ff";
-    badgeColor = "#1d4ed8";
-    badgeBorder = "#bfdbfe";
-    mainTitle = "Siparişiniz Yola Çıktı! 🚚";
-    heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, müjde! Siparişiniz paketlendi ve kargo firmasına teslim edildi.`;
-    nextStepTitle = "🚚 Teslimat Süreci";
+    iconSvg = EMAIL_ICONS.truck;
+    mainTitle = "Siparişiniz Yola Çıktı";
+    heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişiniz paketlendi ve kargo firmasına teslim edildi.`;
+    nextStepTitle = "Teslimat Süreci";
     nextStepMessage = "Kargonuz yola çıktı. Aşağıdaki takip bilgilerini kullanarak gönderinizin nerede olduğunu anlık olarak takip edebilirsiniz.";
+    badgeText = "Kargoda";
+    badgeBg = "#eff6ff";
+    badgeColor = "#2563eb";
+    badgeBorder = "#bfdbfe";
   } else if (payload.event === "order_cancelled") {
     subject = `Siparişiniz İptal Edildi — #${shortOrderId} | ${payload.storeName}`;
-    badgeText = "İptal Edildi";
-    badgeBg = "#fef2f2";
-    badgeColor = "#b91c1c";
-    badgeBorder = "#fecaca";
+    iconSvg = EMAIL_ICONS.alertCircle;
     mainTitle = "Sipariş İptal Edildi";
     heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, #${shortOrderId} numaralı siparişiniz iptal edilmiştir. Varsa ödemeniz bankanıza bağlı olarak 1-7 iş günü içinde hesabınıza yansıyacaktır.`;
-    nextStepTitle = "ℹ️ İade & İptal Bilgisi";
+    nextStepTitle = "İade & İptal Bilgisi";
     nextStepMessage = "İptal işlemiyle ilgili herhangi bir sorunuz olursa müşteri destek ekibimizle iletişime geçebilirsiniz.";
+    badgeText = "İptal Edildi";
+    badgeBg = "#fef2f2";
+    badgeColor = "#dc2626";
+    badgeBorder = "#fecaca";
   } else if (payload.event === "order_delivered") {
     subject = `Siparişiniz Teslim Edildi — #${shortOrderId} | ${payload.storeName}`;
+    iconSvg = EMAIL_ICONS.packageCheck;
+    mainTitle = "Siparişiniz Teslim Edildi";
+    heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişinizin teslimatı başarıyla tamamlandı. Ürünlerinizi güzel günlerde kullanmanızı dileriz.`;
+    nextStepTitle = "Teşekkür Ederiz";
+    nextStepMessage = "Bizi tercih ettiğiniz için teşekkür ederiz. Destek almak için her zaman bize ulaşabilirsiniz.";
     badgeText = "Teslim Edildi";
-    badgeBg = "#ecfdf5";
-    badgeColor = "#047857";
-    badgeBorder = "#a7f3d0";
-    mainTitle = "Siparişiniz Teslim Edildi! 🎉";
-    heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişinizin teslimatı başarıyla tamamlandı. Ürünlerinizi güzel günlerde kullanmanızı dileriz!`;
-    nextStepTitle = "⭐ Bizi Tercih Ettiğiniz İçin Teşekkürler";
-    nextStepMessage = "Ürünlerinizden memnun kalmanızı umuyoruz. Deneyiminizi bizimle paylaşmak veya destek almak için her zaman bize ulaşabilirsiniz.";
+    badgeBg = "#f0fdf4";
+    badgeColor = "#16a34a";
+    badgeBorder = "#bbf7d0";
   } else if (payload.event === "admin_new_order") {
-    subject = `🔔 Yeni Sipariş Alındı! — #${shortOrderId} (${formatTRY(payload.total)}) | ${payload.storeName}`;
-    badgeText = "Yeni Sipariş (Yönetici)";
-    badgeBg = "#fffbeb";
-    badgeColor = "#b45309";
-    badgeBorder = "#fde68a";
-    mainTitle = "Yeni Bir Sipariş Düştü!";
-    heroMessage = `Mağazanızda <strong>${escapeHtml(payload.customerName)}</strong> tarafından yeni bir sipariş oluşturuldu ve ödemesi onaylandı. Sipariş kalemleri ve teslimat bilgileri aşağıdadır:`;
-    nextStepTitle = "📋 Yönetici Notu";
+    subject = `Yeni Sipariş Alındı: #${shortOrderId} (${formatTRY(payload.total)}) | ${payload.storeName}`;
+    iconSvg = EMAIL_ICONS.bell;
+    mainTitle = "Yeni Sipariş Alındı";
+    heroMessage = `Mağazanızda <strong>${escapeHtml(payload.customerName)}</strong> tarafından yeni bir sipariş oluşturuldu. Ödeme yöntemi: ${escapeHtml(payload.paymentMethodTitle || "Belirtilmemiş")}.`;
+    nextStepTitle = "Yönetici Notu";
     nextStepMessage = "Siparişi hazırlayıp kargoya verdiğinizde admin panelinden durumunu güncelleyerek müşteriye kargo takip kodunu iletebilirsiniz.";
+    badgeText = "Yeni Sipariş";
+    badgeBg = "#faf5ff";
+    badgeColor = "#7c3aed";
+    badgeBorder = "#e9d5ff";
   }
 
   // Düz Metin (Plain Text)
@@ -335,7 +383,7 @@ function buildEmail(payload: EmailPayload) {
   );
 
   const text = [
-    `${payload.storeName.toUpperCase()} — ${badgeText.toUpperCase()}`,
+    `${payload.storeName.toUpperCase()} — ${mainTitle.toUpperCase()}`,
     `----------------------------------------`,
     `Merhaba ${payload.customerName},`,
     mainTitle,
@@ -343,11 +391,19 @@ function buildEmail(payload: EmailPayload) {
     `Sipariş No: #${shortOrderId}`,
     `Sipariş ID: ${payload.orderId}`,
     `Tarih: ${formatDate(payload.createdAt)}`,
+    ...(payload.paymentMethodTitle ? [`Ödeme Yöntemi: ${payload.paymentMethodTitle}`] : []),
     ...(payload.event === "order_shipped" && payload.carrier ? [``, `Kargo Firması: ${payload.carrier}`, `Takip No: ${payload.trackingNumber || "—"}`, ...(payload.trackingUrl ? [`Takip Linki: ${payload.trackingUrl}`] : [])] : []),
+    ...(payload.bankAccounts && payload.bankAccounts.length > 0 ? [
+      ``,
+      `=== HAVALE / EFT BİLGİLERİ ===`,
+      `Lütfen havale/EFT yaparken açıklama alanına #${shortOrderId} sipariş numaranızı yazınız.`,
+      ...payload.bankAccounts.map((acc) => `• ${acc.bankName} | ${acc.accountHolder} | IBAN: ${acc.iban}`),
+    ] : []),
     ...(payload.shippingAddress ? [``, `Teslimat Adresi:`, payload.shippingAddress] : []),
     ``,
     `Sipariş Kalemleri:`,
     ...itemTextLines,
+    ...(payload.paymentFee && payload.paymentFee > 0 ? [``, `Kapıda Ödeme Hizmet Bedeli: +${formatTRY(payload.paymentFee)}`] : []),
     ``,
     `Toplam Tutar: ${formatTRY(payload.total)}`,
     ``,
@@ -364,23 +420,23 @@ function buildEmail(payload: EmailPayload) {
   const itemRowsHtml = payload.items.map((item) => {
     const itemTotal = Number(item.price) * item.quantity;
     const imageHtml = item.image
-      ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" width="56" height="56" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;margin-right:12px;" />`
-      : `<div style="width:56px;height:56px;border-radius:8px;background-color:#f3f4f6;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;margin-right:12px;text-align:center;line-height:56px;">Görsel Yok</div>`;
+      ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" width="52" height="52" style="display:block;width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #e4e4e7;margin-right:12px;" />`
+      : `<div style="width:52px;height:52px;border-radius:6px;background-color:#f4f4f5;border:1px solid #e4e4e7;display:flex;align-items:center;justify-content:center;color:#a1a1aa;font-size:10px;margin-right:12px;text-align:center;line-height:52px;">Görsel Yok</div>`;
 
     return `
       <tr>
-        <td style="padding:14px 0;border-bottom:1px solid #f3f4f6;vertical-align:middle;">
+        <td style="padding:12px 0;border-bottom:1px solid #f4f4f5;vertical-align:middle;">
           <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
             <tr>
-              <td style="width:68px;vertical-align:middle;">
+              <td style="width:64px;vertical-align:middle;">
                 ${imageHtml}
               </td>
               <td style="vertical-align:middle;">
-                <div style="font-size:14px;font-weight:600;color:#111827;line-height:1.4;">${escapeHtml(item.title)}</div>
-                ${item.sku ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">Kod: ${escapeHtml(item.sku)}</div>` : ""}
-                <div style="font-size:13px;color:#4b5563;margin-top:2px;">${item.quantity} adet × ${escapeHtml(formatTRY(item.price))}</div>
+                <div style="font-size:13px;font-weight:600;color:#09090b;line-height:1.4;">${escapeHtml(item.title)}</div>
+                ${item.sku ? `<div style="font-size:11px;color:#71717a;margin-top:2px;">Kod: ${escapeHtml(item.sku)}</div>` : ""}
+                <div style="font-size:12px;color:#71717a;margin-top:2px;">${item.quantity} adet × ${escapeHtml(formatTRY(item.price))}</div>
               </td>
-              <td style="vertical-align:middle;text-align:right;font-size:14px;font-weight:600;color:#111827;">
+              <td style="vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#09090b;">
                 ${escapeHtml(formatTRY(itemTotal))}
               </td>
             </tr>
@@ -393,32 +449,63 @@ function buildEmail(payload: EmailPayload) {
   // Kargo Bilgisi Kutucuğu (Sadece order_shipped için)
   const shippingCardHtml = payload.event === "order_shipped" ? `
     <tr>
-      <td style="padding:0 32px 24px 32px;">
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;padding:20px;">
+      <td style="padding:0 28px 20px 28px;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;border-radius:8px;border:1px solid #f0f0f0;padding:16px;">
           <tr>
             <td>
-              <div style="font-size:13px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
-                🚚 Kargo Takip Bilgileri
+              <div style="font-size:11px;font-weight:600;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">
+                Kargo Takip Bilgileri
               </div>
               <table cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
-                  <td style="width:50%;vertical-align:top;padding-bottom:12px;">
-                    <div style="font-size:12px;color:#4b5563;">Kargo Şirketi</div>
-                    <div style="font-size:15px;font-weight:700;color:#111827;margin-top:2px;">${escapeHtml(payload.carrier || "Kargo")}</div>
+                  <td style="width:50%;vertical-align:top;padding-bottom:10px;">
+                    <div style="font-size:11px;color:#71717a;">Kargo Şirketi</div>
+                    <div style="font-size:14px;font-weight:600;color:#09090b;margin-top:2px;">${escapeHtml(payload.carrier || "Kargo")}</div>
                   </td>
-                  <td style="width:50%;vertical-align:top;padding-bottom:12px;">
-                    <div style="font-size:12px;color:#4b5563;">Takip Numarası</div>
-                    <div style="font-size:15px;font-weight:700;color:#111827;font-family:monospace;margin-top:2px;">${escapeHtml(payload.trackingNumber || "—")}</div>
+                  <td style="width:50%;vertical-align:top;padding-bottom:10px;">
+                    <div style="font-size:11px;color:#71717a;">Takip Numarası</div>
+                    <div style="font-size:14px;font-weight:600;color:#09090b;font-family:ui-monospace,monospace;margin-top:2px;">${escapeHtml(payload.trackingNumber || "—")}</div>
                   </td>
                 </tr>
               </table>
               ${payload.trackingUrl ? `
-              <div style="margin-top:8px;">
-                <a href="${escapeHtml(payload.trackingUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 20px;background-color:#16a34a;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-                  Kargonuzu Takip Edin &rarr;
+              <div style="margin-top:6px;">
+                <a href="${escapeHtml(payload.trackingUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:9px 20px;background-color:#09090b;color:#ffffff !important;text-decoration:none;font-size:12px;font-weight:600;border-radius:6px;">
+                  Kargoyu Takip Et &rarr;
                 </a>
               </div>
               ` : ""}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  ` : "";
+
+  // Havale / EFT Banka Hesapları Kutucuğu
+  const bankAccountsHtml = payload.bankAccounts && payload.bankAccounts.length > 0 ? `
+    <tr>
+      <td style="padding:0 28px 20px 28px;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fffbeb;border-radius:8px;border:1px solid #fef08a;padding:16px;">
+          <tr>
+            <td>
+              <div style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">
+                Havale / EFT Yapılacak Banka Hesapları
+              </div>
+              <p style="margin:0 0 10px 0;font-size:12px;color:#b45309;line-height:1.4;">
+                Lütfen havale/EFT yaparken açıklama kısmına mutlaka sipariş numaranızı (<strong style="color:#78350f;">#${shortOrderId}</strong>) yazınız.
+              </p>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                ${payload.bankAccounts.map((acc) => `
+                  <tr>
+                    <td style="padding:8px 0;border-top:1px solid #fef3c7;">
+                      <div style="font-size:13px;font-weight:700;color:#78350f;">${escapeHtml(acc.bankName)}</div>
+                      <div style="font-size:12px;color:#92400e;margin-top:2px;">Hesap Sahibi: ${escapeHtml(acc.accountHolder)}</div>
+                      <div style="font-size:12px;font-family:ui-monospace,monospace;font-weight:600;color:#09090b;margin-top:3px;letter-spacing:0.02em;">IBAN: ${escapeHtml(formatIban(acc.iban))}</div>
+                    </td>
+                  </tr>
+                `).join("")}
+              </table>
             </td>
           </tr>
         </table>
@@ -434,23 +521,23 @@ function buildEmail(payload: EmailPayload) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;line-height:1.5;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;padding:32px 16px;">
+<body style="margin:0;padding:0;background-color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#09090b;line-height:1.5;-webkit-font-smoothing:antialiased;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;padding:24px 12px;">
     <tr>
       <td align="center">
         <!-- Ana Konteyner -->
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;border-collapse:separate;">
           
           <!-- Başlık & Marka -->
           <tr>
-            <td style="padding:28px 32px;border-bottom:1px solid #f3f4f6;">
+            <td style="padding:20px 28px;border-bottom:1px solid #f4f4f5;">
               <table cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td style="vertical-align:middle;">
-                    <span style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.03em;">${escapeHtml(payload.storeName)}</span>
+                    <span style="font-size:16px;font-weight:700;color:#09090b;letter-spacing:-0.02em;">${escapeHtml(payload.storeName)}</span>
                   </td>
                   <td style="vertical-align:middle;text-align:right;">
-                    <span style="display:inline-block;padding:4px 12px;background-color:${badgeBg};color:${badgeColor};border-radius:9999px;font-size:12px;font-weight:600;border:1px solid ${badgeBorder};">
+                    <span style="display:inline-block;padding:3px 10px;background-color:${badgeBg};color:${badgeColor};border-radius:9999px;font-size:11px;font-weight:600;border:1px solid ${badgeBorder};text-transform:uppercase;letter-spacing:0.05em;">
                       ${escapeHtml(badgeText)}
                     </span>
                   </td>
@@ -461,36 +548,42 @@ function buildEmail(payload: EmailPayload) {
 
           <!-- Karşılama & Sipariş Başlığı -->
           <tr>
-            <td style="padding:32px 32px 20px 32px;">
-              <h1 style="margin:0 0 10px 0;font-size:22px;font-weight:700;color:#111827;letter-spacing:-0.02em;">${escapeHtml(mainTitle)}</h1>
-              <p style="margin:0;font-size:15px;color:#4b5563;line-height:1.6;">
+            <td style="padding:28px 28px 16px 28px;">
+              <div style="margin-bottom:14px;color:#09090b;">
+                ${iconSvg}
+              </div>
+              <h1 style="margin:0 0 8px 0;font-size:20px;font-weight:700;color:#09090b;letter-spacing:-0.02em;">${escapeHtml(mainTitle)}</h1>
+              <p style="margin:0;font-size:14px;color:#52525b;line-height:1.6;">
                 ${heroMessage}
               </p>
             </td>
           </tr>
+
+          <!-- Havale / EFT Banka Hesapları (Varsa) -->
+          ${bankAccountsHtml}
 
           <!-- Kargo Takip Kartı (Varsa) -->
           ${shippingCardHtml}
 
           <!-- Sipariş Bilgi Kartı -->
           <tr>
-            <td style="padding:0 32px 24px 32px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;border-radius:10px;border:1px solid #f3f4f6;padding:16px;">
+            <td style="padding:0 28px 20px 28px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;border-radius:8px;border:1px solid #f0f0f0;padding:16px;">
                 <tr>
-                  <td style="width:50%;vertical-align:top;padding:4px 8px;">
-                    <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Sipariş No</div>
-                    <div style="font-size:15px;font-weight:700;color:#111827;margin-top:3px;">#${escapeHtml(shortOrderId)}</div>
+                  <td style="width:50%;vertical-align:top;padding:2px 6px;">
+                    <div style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Sipariş No</div>
+                    <div style="font-size:14px;font-weight:600;color:#09090b;margin-top:2px;">#${escapeHtml(shortOrderId)}</div>
                   </td>
-                  <td style="width:50%;vertical-align:top;padding:4px 8px;">
-                    <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Sipariş Tarihi</div>
-                    <div style="font-size:14px;font-weight:500;color:#111827;margin-top:3px;">${escapeHtml(formatDate(payload.createdAt))}</div>
+                  <td style="width:50%;vertical-align:top;padding:2px 6px;">
+                    <div style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Sipariş Tarihi</div>
+                    <div style="font-size:13px;font-weight:500;color:#09090b;margin-top:2px;">${escapeHtml(formatDate(payload.createdAt))}</div>
                   </td>
                 </tr>
                 ${payload.shippingAddress ? `
                 <tr>
-                  <td colspan="2" style="padding:12px 8px 4px 8px;border-top:1px solid #e5e7eb;margin-top:10px;">
-                    <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Teslimat Adresi</div>
-                    <div style="font-size:14px;color:#374151;margin-top:4px;line-height:1.5;">${escapeHtml(payload.shippingAddress)}</div>
+                  <td colspan="2" style="padding:10px 6px 2px 6px;border-top:1px solid #f0f0f0;margin-top:8px;">
+                    <div style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Teslimat Adresi</div>
+                    <div style="font-size:13px;color:#09090b;margin-top:3px;line-height:1.5;">${escapeHtml(payload.shippingAddress)}</div>
                   </td>
                 </tr>
                 ` : ""}
@@ -500,16 +593,16 @@ function buildEmail(payload: EmailPayload) {
 
           <!-- Ürün Listesi Başlığı -->
           <tr>
-            <td style="padding:0 32px 10px 32px;">
-              <div style="font-size:15px;font-weight:700;color:#111827;border-bottom:2px solid #f3f4f6;padding-bottom:8px;">
-                Sipariş Detayı (${payload.itemCount} ürün)
+            <td style="padding:0 28px 8px 28px;">
+              <div style="font-size:13px;font-weight:600;color:#09090b;border-bottom:1px solid #f4f4f5;padding-bottom:8px;">
+                Sipariş Kalemleri (${payload.itemCount} ürün)
               </div>
             </td>
           </tr>
 
           <!-- Ürün Satırları -->
           <tr>
-            <td style="padding:0 32px 16px 32px;">
+            <td style="padding:0 28px 12px 28px;">
               <table cellpadding="0" cellspacing="0" border="0" width="100%">
                 ${itemRowsHtml}
               </table>
@@ -518,25 +611,37 @@ function buildEmail(payload: EmailPayload) {
 
           <!-- Tutar Özeti -->
           <tr>
-            <td style="padding:0 32px 28px 32px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb;border-radius:10px;border:1px solid #f3f4f6;padding:16px;">
+            <td style="padding:0 28px 24px 28px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;border-radius:8px;border:1px solid #f0f0f0;padding:14px 16px;">
                 <tr>
-                  <td style="font-size:14px;color:#4b5563;padding:4px 0;">Ara Toplam</td>
-                  <td style="font-size:14px;color:#111827;font-weight:600;text-align:right;padding:4px 0;">${escapeHtml(formatTRY(itemsSubtotal))}</td>
+                  <td style="font-size:13px;color:#52525b;padding:3px 0;">Ara Toplam</td>
+                  <td style="font-size:13px;color:#09090b;font-weight:600;text-align:right;padding:3px 0;">${escapeHtml(formatTRY(itemsSubtotal))}</td>
                 </tr>
                 ${discountAmount > 0 ? `
                 <tr>
-                  <td style="font-size:14px;color:#059669;padding:4px 0;">İndirim Kuponu (${escapeHtml(payload.couponCode || "")})</td>
-                  <td style="font-size:14px;color:#059669;font-weight:600;text-align:right;padding:4px 0;">-${escapeHtml(formatTRY(discountAmount))}</td>
+                  <td style="font-size:13px;color:#16a34a;padding:3px 0;">İndirim Kuponu (${escapeHtml(payload.couponCode || "")})</td>
+                  <td style="font-size:13px;color:#16a34a;font-weight:600;text-align:right;padding:3px 0;">-${escapeHtml(formatTRY(discountAmount))}</td>
+                </tr>
+                ` : ""}
+                ${payload.paymentMethodTitle ? `
+                <tr>
+                  <td style="font-size:13px;color:#52525b;padding:3px 0;">Ödeme Yöntemi</td>
+                  <td style="font-size:13px;color:#09090b;font-weight:600;text-align:right;padding:3px 0;">${escapeHtml(payload.paymentMethodTitle)}</td>
+                </tr>
+                ` : ""}
+                ${payload.paymentFee && payload.paymentFee > 0 ? `
+                <tr>
+                  <td style="font-size:13px;color:#52525b;padding:3px 0;">Kapıda Ödeme Hizmet Bedeli</td>
+                  <td style="font-size:13px;color:#09090b;font-weight:600;text-align:right;padding:3px 0;">+${escapeHtml(formatTRY(payload.paymentFee))}</td>
                 </tr>
                 ` : ""}
                 <tr>
-                  <td style="font-size:14px;color:#4b5563;padding:4px 0;">Kargo</td>
-                  <td style="font-size:14px;color:#059669;font-weight:600;text-align:right;padding:4px 0;">Ücretsiz</td>
+                  <td style="font-size:13px;color:#52525b;padding:3px 0;">Kargo</td>
+                  <td style="font-size:13px;color:#09090b;font-weight:600;text-align:right;padding:3px 0;">Ücretsiz</td>
                 </tr>
                 <tr>
-                  <td style="font-size:16px;color:#111827;font-weight:800;padding:12px 0 4px 0;border-top:1px solid #e5e7eb;">Toplam Tutar</td>
-                  <td style="font-size:20px;color:#111827;font-weight:800;text-align:right;padding:12px 0 4px 0;border-top:1px solid #e5e7eb;">${escapeHtml(formatTRY(payload.total))}</td>
+                  <td style="font-size:14px;color:#09090b;font-weight:700;padding:10px 0 2px 0;border-top:1px solid #e4e4e7;">Toplam Tutar</td>
+                  <td style="font-size:16px;color:#09090b;font-weight:700;text-align:right;padding:10px 0 2px 0;border-top:1px solid #e4e4e7;">${escapeHtml(formatTRY(payload.total))}</td>
                 </tr>
               </table>
             </td>
@@ -544,12 +649,12 @@ function buildEmail(payload: EmailPayload) {
 
           <!-- Bilgilendirme / Sonraki Adım -->
           <tr>
-            <td style="padding:0 32px 28px 32px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eff6ff;border-radius:10px;border:1px solid #dbeafe;padding:16px;">
+            <td style="padding:0 28px 24px 28px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;border-radius:8px;border:1px solid #f0f0f0;padding:14px 16px;">
                 <tr>
                   <td style="vertical-align:middle;">
-                    <div style="font-size:13px;color:#1e40af;line-height:1.5;">
-                      <strong>${escapeHtml(nextStepTitle)}</strong><br />
+                    <div style="font-size:12px;color:#52525b;line-height:1.5;">
+                      <strong style="color:#09090b;">${escapeHtml(nextStepTitle)}</strong><br />
                       ${escapeHtml(nextStepMessage)}
                     </div>
                   </td>
@@ -560,14 +665,14 @@ function buildEmail(payload: EmailPayload) {
 
           <!-- Alt Bilgi (Footer) -->
           <tr>
-            <td style="padding:24px 32px;background-color:#f9fafb;border-top:1px solid #f3f4f6;text-align:center;">
-              <p style="margin:0 0 6px 0;font-size:13px;color:#6b7280;">
+            <td style="padding:18px 28px;background-color:#fafafa;border-top:1px solid #f4f4f5;text-align:center;">
+              <p style="margin:0 0 4px 0;font-size:12px;color:#71717a;">
                 Bir sorunuz mu var? 
-                ${payload.storeEmail ? `<a href="mailto:${escapeHtml(payload.storeEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(payload.storeEmail)}</a>` : ""}
+                ${payload.storeEmail ? `<a href="mailto:${escapeHtml(payload.storeEmail)}" style="color:#09090b;text-decoration:underline;">${escapeHtml(payload.storeEmail)}</a>` : ""}
                 ${payload.storePhone ? ` veya <strong>${escapeHtml(payload.storePhone)}</strong>` : ""} üzerinden bize ulaşabilirsiniz.
               </p>
-              <p style="margin:0;font-size:12px;color:#9ca3af;">
-                © ${escapeHtml(payload.storeName)}. Bu e-posta sipariş teyidi için otomatik olarak gönderilmiştir.
+              <p style="margin:0;font-size:11px;color:#a1a1aa;">
+                © ${escapeHtml(payload.storeName)} — Tüm hakları saklıdır.
               </p>
             </td>
           </tr>

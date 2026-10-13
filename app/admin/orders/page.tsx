@@ -30,8 +30,16 @@ import {
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { CsvExportButton } from "../_components/export-button";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
+import {
+  orderStatusLabels,
+  getOrderCode,
+  getOrderPaymentMethodTitle,
+  formatWhatsAppUrl,
+  resolveCarrierTrackingUrl,
+  CARRIER_OPTIONS,
+} from "@/lib/orders";
+import { formatDateTime } from "@/lib/format-date";
 import { formatMoney } from "@/lib/format-money";
-import { orderStatusLabels } from "@/lib/orders";
 import { adminPath } from "@/lib/admin/routes";
 
 type Order = Doc<"orders"> & {
@@ -41,17 +49,6 @@ type OrderStatus = Order["status"];
 type OrderEmailEvent = Doc<"orderEmailEvents">["event"];
 
 const statuses: OrderStatus[] = ["pending", "paid", "shipped", "delivered", "cancelled"];
-
-const CARRIER_OPTIONS = [
-  "Yurtiçi Kargo",
-  "Aras Kargo",
-  "MNG Kargo",
-  "PTT Kargo",
-  "Sürat Kargo",
-  "HepsiJet",
-  "Trendyol Express",
-  "Kolay Gelsin",
-];
 
 const LIST_COLUMNS = "lg:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_110px_150px_88px]";
 
@@ -208,23 +205,8 @@ function OrderDetails({
     }
   };
 
-  const shortCode = order._id.slice(-8).toUpperCase();
-
-  const getWhatsAppUrl = (phone: string | undefined) => {
-    if (!phone) return null;
-    const digits = phone.replace(/\D/g, "");
-    if (!digits) return null;
-    const formatted = digits.startsWith("0")
-      ? `9${digits}`
-      : digits.startsWith("90")
-        ? digits
-        : digits.length === 10
-          ? `90${digits}`
-          : digits;
-    return `https://wa.me/${formatted}`;
-  };
-
-  const whatsAppUrl = getWhatsAppUrl(order.customerPhone);
+  const shortCode = getOrderCode(order);
+  const whatsAppUrl = formatWhatsAppUrl(order.customerPhone);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -253,9 +235,7 @@ function OrderDetails({
                 </button>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeStyle: "short" }).format(
-                  new Date(order._creationTime)
-                )}
+                {formatDateTime(order._creationTime, { dateStyle: "long", timeStyle: "short" })}
               </p>
             </div>
 
@@ -554,6 +534,20 @@ function OrderDetails({
           {/* Finansal Tutar */}
           <div className="rounded-xl border border-border bg-card p-3.5">
             <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
+                <span className="text-muted-foreground">Ödeme Yöntemi</span>
+                <span className="font-semibold text-foreground">
+                  {getOrderPaymentMethodTitle(order)}
+                </span>
+              </div>
+              {order.paymentFee !== undefined && order.paymentFee > 0 && (
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
+                  <span className="text-muted-foreground">Kapıda Ödeme Hizmet Bedeli</span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    +{formatMoney(order.paymentFee)}
+                  </span>
+                </div>
+              )}
               {order.couponCode && (
                 <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
                   <span className="text-muted-foreground">İndirim Kuponu ({order.couponCode})</span>
@@ -636,7 +630,7 @@ function AdminOrdersContent() {
       setSelectedOrderOverride((prev) =>
         prev && prev._id === order._id ? { ...prev, status, ...shippingInfo } : prev
       );
-      setMessage(`Sipariş #${order._id.slice(-8).toUpperCase()} güncellendi.`);
+      setMessage(`Sipariş ${getOrderCode(order, true)} güncellendi.`);
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Sipariş durumu güncellenemedi.");
@@ -770,19 +764,20 @@ function AdminOrdersContent() {
               >
                 <div className="min-w-0">
                   <p className="font-mono text-xs font-bold text-muted-foreground">
-                    #{order._id.slice(-8).toUpperCase()}
+                    {getOrderCode(order, true)}
                   </p>
                   <p className="mt-1 truncate text-sm font-semibold text-foreground">
                     {order.customerName}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{order.customerEmail}</p>
+                  <p className="truncate text-[11px] font-medium text-primary mt-0.5">
+                    {getOrderPaymentMethodTitle(order)}
+                  </p>
                 </div>
 
                 <p className="text-xs text-muted-foreground">
                   <span className="mr-2 font-medium lg:hidden">Tarih</span>
-                  {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(
-                    new Date(order._creationTime)
-                  )}
+                  {formatDateTime(order._creationTime, { dateStyle: "medium", timeStyle: "short" })}
                 </p>
 
                 <p className="text-sm font-semibold tabular-nums text-foreground">

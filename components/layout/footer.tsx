@@ -15,6 +15,9 @@ import {
   TruckIcon,
 } from "@heroicons/react/24/outline";
 
+import { formatDate } from "@/lib/format-date";
+import { formatPhone } from "@/lib/orders";
+
 const valueProps = [
   { icon: TruckIcon, title: "Hızlı Teslimat", description: "Özenli paketleme, hızlı kargo" },
   { icon: ShieldCheckIcon, title: "Orijinal Ürün", description: "Doğrulanmış kalite güvencesi" },
@@ -26,7 +29,7 @@ export default async function Footer() {
   "use cache";
   cacheTag("store-settings");
   cacheTag("categories");
-  const copyrightDate = new Date().getFullYear();
+  const copyrightDate = formatDate(new Date(), { year: "numeric" });
   const [menu, settings] = await Promise.all([
     getMenu(),
     getStoreSettings(),
@@ -87,7 +90,7 @@ export default async function Footer() {
                   <li>
                     <a href={`tel:${settings.phone}`} className="inline-flex items-center gap-2.5 transition-colors hover:text-black dark:hover:text-white">
                       <PhoneIcon className="size-4 shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
-                      {settings.phone}
+                      {formatPhone(settings.phone)}
                     </a>
                   </li>
                 )}

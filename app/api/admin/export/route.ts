@@ -3,12 +3,11 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import { toCsv } from "@/lib/admin/csv";
-import { orderStatusLabels } from "@/lib/orders";
+import { orderStatusLabels, getOrderCode } from "@/lib/orders";
+import { kurusToLira } from "@/lib/format-money";
+import { formatDate, formatDateTime } from "@/lib/format-date";
 import { getProductPriceRange } from "@/lib/catalog/variants";
 import { NextRequest, NextResponse } from "next/server";
-
-const dateFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" });
-const dateTimeFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" });
 
 type ExportOrder = Doc<"orders">;
 
@@ -92,8 +91,8 @@ export async function GET(request: NextRequest) {
       } while (cursor && allOrders.length < 10000);
 
       const rows = allOrders.map((order) => [
-        `#${order._id.slice(-8).toUpperCase()}`,
-        dateTimeFormatter.format(new Date(order._creationTime)),
+        getOrderCode(order, true),
+        formatDateTime(order._creationTime, { dateStyle: "short", timeStyle: "short" }),
         orderStatusLabels[order.status as keyof typeof orderStatusLabels] ?? order.status,
         order.customerName,
         order.customerEmail,
@@ -101,7 +100,7 @@ export async function GET(request: NextRequest) {
         order.items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0),
         order.total,
         order.couponCode ?? "",
-        order.couponDiscountKurus ? (order.couponDiscountKurus / 100).toFixed(2) : "",
+        order.couponDiscountKurus ? kurusToLira(order.couponDiscountKurus) : "",
         order.shippingAddress ?? "",
       ]);
       return csvResponse(
@@ -172,11 +171,11 @@ export async function GET(request: NextRequest) {
         customer.name,
         customer.email,
         customer.phone,
-        customer.registeredAt ? dateFormatter.format(new Date(customer.registeredAt)) : "",
+        formatDate(customer.registeredAt, { dateStyle: "short" }, ""),
         customer.orderCount,
         customer.totalSpent,
         customer.addressCount,
-        customer.lastOrderAt ? dateFormatter.format(new Date(customer.lastOrderAt)) : "",
+        formatDate(customer.lastOrderAt, { dateStyle: "short" }, ""),
       ]);
       return csvResponse(
         "musteriler.csv",

@@ -4,6 +4,7 @@ import { env, internalAction, internalMutation, internalQuery, mutation, query }
 import { assertAdminApiSecret } from "./adminAuth";
 import { resolveLowStockThreshold } from "./settings";
 import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
+import { buildLowStockAlertEmail } from "./emailTemplates";
 
 const ALERT_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 saat spam koruması
 
@@ -85,88 +86,14 @@ export const sendLowStockAlertAction = internalAction({
     ].join("\n");
 
     // HTML Şablonu
-    const html = `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0;padding:24px;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;line-height:1.5;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
-    <tr>
-      <td>
-        <!-- Başlık Barı (Kırmızı Uyarı) -->
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#dc2626;color:#ffffff;padding:24px 32px;">
-          <tr>
-            <td>
-              <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#fecaca;margin-bottom:6px;">
-                ⚠️ MAĞAZA YÖNETİCİ UYARISI
-              </div>
-              <h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.3;color:#ffffff;">
-                Kritik Stok Seviyesi Bildirimi
-              </h1>
-            </td>
-          </tr>
-        </table>
-
-        <!-- İçerik Alanı -->
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding:32px;">
-          <tr>
-            <td style="padding:0 32px 24px 32px;">
-              <p style="margin:0 0 16px 0;font-size:15px;color:#374151;">
-                <strong>${escapeHtml(storeName)}</strong> mağazanızdaki bir ürünün stoğu belirlediğiniz kritik seviyenin altına düştü. Müşteri kaybı yaşamamak için stoğu güncellemeniz önerilir.
-              </p>
-
-              <!-- Ürün Detay Kartı -->
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:20px;margin-bottom:24px;">
-                <tr>
-                  <td style="vertical-align:top;">
-                    <div style="font-size:16px;font-weight:700;color:#991b1b;margin-bottom:4px;">
-                      ${escapeHtml(product.title)}
-                    </div>
-                    ${variantTitle ? `<div style="font-size:13px;color:#7f1d1d;margin-bottom:12px;">Seçenek: <strong>${escapeHtml(variantTitle)}</strong></div>` : ""}
-                    
-                    <table cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
-                      <tr>
-                        <td style="padding-right:24px;">
-                          <div style="font-size:12px;color:#991b1b;text-transform:uppercase;">Kalan Stok</div>
-                          <div style="font-size:24px;font-weight:800;color:#dc2626;">${args.currentStock} <span style="font-size:14px;font-weight:500;">adet</span></div>
-                        </td>
-                        <td style="border-left:1px solid #fca5a5;padding-left:24px;">
-                          <div style="font-size:12px;color:#991b1b;text-transform:uppercase;">Kritik Eşik</div>
-                          <div style="font-size:18px;font-weight:700;color:#7f1d1d;">${args.threshold} <span style="font-size:13px;font-weight:500;">adet</span></div>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Aksiyon Butonu -->
-          <tr>
-            <td style="padding:0 32px 32px 32px;text-align:center;">
-              <a href="${escapeHtml(adminInventoryUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 28px;background-color:#111827;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                Ürünü ve Stokları İncele &rarr;
-              </a>
-            </td>
-          </tr>
-
-          <!-- Alt Bilgi -->
-          <tr>
-            <td style="padding:20px 32px;background-color:#f9fafb;border-top:1px solid #f3f4f6;text-align:center;font-size:12px;color:#9ca3af;">
-              Bu bildirim, mağaza yöneticisi için otomatik kritik stok denetimi tarafından oluşturulmuştur.
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
+    const html = buildLowStockAlertEmail({
+      storeName,
+      productTitle: product.title,
+      variantTitle,
+      currentStock: args.currentStock,
+      threshold: args.threshold,
+      adminInventoryUrl,
+    });
 
     const result = await sendResendEmail({
       to: toEmail,

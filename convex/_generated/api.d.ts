@@ -31,6 +31,7 @@ import type * as lowStock from "../lowStock.js";
 import type * as mailUtils from "../mailUtils.js";
 import type * as notifications from "../notifications.js";
 import type * as orders from "../orders.js";
+import type * as payments from "../payments.js";
 import type * as productSkus from "../productSkus.js";
 import type * as products from "../products.js";
 import type * as restock from "../restock.js";
@@ -68,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   mailUtils: typeof mailUtils;
   notifications: typeof notifications;
   orders: typeof orders;
+  payments: typeof payments;
   productSkus: typeof productSkus;
   products: typeof products;
   restock: typeof restock;

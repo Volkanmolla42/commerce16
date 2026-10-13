@@ -145,6 +145,13 @@ export default defineSchema({
         body: v.string(),
       }),
     })),
+    paymentMethod: v.optional(v.union(
+      v.literal("cash_on_delivery"),
+      v.literal("bank_transfer"),
+      v.literal("paytr")
+    )),
+    paymentMethodTitle: v.optional(v.string()),
+    paymentFee: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
@@ -350,4 +357,32 @@ export default defineSchema({
     .index("by_recipient", ["recipient"])
     .index("by_template_key", ["templateKey"])
     .index("by_status", ["status"]),
+
+  paymentSettings: defineTable({
+    key: v.literal("payment"),
+    cashOnDelivery: v.object({
+      enabled: v.boolean(),
+      fee: v.number(),
+      description: v.string(),
+    }),
+    bankTransfer: v.object({
+      enabled: v.boolean(),
+      description: v.string(),
+      accounts: v.array(v.object({
+        id: v.string(),
+        bankName: v.string(),
+        accountHolder: v.string(),
+        iban: v.string(),
+      })),
+    }),
+    paytr: v.object({
+      enabled: v.boolean(),
+      testMode: v.boolean(),
+      merchantId: v.optional(v.string()),
+      merchantKey: v.optional(v.string()),
+      merchantSalt: v.optional(v.string()),
+      description: v.string(),
+    }),
+    updatedAt: v.optional(v.string()),
+  }).index("by_key", ["key"]),
 });

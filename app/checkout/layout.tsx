@@ -1,5 +1,6 @@
 import { CookieConsentManager } from "@/components/privacy/cookie-consent-manager";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
+import { MetaPixelProvider } from "@/components/analytics/meta-pixel-provider";
 import StoreInitial from "@/components/store-initial";
 import { getStoreSettings } from "@/lib/catalog";
 import { LockClosedIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
@@ -21,6 +22,7 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
       <>
         <Suspense fallback={null}>
           <AnalyticsProvider />
+          <MetaPixelProvider />
         </Suspense>
         <main className="mx-auto grid min-h-[100dvh] w-full max-w-xl place-items-center px-4">
           <div className="text-center">
@@ -40,6 +42,7 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
     <>
       <Suspense fallback={null}>
         <AnalyticsProvider />
+        <MetaPixelProvider />
       </Suspense>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
         {/* Distraction-free Checkout Header */}

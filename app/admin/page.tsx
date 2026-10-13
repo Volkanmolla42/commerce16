@@ -18,6 +18,8 @@ import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "./_comp
 import { useAdminResource } from "./_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
+import { formatDateTime } from "@/lib/format-date";
+import { getOrderCode } from "@/lib/orders";
 
 
 type LowStockItem = {
@@ -244,16 +246,14 @@ export default function AdminOverviewPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-bold text-muted-foreground">
-                              #{order._id.slice(-8).toUpperCase()}
+                              {getOrderCode(order, true)}
                             </span>
                             <span className="truncate text-sm font-medium text-foreground">
                               {order.customerName || order.customerEmail}
                             </span>
                           </div>
                           <p className="mt-0.5 text-xs text-muted-foreground">
-                            {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(
-                              new Date(order._creationTime)
-                            )}
+                            {formatDateTime(order._creationTime, { dateStyle: "medium", timeStyle: "short" })}
                           </p>
                         </div>
 

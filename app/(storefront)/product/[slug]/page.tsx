@@ -186,7 +186,10 @@ async function ProductContent({
           __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c"),
         }}
       />
-      <ProductViewTracker slug={product.slug} />
+      <ProductViewTracker
+        slug={product.slug}
+        product={{ id: product.id, title: product.title, price: product.price }}
+      />
 
       <div className={productPageClassName}>
         {/* Product Details Grid */}

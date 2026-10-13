@@ -10,6 +10,8 @@ import {
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { formatMoney } from "@/lib/format-money";
+import { getOrderCode } from "@/lib/orders";
+import { formatDate } from "@/lib/format-date";
 import { Button, Card, CardContent } from "@/components/ui";
 import { OrderStatusBadge } from "./order-status-badge";
 import { AccountLoginCard } from "./account-gate";
@@ -102,7 +104,7 @@ export default function AccountOrdersPage() {
               <div>
                 <span className="block text-muted-foreground">Sipariş Tarihi</span>
                 <span className="font-semibold text-foreground">
-                  {new Date(order._creationTime).toLocaleDateString("tr-TR", {
+                  {formatDate(order._creationTime, {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -118,7 +120,7 @@ export default function AccountOrdersPage() {
               <div>
                 <span className="block text-muted-foreground">Sipariş Numarası</span>
                 <span className="font-mono font-bold text-foreground">
-                  #{order._id.slice(-8).toUpperCase()}
+                  {getOrderCode(order, true)}
                 </span>
               </div>
             </div>

@@ -24,9 +24,27 @@ import { getProductPriceRange, getProductVariantTitle, getSelectedVariant } from
 import { getProductImages, getVariantImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
+import { trackPixelViewContent } from "@/lib/analytics/meta-pixel";
 
-export function ProductViewTracker({ slug }: { slug: string }) {
-  useEffect(() => recordRecentProduct(slug), [slug]);
+export function ProductViewTracker({
+  slug,
+  product,
+}: {
+  slug: string;
+  product?: { id: string; title: string; price?: string };
+}) {
+  useEffect(() => {
+    recordRecentProduct(slug);
+    if (product) {
+      const priceVal = product.price ? Number(product.price) : undefined;
+      trackPixelViewContent({
+        content_id: product.id,
+        content_name: product.title,
+        value: Number.isFinite(priceVal) ? priceVal : undefined,
+        currency: "TRY",
+      });
+    }
+  }, [slug, product?.id, product?.title, product?.price]);
   return null;
 }
 

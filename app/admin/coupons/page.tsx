@@ -22,7 +22,8 @@ import {
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
-import { formatMoney } from "@/lib/format-money";
+import { formatMoney, kurusToLira } from "@/lib/format-money";
+import { formatDateTime } from "@/lib/format-date";
 import { adminPath } from "@/lib/admin/routes";
 
 type Coupon = Doc<"coupons">;
@@ -67,9 +68,9 @@ function draftFromCoupon(coupon: Coupon): CouponDraft {
     code: coupon.code,
     discountType: coupon.discountType,
     discountValue:
-      coupon.discountType === "fixed" ? (coupon.discountValue / 100).toFixed(2) : String(coupon.discountValue),
-    minOrderAmount: coupon.minOrderAmountKurus === undefined ? "" : (coupon.minOrderAmountKurus / 100).toFixed(2),
-    maxDiscount: coupon.maxDiscountKurus === undefined ? "" : (coupon.maxDiscountKurus / 100).toFixed(2),
+      coupon.discountType === "fixed" ? kurusToLira(coupon.discountValue) : String(coupon.discountValue),
+    minOrderAmount: coupon.minOrderAmountKurus === undefined ? "" : kurusToLira(coupon.minOrderAmountKurus),
+    maxDiscount: coupon.maxDiscountKurus === undefined ? "" : kurusToLira(coupon.maxDiscountKurus),
     usageLimit: coupon.usageLimit === undefined ? "" : String(coupon.usageLimit),
     expiresAt: toDateTimeInput(coupon.expiresAt),
     isActive: coupon.isActive,
@@ -406,11 +407,7 @@ export default function AdminCouponsPage() {
                     </span>
                     {coupon.expiresAt !== undefined && (
                       <span>
-                        Son Tarih:{" "}
-                        {new Intl.DateTimeFormat("tr-TR", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        }).format(coupon.expiresAt)}
+                        Son Tarih: {formatDateTime(coupon.expiresAt)}
                       </span>
                     )}
                   </div>

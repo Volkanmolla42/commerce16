@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useConvexAuth } from "@convex-dev/auth/react";
 import type { Id } from "@/convex/_generated/dataModel";
+import { trackPixelPurchase } from "@/lib/analytics/meta-pixel";
 import {
   CheckBadgeIcon,
   ShoppingBagIcon,
@@ -17,6 +18,8 @@ import {
   ArrowRightIcon,
   XCircleIcon,
   TruckIcon,
+  CreditCardIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
@@ -25,11 +28,15 @@ import { useCart } from "@/components/cart/cart-context";
 import { clearQuickBuyItem } from "@/components/cart/quick-buy-store";
 import { clearCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { OrderSuccessSkeleton } from "./order-success-skeleton";
+import { getOrderCode, getOrderPaymentMethodTitle, formatPhone } from "@/lib/orders";
+import { formatDateTime } from "@/lib/format-date";
+import { formatIban } from "@/lib/iban";
 
 export default function OrderSuccessClient({ orderId }: { orderId: string }) {
   const { clearCart } = useCart();
   const { isAuthenticated } = useConvexAuth();
   const [copied, setCopied] = useState(false);
+  const [copiedIban, setCopiedIban] = useState<string | null>(null);
 
   // Sayfa açıldığında sepet ve taslakları temizle
   useEffect(() => {
@@ -46,10 +53,36 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
     api.orders.getOrderById,
     orderId ? { id: orderId as Id<"orders"> } : "skip"
   );
+  const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
+
+  const hasTrackedPixelRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!order || hasTrackedPixelRef.current === order._id) return;
+    hasTrackedPixelRef.current = order._id;
+
+    const totalNum = Number(order.total);
+    trackPixelPurchase({
+      order_id: order._id,
+      value: Number.isFinite(totalNum) ? totalNum : 0,
+      currency: "TRY",
+      num_items: order.items.reduce((sum, item) => sum + item.quantity, 0),
+      content_ids: order.items.map((item) => (item.variantId ? `${item.productId}_${item.variantId}` : item.productId)),
+    });
+  }, [order]);
+
+  const handleCopyIban = (iban: string) => {
+    navigator.clipboard.writeText(iban).then(() => {
+      setCopiedIban(iban);
+      setTimeout(() => setCopiedIban(null), 2000);
+    });
+  };
+
+  const orderCode = getOrderCode(order);
 
   const handleCopyId = () => {
-    if (!orderId) return;
-    navigator.clipboard.writeText(orderId).then(() => {
+    if (!orderCode) return;
+    navigator.clipboard.writeText(orderCode).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -88,7 +121,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
     );
   }
 
-  const orderDate = new Date(order._creationTime).toLocaleDateString("tr-TR", {
+  const orderDate = formatDateTime(order._creationTime, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -128,7 +161,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                 className="inline-flex items-center gap-1.5 font-mono font-bold text-foreground bg-muted/60 hover:bg-muted border border-border px-2.5 py-1 rounded-xl transition-colors cursor-pointer group"
                 title="Sipariş numarasını kopyala"
               >
-                <span className="truncate max-w-[200px] sm:max-w-none">#{order._id}</span>
+                <span>#{orderCode}</span>
                 {copied ? (
                   <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : (
@@ -229,7 +262,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                 <span className="text-xs text-muted-foreground block font-medium">Alıcı Bilgileri</span>
                 <p className="font-semibold text-foreground">{order.customerName}</p>
                 {order.customerPhone && (
-                  <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+                  <p className="text-xs text-muted-foreground">{formatPhone(order.customerPhone)}</p>
                 )}
                 <p className="text-xs text-muted-foreground">{order.customerEmail}</p>
               </div>
@@ -245,6 +278,99 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
               </div>
             </div>
           </Card>
+
+          {/* ÖDEME YÖNTEMİ VE TALİMATI KARTI */}
+          {order.paymentMethod === "bank_transfer" && (
+            <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-4">
+              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2 pb-3 border-b border-border">
+                <BanknotesIcon className="size-5 text-primary" />
+                <span>Havale / EFT Ödeme Talimatı</span>
+              </CardTitle>
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-foreground leading-relaxed">
+                <p className="font-semibold text-primary">Önemli Hatırlatma:</p>
+                <p className="mt-1 text-muted-foreground">
+                  Lütfen aşağıdaki banka hesaplarından birine havale/EFT yaparken açıklama kısmına yalnızca sipariş numaranızı (<span className="font-mono font-bold text-foreground">#{orderCode}</span>) yazınız. Ödemeniz onaylandığında siparişiniz işleme alınacaktır.
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Banka Hesap Bilgileri
+                </span>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {(paymentSettings?.bankTransfer?.accounts ?? []).map((acc) => (
+                    <div
+                      key={acc.id}
+                      className="rounded-xl border border-border bg-background/60 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-bold text-foreground text-sm block">{acc.bankName}</span>
+                        <span className="text-muted-foreground">{acc.accountHolder}</span>
+                        <p className="font-mono font-semibold text-foreground text-xs mt-1 select-all">
+                          {formatIban(acc.iban)}
+                        </p>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopyIban(acc.iban)}
+                        className="h-8 text-xs shrink-0 self-start sm:self-auto gap-1.5"
+                      >
+                        {copiedIban === acc.iban ? (
+                          <>
+                            <CheckIcon className="size-3.5 text-emerald-600" />
+                            <span>Kopyalandı</span>
+                          </>
+                        ) : (
+                          <>
+                            <DocumentDuplicateIcon className="size-3.5 text-muted-foreground" />
+                            <span>IBAN Kopyala</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {order.paymentMethod === "cash_on_delivery" && (
+            <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-3">
+              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2 pb-3 border-b border-border">
+                <TruckIcon className="size-5 text-primary" />
+                <span>Kapıda Ödeme Bilgisi</span>
+              </CardTitle>
+
+              <div className="rounded-xl border border-border bg-muted/20 p-3.5 text-xs text-muted-foreground leading-relaxed space-y-1">
+                <p className="font-semibold text-foreground text-sm">
+                  Ödeme Kapıda Tahsil Edilecektir
+                </p>
+                <p>
+                  Sipariş tutarınız kargonuz kapınıza ulaştığında kuryeye nakit veya banka/kredi kartı ile ödenecektir.
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {order.paymentMethod === "paytr" && (
+            <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-3">
+              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2 pb-3 border-b border-border">
+                <CreditCardIcon className="size-5 text-primary" />
+                <span>PayTR Kredi Kartı Ödemesi (Demo)</span>
+              </CardTitle>
+
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-xs text-emerald-900 dark:text-emerald-200 leading-relaxed">
+                <p className="font-semibold">Ödeme Başarıyla Tamamlandı (Demo Modu)</p>
+                <p className="mt-0.5 text-emerald-800 dark:text-emerald-300">
+                  Kart ödemeniz demo simülasyonu ile test edildi ve siparişinizin durumu doğrudan &quot;Ödendi&quot; olarak onaylandı.
+                </p>
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* SAĞ KOLON: Özet & Aksiyonlar */}
@@ -256,11 +382,27 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
 
             <div className="space-y-3 pt-4 text-sm">
               <div className="flex justify-between text-muted-foreground">
+                <span>Ödeme Yöntemi</span>
+                <span className="font-semibold text-foreground">
+                  {getOrderPaymentMethodTitle(order)}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-muted-foreground">
                 <span>Ara Toplam</span>
                 <span className="font-semibold tabular-nums text-foreground">
                   {formatMoney(totalAmountNum)}
                 </span>
               </div>
+
+              {order.paymentFee !== undefined && order.paymentFee > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Kapıda Ödeme Bedeli</span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    +{formatMoney(order.paymentFee)}
+                  </span>
+                </div>
+              )}
 
               {order.couponCode && (
                 <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">

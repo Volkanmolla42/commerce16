@@ -4,12 +4,9 @@ import { Suspense, useState } from "react";
 import {
   MagnifyingGlassIcon,
   EnvelopeIcon,
-  EyeIcon,
   PaperAirplaneIcon,
   DevicePhoneMobileIcon,
   ComputerDesktopIcon,
-  DocumentTextIcon,
-  CodeBracketIcon,
 } from "@heroicons/react/24/outline";
 import {
   Input,
@@ -19,10 +16,10 @@ import {
 } from "@/components/ui";
 import { AdminEmpty, AdminLoading } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
+import { formatDateTime } from "@/lib/format-date";
 
 type TabMode = "templates" | "sent";
 type ViewportMode = "desktop" | "mobile";
-type PreviewTab = "html" | "text" | "variables";
 
 interface EmailTemplate {
   key: string;
@@ -77,7 +74,6 @@ function AdminEmailsContent() {
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string | null>(null);
   const [selectedSentEmailId, setSelectedSentEmailId] = useState<string | null>(null);
 
-  const [previewTab, setPreviewTab] = useState<PreviewTab>("html");
   const [viewportMode, setViewportMode] = useState<ViewportMode>("desktop");
 
   const term = query.trim().toLocaleLowerCase("tr-TR");
@@ -276,9 +272,7 @@ function AdminEmailsContent() {
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-0.5">
                     <span className="font-mono">{email.templateKey}</span>
                     <span>
-                      {new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(
-                        new Date(email.createdAt)
-                      )}
+                      {formatDateTime(email.createdAt, { dateStyle: "short", timeStyle: "short" })}
                     </span>
                   </div>
                 </button>
@@ -309,128 +303,53 @@ function AdminEmailsContent() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Görünüm Sekmeleri */}
-                    <div className="flex items-center rounded-lg border border-border bg-muted/40 p-1">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewTab("html")}
-                        className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-                          previewTab === "html"
-                            ? "bg-background text-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <EyeIcon className="size-3.5" />
-                        <span>HTML</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewTab("text")}
-                        className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-                          previewTab === "text"
-                            ? "bg-background text-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <DocumentTextIcon className="size-3.5" />
-                        <span>Düz Metin</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewTab("variables")}
-                        className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-                          previewTab === "variables"
-                            ? "bg-background text-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <CodeBracketIcon className="size-3.5" />
-                        <span>Değişkenler</span>
-                      </button>
-                    </div>
-
-                    {/* Cihaz Genişliği Toggle */}
-                    {previewTab === "html" && (
-                      <div className="flex items-center rounded-lg border border-border bg-muted/40 p-1">
-                        <button
-                          type="button"
-                          onClick={() => setViewportMode("desktop")}
-                          className={`rounded-md p-1.5 transition-colors cursor-pointer ${
-                            viewportMode === "desktop"
-                              ? "bg-background text-foreground shadow-xs"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                          title="Masaüstü"
-                        >
-                          <ComputerDesktopIcon className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setViewportMode("mobile")}
-                          className={`rounded-md p-1.5 transition-colors cursor-pointer ${
-                            viewportMode === "mobile"
-                              ? "bg-background text-foreground shadow-xs"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                          title="Mobil"
-                        >
-                          <DevicePhoneMobileIcon className="size-3.5" />
-                        </button>
-                      </div>
-                    )}
+                  {/* Cihaz Genişliği Toggle */}
+                  <div className="flex items-center rounded-lg border border-border bg-muted/40 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setViewportMode("desktop")}
+                      className={`rounded-md p-1.5 transition-colors cursor-pointer ${
+                        viewportMode === "desktop"
+                          ? "bg-background text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="Masaüstü"
+                    >
+                      <ComputerDesktopIcon className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewportMode("mobile")}
+                      className={`rounded-md p-1.5 transition-colors cursor-pointer ${
+                        viewportMode === "mobile"
+                          ? "bg-background text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="Mobil"
+                    >
+                      <DevicePhoneMobileIcon className="size-3.5" />
+                    </button>
                   </div>
                 </div>
 
                 {/* Şablon Önizleme Gövdesi */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-muted/20">
-                  {previewTab === "html" && (
-                    <div className="flex justify-center">
-                      <div
-                        style={{
-                          width: viewportMode === "mobile" ? "375px" : "100%",
-                          maxWidth: "640px",
-                        }}
-                        className="bg-white rounded-xl border border-border shadow-xs overflow-hidden transition-all duration-200"
-                      >
-                        <iframe
-                          title={activeTemplate.name}
-                          srcDoc={renderSample(activeTemplate.bodyHtml, activeTemplate.sampleData)}
-                          className="w-full border-0 min-h-[560px]"
-                          sandbox="allow-same-origin"
-                        />
-                      </div>
+                  <div className="flex justify-center">
+                    <div
+                      style={{
+                        width: viewportMode === "mobile" ? "375px" : "100%",
+                        maxWidth: "640px",
+                      }}
+                      className="bg-white rounded-xl border border-border shadow-xs overflow-hidden transition-all duration-200"
+                    >
+                      <iframe
+                        title={activeTemplate.name}
+                        srcDoc={renderSample(activeTemplate.bodyHtml, activeTemplate.sampleData)}
+                        className="w-full border-0 min-h-[560px]"
+                        sandbox="allow-same-origin"
+                      />
                     </div>
-                  )}
-
-                  {previewTab === "text" && (
-                    <div className="rounded-xl border border-border bg-card p-4 max-w-2xl mx-auto">
-                      <pre className="font-mono text-xs whitespace-pre-wrap text-foreground leading-relaxed">
-                        {renderSample(activeTemplate.bodyText, activeTemplate.sampleData)}
-                      </pre>
-                    </div>
-                  )}
-
-                  {previewTab === "variables" && (
-                    <div className="rounded-xl border border-border overflow-hidden bg-card max-w-2xl mx-auto">
-                      <div className="grid grid-cols-2 gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground border-b border-border">
-                        <span>Değişken</span>
-                        <span>Örnek Değer</span>
-                      </div>
-                      <div className="divide-y divide-border">
-                        {activeTemplate.variables.map((v) => {
-                          const pureKey = v.replace(/[{}]/g, "");
-                          const val = activeTemplate.sampleData[pureKey] ?? "—";
-                          return (
-                            <div key={v} className="grid grid-cols-2 gap-4 px-4 py-2.5 text-xs">
-                              <span className="font-mono font-semibold text-primary">{v}</span>
-                              <span className="font-mono text-muted-foreground truncate">{val}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </>
             ) : (
@@ -471,9 +390,7 @@ function AdminEmailsContent() {
                   <div>
                     <span className="text-muted-foreground block text-[11px]">Tarih:</span>
                     <span className="text-foreground">
-                      {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeStyle: "medium" }).format(
-                        new Date(activeSentEmail.createdAt)
-                      )}
+                      {formatDateTime(activeSentEmail.createdAt, { dateStyle: "long", timeStyle: "medium" })}
                     </span>
                   </div>
                   <div className="col-span-2 sm:col-span-1">

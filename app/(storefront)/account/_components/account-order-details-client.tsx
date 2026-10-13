@@ -15,7 +15,8 @@ import {
   MapPinIcon,
   CreditCardIcon,
 } from "@heroicons/react/24/outline";
-import { orderStatusLabels } from "@/lib/orders";
+import { orderStatusLabels, getOrderCode, getOrderPaymentMethodTitle, formatPhone } from "@/lib/orders";
+import { formatDateTime } from "@/lib/format-date";
 import { formatMoney } from "@/lib/format-money";
 import {
   Button,
@@ -239,14 +240,14 @@ export default function AccountOrderDetailsClient({
 
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Sipariş #{order._id.slice(-8).toUpperCase()}
+              Sipariş #{getOrderCode(order)}
             </h1>
             <OrderStatusBadge status={order.status} />
           </div>
 
           <p className="mt-1 text-xs text-muted-foreground">
             Oluşturulma:{" "}
-            {new Date(order._creationTime).toLocaleString("tr-TR", {
+            {formatDateTime(order._creationTime, {
               year: "numeric",
               month: "long",
               day: "numeric",
@@ -392,7 +393,7 @@ export default function AccountOrderDetailsClient({
               <div>
                 <span className="text-muted-foreground block">Telefon Numarası:</span>
                 <span className="font-medium text-foreground">
-                  {order.customerPhone}
+                  {formatPhone(order.customerPhone)}
                 </span>
               </div>
             )}
@@ -416,9 +417,23 @@ export default function AccountOrderDetailsClient({
 
           <div className="space-y-2.5 text-xs">
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Ödeme Yöntemi:</span>
+              <span className="font-semibold text-foreground">
+                {getOrderPaymentMethodTitle(order)}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Ara Toplam:</span>
               <span className="font-medium text-foreground">{formatMoney(order.total)}</span>
             </div>
+
+            {order.paymentFee !== undefined && order.paymentFee > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Kapıda Ödeme Hizmet Bedeli:</span>
+                <span className="font-medium text-foreground">+{formatMoney(order.paymentFee)}</span>
+              </div>
+            )}
 
             <Separator className="my-2" />
 
@@ -431,7 +446,7 @@ export default function AccountOrderDetailsClient({
 
             <div className="mt-4 rounded-2xl bg-muted/40 p-3.5 text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Sipariş Durumu: {order.status.toUpperCase()}</p>
-              <p className="mt-0.5">Sipariş numaranız: <span className="font-mono">{order._id}</span></p>
+              <p className="mt-0.5">Sipariş numaranız: <span className="font-mono font-semibold">{getOrderCode(order, true)}</span></p>
             </div>
           </div>
         </Card>

@@ -1,6 +1,7 @@
 import type { Product } from "../../lib/catalog/types";
 import { MAX_CART_QUANTITY, getVariantStock } from "@/lib/catalog/variants";
 import { trackAnalyticsEvent } from "@/lib/analytics-client";
+import { trackPixelAddToCart } from "@/lib/analytics/meta-pixel";
 import type { ProductImage } from "@/lib/catalog/types";
 
 export type CartItem = { product: Product; quantity: number; variantId?: string };
@@ -103,6 +104,14 @@ export const cartStore = {
         : [...current, { product, quantity: Math.min(maxStock, quantity), variantId }];
     });
     void trackAnalyticsEvent("add_to_cart");
+    const priceNum = product.price ? Number(product.price) : undefined;
+    trackPixelAddToCart({
+      content_id: variantId ? `${product.id}_${variantId}` : product.id,
+      content_name: product.title,
+      value: Number.isFinite(priceNum) ? priceNum : undefined,
+      quantity,
+      currency: "TRY",
+    });
   },
   replaceItem(sourceProductId: string, sourceVariantId: string | undefined, product: Product, quantity: number, variantId?: string) {
     if (!product.availableForSale || !Number.isSafeInteger(quantity) || quantity <= 0) return;

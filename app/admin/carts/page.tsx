@@ -25,6 +25,7 @@ import {
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
+import { formatDateTime } from "@/lib/format-date";
 import { adminPath } from "@/lib/admin/routes";
 
 type AbandonedCartItem = {
@@ -80,12 +81,12 @@ const statusBadgeConfig: Record<string, { label: string; className: string }> = 
 };
 
 function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat("tr-TR", {
+  return formatDateTime(timestamp, {
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(timestamp));
+  });
 }
 
 function CartDetailModal({

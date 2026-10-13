@@ -317,6 +317,23 @@ export const listForSitemap = query({
   },
 });
 
+export const listForGoogleShoppingFeed = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(productValidator),
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("products")
+      .withIndex("by_available", (q) => q.eq("availableForSale", true))
+      .order("desc")
+      .paginate(args.paginationOpts);
+    const page = await Promise.all(result.page.map((item) => withPublicImageUrls(ctx, item)));
+    return {
+      ...result,
+      page,
+    };
+  },
+});
+
 export const listAllAdmin = query({
   args: {
     adminSecret: v.string(),

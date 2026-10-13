@@ -9,6 +9,8 @@ import { CsvExportButton } from "../_components/export-button";
 import { useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
+import { formatOrderCode } from "@/lib/orders";
+import { formatDate, formatDateTime } from "@/lib/format-date";
 
 type Customer = {
   key: string;
@@ -65,13 +67,6 @@ type CustomerDetail = {
 };
 
 const LIST_COLUMNS = "lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_90px_130px_90px]";
-
-const dateFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
-const dateTimeFormatter = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" });
-
-function formatDate(value?: number) {
-  return value ? dateFormatter.format(new Date(value)) : "—";
-}
 
 function customerLabel(customer: { name: string; email: string }) {
   return customer.name || customer.email || "İsimsiz müşteri";
@@ -179,9 +174,9 @@ function CustomerDetailsDialog({ customer, onClose }: { customer: Customer; onCl
                       className="flex items-center justify-between gap-3 p-4 transition-colors hover:bg-muted/40"
                     >
                       <div className="min-w-0">
-                        <p className="font-mono text-xs font-bold text-foreground">#{order._id.slice(-8).toUpperCase()}</p>
+                        <p className="font-mono text-xs font-bold text-foreground">{formatOrderCode(order._id, true)}</p>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {dateTimeFormatter.format(new Date(order._creationTime))} · {order.itemCount} adet ürün
+                          {formatDateTime(order._creationTime)} · {order.itemCount} adet ürün
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">

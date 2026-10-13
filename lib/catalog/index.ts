@@ -73,6 +73,32 @@ export async function getSitemapProducts() {
   return products;
 }
 
+export async function getGoogleShoppingProducts(): Promise<Product[]> {
+  "use cache";
+  cacheTag("products");
+  const products: Product[] = [];
+  let cursor: string | null = null;
+  let isDone = false;
+
+  while (!isDone) {
+    const result: {
+      page: Parameters<typeof formatProduct>[0][];
+      continueCursor: string;
+      isDone: boolean;
+    } = await fetchQuery(api.products.listForGoogleShoppingFeed, {
+      paginationOpts: {
+        numItems: 100,
+        cursor,
+      },
+    });
+    products.push(...result.page.map(formatProduct));
+    cursor = result.continueCursor;
+    isDone = result.isDone;
+  }
+
+  return products;
+}
+
 export async function getProduct(slug: string): Promise<Product | undefined> {
   "use cache";
   cacheTag("products");

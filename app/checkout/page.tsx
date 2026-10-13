@@ -15,6 +15,9 @@ import {
   ChevronDownIcon,
   TagIcon,
   ArrowTopRightOnSquareIcon,
+  CreditCardIcon,
+  BanknotesIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
 import {
   Button,
@@ -24,12 +27,14 @@ import {
   CardHeader,
   CardTitle,
   Separator,
+  Badge,
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
 import { useQuickBuyDraft } from "@/components/cart/quick-buy-store";
 import { getCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
+import { trackPixelInitiateCheckout } from "@/lib/analytics/meta-pixel";
 import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
 
@@ -164,12 +169,14 @@ function PriceSummaryRows({
   couponPreview,
   appliedCouponCode,
   payableAmount,
+  paymentFee = 0,
 }: {
   totalAmount: number;
   couponDiscountKurus: number;
   couponPreview: CouponPreview;
   appliedCouponCode: string;
   payableAmount: number;
+  paymentFee?: number;
 }) {
   return (
     <div className="space-y-2 pt-1 text-sm">
@@ -181,6 +188,12 @@ function PriceSummaryRows({
         <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
           <span>Kupon İndirimi ({couponPreview?.valid ? couponPreview.code : appliedCouponCode})</span>
           <span className="tabular-nums">−{formatMoney(couponDiscountKurus / 100)}</span>
+        </div>
+      )}
+      {paymentFee > 0 && (
+        <div className="flex justify-between text-muted-foreground">
+          <span>Kapıda Ödeme Hizmet Bedeli</span>
+          <span className="font-medium tabular-nums text-foreground">+{formatMoney(paymentFee)}</span>
         </div>
       )}
       <Separator className="my-2" />
@@ -229,6 +242,39 @@ function CheckoutContent() {
   const payableKurus = Math.max(0, subtotalKurus - couponDiscountKurus);
   const payableAmount = payableKurus / 100;
 
+  const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"paytr" | "bank_transfer" | "cash_on_delivery" | null>(null);
+
+  // Demo kart bilgileri (PayTR)
+  const [cardHolder, setCardHolder] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+
+  const effectivePaymentMethod = selectedPaymentMethod ?? (
+    paymentSettings?.paytr.enabled
+      ? "paytr"
+      : paymentSettings?.bankTransfer.enabled
+        ? "bank_transfer"
+        : paymentSettings?.cashOnDelivery.enabled
+          ? "cash_on_delivery"
+          : null
+  );
+
+  const codFee = (effectivePaymentMethod === "cash_on_delivery" && paymentSettings?.cashOnDelivery.enabled)
+    ? (paymentSettings.cashOnDelivery.fee || 0)
+    : 0;
+  const codFeeKurus = Math.round(codFee * 100);
+  const finalPayableKurus = payableKurus + codFeeKurus;
+  const finalPayableAmount = finalPayableKurus / 100;
+
+  const fillDemoCard = () => {
+    setCardHolder("Ahmet Yılmaz");
+    setCardNumber("5423 4567 8901 2345");
+    setCardExpiry("12/28");
+    setCardCvv("123");
+  };
+
   const createOrder = useMutation(api.orders.createOrder);
   const captureRecovery = useMutation(api.abandonedCartRecovery.capture);
   const linkRecoveryOrder = useMutation(api.abandonedCartRecovery.linkOrder);
@@ -249,7 +295,15 @@ function CheckoutContent() {
   const [emailReminderConsent, setEmailReminderConsent] = useState(false);
 
   useEffect(() => {
-    if (items.length > 0) void trackAnalyticsEvent("begin_checkout");
+    if (items.length > 0) {
+      void trackAnalyticsEvent("begin_checkout");
+      trackPixelInitiateCheckout({
+        value: finalPayableAmount,
+        currency: "TRY",
+        num_items: items.reduce((acc, item) => acc + item.quantity, 0),
+        content_ids: items.map((item) => (item.variantId ? `${item.product.id}_${item.variantId}` : item.product.id)),
+      });
+    }
   }, [items.length]);
 
   const itemsKey = items.map((item) => `${item.product.id}:${item.variantId ?? ""}:${item.quantity}`).join(",");
@@ -340,6 +394,18 @@ function CheckoutContent() {
       setIsSubmitting(false);
       return;
     }
+    if (!effectivePaymentMethod) {
+      setErrorMessage("Lütfen geçerli bir ödeme yöntemi seçin.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (effectivePaymentMethod === "paytr") {
+      if (!cardHolder.trim() || !cardNumber.trim() || !cardExpiry.trim() || !cardCvv.trim()) {
+        setErrorMessage("Lütfen kart bilgilerini girin veya 'Demo Kart Bilgilerini Doldur' butonuna tıklayın.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
     const fullShippingAddress = `${customerName}, Tel: ${phone} - ${addressLine}, ${district}/${city}`;
     const isNewAddress = selectedAddressId === "custom" || !addresses || addresses.length === 0;
     const shouldSave = isAuthenticated && isNewAddress && saveAddressToBook;
@@ -379,6 +445,11 @@ function CheckoutContent() {
         }).catch(() => undefined);
       }
 
+      // PayTR Demo simülasyonu: 600ms işlem efekti
+      if (effectivePaymentMethod === "paytr") {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+
       const analyticsSessionId = getAnalyticsSessionIdForOrder();
       const orderId = await createOrder({
         customerName: customerName.trim(),
@@ -386,7 +457,8 @@ function CheckoutContent() {
         customerPhone: phone.trim() || undefined,
         ...(analyticsSessionId ? { analyticsSessionId } : {}),
         shippingAddress: fullShippingAddress,
-        total: payableAmount.toFixed(2),
+        total: finalPayableAmount.toFixed(2),
+        paymentMethod: effectivePaymentMethod,
         ...(couponPreview?.valid ? { couponCode: couponPreview.code } : {}),
         provinceId,
         districtId,
@@ -507,7 +579,8 @@ function CheckoutContent() {
               couponDiscountKurus={couponDiscountKurus}
               couponPreview={couponPreview}
               appliedCouponCode={appliedCouponCode}
-              payableAmount={payableAmount}
+              payableAmount={finalPayableAmount}
+              paymentFee={codFee}
             />
           </Card>
 
@@ -794,11 +867,257 @@ function CheckoutContent() {
             )}
           </Card>
 
-          {/* 3. Sipariş Onayı */}
+          {/* 3. Ödeme Yöntemi */}
           <Card className="rounded-2xl border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
             <CardHeader className="p-0">
               <CardTitle className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                3. Sipariş Onayı
+                3. Ödeme Yöntemi
+              </CardTitle>
+            </CardHeader>
+            <Separator />
+
+            {paymentSettings === undefined ? (
+              <div className="py-6 text-center text-xs text-muted-foreground">
+                Ödeme yöntemleri yükleniyor...
+              </div>
+            ) : !paymentSettings.paytr.enabled && !paymentSettings.bankTransfer.enabled && !paymentSettings.cashOnDelivery.enabled ? (
+              <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                Şu anda aktif bir ödeme yöntemi bulunmuyor. Lütfen mağaza yönetimiyle iletişime geçin.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* PayTR Seçeneği */}
+                {paymentSettings.paytr.enabled && (
+                  <div
+                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${
+                      effectivePaymentMethod === "paytr"
+                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                        : "border-border hover:border-muted-foreground/40 bg-card"
+                    }`}
+                    onClick={() => setSelectedPaymentMethod("paytr")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CreditCardIcon className="size-5 text-primary shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-foreground">
+                              Kredi / Banka Kartı (PayTR)
+                            </span>
+                            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                              Demo
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {paymentSettings.paytr.description}
+                          </p>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={effectivePaymentMethod === "paytr"}
+                        onChange={() => setSelectedPaymentMethod("paytr")}
+                        className="size-4 accent-primary cursor-pointer shrink-0"
+                      />
+                    </div>
+
+                    {effectivePaymentMethod === "paytr" && (
+                      <div
+                        className="mt-4 pt-4 border-t border-border/80 space-y-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
+                          <span>
+                            PayTR Demo Modu devrede. Kartınızdan herhangi bir ücret tahsil edilmez.
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={fillDemoCard}
+                            className="h-7 text-xs bg-card hover:bg-muted font-medium shrink-0"
+                          >
+                            Demo Kart Bilgilerini Doldur
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="sm:col-span-2 space-y-1">
+                            <Label htmlFor="checkout-card-holder" className="text-xs font-medium">
+                              Kart Üzerindeki İsim
+                            </Label>
+                            <Input
+                              id="checkout-card-holder"
+                              value={cardHolder}
+                              onChange={(e) => setCardHolder(e.target.value)}
+                              placeholder="Ad Soyad"
+                              className="h-9 text-sm rounded-lg"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1">
+                            <Label htmlFor="checkout-card-number" className="text-xs font-medium">
+                              Kart Numarası
+                            </Label>
+                            <Input
+                              id="checkout-card-number"
+                              value={cardNumber}
+                              onChange={(e) => setCardNumber(e.target.value)}
+                              placeholder="5423 4567 8901 2345"
+                              maxLength={19}
+                              className="h-9 text-sm font-mono rounded-lg"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label htmlFor="checkout-card-expiry" className="text-xs font-medium">
+                              Son Kullanma (AA/YY)
+                            </Label>
+                            <Input
+                              id="checkout-card-expiry"
+                              value={cardExpiry}
+                              onChange={(e) => setCardExpiry(e.target.value)}
+                              placeholder="12/28"
+                              maxLength={5}
+                              className="h-9 text-sm font-mono rounded-lg"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label htmlFor="checkout-card-cvv" className="text-xs font-medium">
+                              Güvenlik Kodu (CVV)
+                            </Label>
+                            <Input
+                              id="checkout-card-cvv"
+                              value={cardCvv}
+                              onChange={(e) => setCardCvv(e.target.value)}
+                              placeholder="123"
+                              maxLength={4}
+                              className="h-9 text-sm font-mono rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Havale / EFT Seçeneği */}
+                {paymentSettings.bankTransfer.enabled && (
+                  <div
+                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${
+                      effectivePaymentMethod === "bank_transfer"
+                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                        : "border-border hover:border-muted-foreground/40 bg-card"
+                    }`}
+                    onClick={() => setSelectedPaymentMethod("bank_transfer")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <BanknotesIcon className="size-5 text-primary shrink-0" />
+                        <div>
+                          <span className="font-semibold text-sm text-foreground">
+                            Havale / EFT ile Ödeme
+                          </span>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {paymentSettings.bankTransfer.description}
+                          </p>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={effectivePaymentMethod === "bank_transfer"}
+                        onChange={() => setSelectedPaymentMethod("bank_transfer")}
+                        className="size-4 accent-primary cursor-pointer shrink-0"
+                      />
+                    </div>
+
+                    {effectivePaymentMethod === "bank_transfer" && (
+                      <div
+                        className="mt-4 pt-4 border-t border-border/80 space-y-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <p className="text-xs font-medium text-foreground">
+                          Ödeme yapabileceğiniz banka hesapları:
+                        </p>
+                        <div className="space-y-2">
+                          {paymentSettings.bankTransfer.accounts.map((acc) => (
+                            <div
+                              key={acc.id}
+                              className="rounded-lg border border-border bg-background/80 p-2.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1.5"
+                            >
+                              <div>
+                                <span className="font-semibold text-foreground">{acc.bankName}</span>
+                                <span className="text-muted-foreground ml-2">({acc.accountHolder})</span>
+                                <p className="font-mono text-muted-foreground text-[11px] mt-0.5 select-all">
+                                  {acc.iban}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Sipariş onayından sonra sipariş numaranızı açıklama kısmına yazarak transferi tamamlayabilirsiniz.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Kapıda Ödeme Seçeneği */}
+                {paymentSettings.cashOnDelivery.enabled && (
+                  <div
+                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${
+                      effectivePaymentMethod === "cash_on_delivery"
+                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                        : "border-border hover:border-muted-foreground/40 bg-card"
+                    }`}
+                    onClick={() => setSelectedPaymentMethod("cash_on_delivery")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <TruckIcon className="size-5 text-primary shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-foreground">
+                              Kapıda Ödeme
+                            </span>
+                            {paymentSettings.cashOnDelivery.fee > 0 ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                +{formatMoney(paymentSettings.cashOnDelivery.fee)}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500/20">
+                                Ücretsiz
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {paymentSettings.cashOnDelivery.description}
+                          </p>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={effectivePaymentMethod === "cash_on_delivery"}
+                        onChange={() => setSelectedPaymentMethod("cash_on_delivery")}
+                        className="size-4 accent-primary cursor-pointer shrink-0"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* 4. Sipariş Onayı */}
+          <Card className="rounded-2xl border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+            <CardHeader className="p-0">
+              <CardTitle className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                4. Sipariş Onayı
               </CardTitle>
             </CardHeader>
             <Separator />
@@ -906,7 +1225,8 @@ function CheckoutContent() {
               couponDiscountKurus={couponDiscountKurus}
               couponPreview={couponPreview}
               appliedCouponCode={appliedCouponCode}
-              payableAmount={payableAmount}
+              payableAmount={finalPayableAmount}
+              paymentFee={codFee}
             />
 
             <Button
@@ -923,7 +1243,7 @@ function CheckoutContent() {
               ) : (
                 <>
                   <LockClosedIcon className="size-4" />
-                  <span>Siparişi Tamamla ({formatMoney(payableAmount)})</span>
+                  <span>Siparişi Tamamla ({formatMoney(finalPayableAmount)})</span>
                 </>
               )}
             </Button>
@@ -939,7 +1259,7 @@ function CheckoutContent() {
               Toplam Tutar
             </span>
             <div className="text-lg font-bold tabular-nums text-foreground truncate">
-              {formatMoney(payableAmount)}
+              {formatMoney(finalPayableAmount)}
             </div>
           </div>
 

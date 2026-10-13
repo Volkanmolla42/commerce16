@@ -13,6 +13,7 @@ import type { Id, Doc } from "./_generated/dataModel";
 import { getDistrictById, getProvinceById } from "../lib/turkey-provinces";
 import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation } from "./coupons";
 import { patchCatalogProduct } from "./catalogModel";
+import { defaultPaymentSettings } from "./payments";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -168,6 +169,13 @@ export const createOrder = mutation({
       schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1")
         .extend({ isDefault: v.optional(v.boolean()) })
     ),
+    paymentMethod: v.optional(
+      v.union(
+        v.literal("cash_on_delivery"),
+        v.literal("bank_transfer"),
+        v.literal("paytr")
+      )
+    ),
   },
   returns: v.id("orders"),
   handler: async (ctx, args) => {
@@ -261,7 +269,49 @@ export const createOrder = mutation({
       : undefined;
     const payableCents = coupon?.valid ? coupon.totalKurus : totalCents;
     if (payableCents <= 0) throw new Error("Kupon indirimi sepet toplamını sıfırlıyor; bu ödeme akışında ücretsiz sipariş oluşturulamıyor.");
-    if (!Number.isSafeInteger(payableCents) || Number(args.total) !== payableCents / 100) throw new Error("Sepet tutarı değişti. Sepetinizi kontrol edin.");
+
+    let paymentMethodTitle: string | undefined = undefined;
+    let paymentFee: number | undefined = undefined;
+    let orderStatus: "pending" | "paid" = "pending";
+    let paidAtTimestamp: number | undefined = undefined;
+    let additionalFeeCents = 0;
+
+    if (args.paymentMethod) {
+      const paymentSettingsDoc = await ctx.db
+        .query("paymentSettings")
+        .withIndex("by_key", (q) => q.eq("key", "payment"))
+        .unique();
+      const paymentSettings = paymentSettingsDoc ?? defaultPaymentSettings;
+
+      if (args.paymentMethod === "cash_on_delivery") {
+        if (!paymentSettings.cashOnDelivery.enabled) {
+          throw new Error("Kapıda ödeme yöntemi şu anda aktif değildir.");
+        }
+        paymentMethodTitle = "Kapıda Ödeme";
+        if (paymentSettings.cashOnDelivery.fee > 0) {
+          paymentFee = paymentSettings.cashOnDelivery.fee;
+          additionalFeeCents = Math.round(paymentFee * 100);
+        }
+      } else if (args.paymentMethod === "bank_transfer") {
+        if (!paymentSettings.bankTransfer.enabled) {
+          throw new Error("Havale / EFT ile ödeme yöntemi şu anda aktif değildir.");
+        }
+        paymentMethodTitle = "Havale / EFT";
+      } else if (args.paymentMethod === "paytr") {
+        if (!paymentSettings.paytr.enabled) {
+          throw new Error("PayTR ile ödeme yöntemi şu anda aktif değildir.");
+        }
+        paymentMethodTitle = paymentSettings.paytr.testMode ? "PayTR (Demo)" : "PayTR (Kredi Kartı)";
+        // PayTR demo payment is simulated and paid at checkout
+        orderStatus = "paid";
+        paidAtTimestamp = Date.now();
+      }
+    }
+
+    const finalPayableCents = payableCents + additionalFeeCents;
+    if (!Number.isSafeInteger(finalPayableCents) || Math.abs(Number(args.total) - finalPayableCents / 100) > 0.01) {
+      throw new Error("Sepet tutarı değişti. Sepetinizi kontrol edin.");
+    }
 
     const analyticsSessionId = args.analyticsSessionId &&
       /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(args.analyticsSessionId)
@@ -303,14 +353,20 @@ export const createOrder = mutation({
       customerName: args.customerName.trim(),
       customerPhone: args.customerPhone?.trim(),
       items,
-      total: (payableCents / 100).toFixed(2),
+      total: (finalPayableCents / 100).toFixed(2),
       ...(coupon?.valid ? {
         couponId: coupon.couponId,
         couponCode: coupon.code,
         couponDiscountKurus: coupon.discountKurus,
         couponReserved: false,
       } : {}),
-      status: "pending",
+      status: orderStatus,
+      ...(paidAtTimestamp ? { paidAt: paidAtTimestamp } : {}),
+      ...(args.paymentMethod ? {
+        paymentMethod: args.paymentMethod,
+        paymentMethodTitle,
+        ...(paymentFee !== undefined ? { paymentFee } : {}),
+      } : {}),
       ...(analyticsSessionId ? { analyticsSessionId } : {}),
       shippingAddress: args.shippingAddress,
       ...(recordedLegalAcceptance ? { legalAcceptance: recordedLegalAcceptance } : {}),
@@ -322,6 +378,11 @@ export const createOrder = mutation({
     if (coupon?.valid) await commitCouponReservation(ctx, createdOrder);
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId });
     await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.markConvertedForOrder, { orderId });
+
+    // Müşteriye sipariş alındı e-postası (ödendi, havale bekleniyor veya kapıda ödeme)
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "payment_confirmation" });
+    // Yöneticiye yeni sipariş bildirimi
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "admin_new_order" });
 
     return orderId;
   },

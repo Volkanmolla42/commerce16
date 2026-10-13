@@ -3,6 +3,7 @@ import { Navbar } from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { CookieConsentManager } from "@/components/privacy/cookie-consent-manager";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
+import { MetaPixelProvider } from "@/components/analytics/meta-pixel-provider";
 import { getStoreSettings } from "@/lib/catalog";
 import { Suspense, type ReactNode } from "react";
 
@@ -14,6 +15,7 @@ export default async function StorefrontLayout({ children }: { children: ReactNo
       <>
         <Suspense fallback={null}>
           <AnalyticsProvider />
+          <MetaPixelProvider />
         </Suspense>
         <main className="mx-auto grid min-h-[100dvh] w-full max-w-xl place-items-center px-4">
           <div className="text-center">
@@ -33,6 +35,7 @@ export default async function StorefrontLayout({ children }: { children: ReactNo
     <>
       <Suspense fallback={null}>
         <AnalyticsProvider />
+        <MetaPixelProvider />
       </Suspense>
       <div className="flex flex-col">
         <FavoritesProvider>

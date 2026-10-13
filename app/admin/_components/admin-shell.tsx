@@ -27,6 +27,7 @@ import {
   TagIcon,
   UsersIcon,
   EnvelopeIcon,
+  CreditCardIcon,
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui";
 import { useQuery } from "convex/react";
@@ -45,6 +46,7 @@ const navigation = [
   { label: "Müşteriler", href: adminPath("customers"), icon: UsersIcon },
   { label: "Sepetler", href: adminPath("carts"), icon: ShoppingCartIcon },
   { label: "E-Postalar", href: adminPath("emails"), icon: EnvelopeIcon },
+  { label: "Ödeme Yöntemleri", href: adminPath("payments"), icon: CreditCardIcon },
   { label: "Analitik", href: adminPath("analytics"), icon: ChartBarIcon },
   { label: "Mağaza ayarları", href: adminPath("settings"), icon: Cog6ToothIcon },
 ];

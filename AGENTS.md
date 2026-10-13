@@ -5,7 +5,7 @@ useMemo ve useCallback kullanımı YASAKTIR. Next.js ve Cache Components mimaris
 
 ## Projenin amacı
 
-Bu repo, müşteriler için e-ticaret sitelerini hızlıca uyarlayıp teslim etmeye yarayan bir boilerplate'tir. Yeni özellikleri tek bir mağazaya veya markaya özel varsayımlarla değil, farklı müşteri projelerinde yeniden kullanılabilir ve yapılandırılabilir olacak şekilde geliştir. Mevcut mağaza verisini boilerplate'in evrensel kuralı kabul etme.
+Bu repo, müşteriler için e-ticaret sitelerini hızlıca uyarlayıp teslim etmeye yarayan bir boilerplate'tir. Mevcut mağaza verisini boilerplate'in evrensel kuralı kabul etme.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
