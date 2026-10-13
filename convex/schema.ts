@@ -304,6 +304,13 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_slug", ["userId", "productSlug"]),
 
+  passwordChangeCodes: defineTable({
+    userId: v.id("users"),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    attempts: v.number(),
+  }).index("by_userId", ["userId"]),
+
   restockSubscriptions: defineTable({
     email: v.string(),
     productId: v.id("products"),

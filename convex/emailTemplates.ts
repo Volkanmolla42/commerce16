@@ -602,6 +602,35 @@ export function buildPasswordResetEmail(args: {
   });
 }
 
+export function buildPasswordChangeEmail(args: {
+  storeName: string;
+  token: string;
+}) {
+  const contentHtml = `<p style="margin:0 0 20px 0;font-size:14px;color:#52525b;line-height:1.6;max-width:440px;margin-left:auto;margin-right:auto;">
+  Hesabınızın şifresini değiştirmek için talepte bulundunuz. Değişikliği tamamlamak için aşağıdaki tek kullanımlık doğrulama kodunu ekrandaki alana giriniz:
+</p>
+<div style="margin:20px auto;padding:14px 28px;background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;font-size:30px;font-weight:700;letter-spacing:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#09090b;display:inline-block;">
+  ${escapeHtml(args.token)}
+</div>
+<p style="margin:16px 0 0 0;font-size:12px;color:#71717a;line-height:1.5;">
+  Bu kod güvenliğiniz için <strong>sınırlı süreyle</strong> geçerlidir.<br />
+  Lütfen bu kodu kimseyle paylaşmayınız.
+</p>
+<div style="margin-top:24px;background-color:#fafafa;border:1px solid #f0f0f0;border-radius:8px;padding:12px 16px;text-align:left;">
+  <p style="margin:0;font-size:12px;color:#71717a;line-height:1.5;">
+    Bu talebi siz gerçekleştirmediyseniz şifreniz değişmemiştir; bu e-postayı dikkate almanıza gerek yoktur.
+  </p>
+</div>`;
+
+  return renderEmailContainer({
+    storeName: escapeHtml(args.storeName),
+    iconSvg: EMAIL_ICONS.lock,
+    title: "Şifre Değiştirme Kodu",
+    align: "center",
+    contentHtml,
+  });
+}
+
 export function buildWelcomeEmail(args: {
   storeName: string;
   userName?: string | null;

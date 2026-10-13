@@ -1,13 +1,16 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { useConvexAuth, useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
 import { useState, type ReactNode } from "react";
+import { ConvexError } from "convex/values";
 import {
   UserIcon,
   LockClosedIcon,
   CheckBadgeIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   Button,
@@ -21,6 +24,16 @@ import {
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
 import { ArrowRight01Icon } from "hugeicons-react";
+
+function resolveErrorMessage(error: unknown): string {
+  if (error instanceof ConvexError) {
+    return typeof error.data === "string" ? error.data : "Beklenmeyen bir hata oluştu.";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Beklenmeyen bir hata oluştu.";
+}
 
 function ProfileCardHeader({
   icon: Icon,
@@ -67,6 +80,8 @@ function Field({
 export default function AccountProfilePage() {
   const profile = useQuery(api.users.getMyProfile);
   const updateProfile = useMutation(api.users.updateProfile);
+  const requestChangeCode = useAction(api.passwordChange.requestPasswordChangeCode);
+  const changePassword = useAction(api.passwordChange.changePassword);
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { signOut } = useAuthActions();
 
@@ -77,6 +92,17 @@ export default function AccountProfilePage() {
   const phoneNumber = phoneDraft ?? profile?.phone ?? "";
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Şifre Değiştirme Formu
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +119,76 @@ export default function AccountProfilePage() {
       setStatusMessage("Bilgiler güncellenirken bir hata oluştu.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const validatePasswordFields = (): string | null => {
+    if (!currentPassword) return "Mevcut şifrenizi girin.";
+    if (newPassword.length < 8) return "Yeni şifre en az 8 karakter olmalıdır.";
+    if (newPassword !== confirmPassword) return "Yeni şifreler birbiriyle eşleşmiyor.";
+    return null;
+  };
+
+  const handleSendCode = async () => {
+    setPasswordError(null);
+    setPasswordNotice(null);
+
+    const validationError = validatePasswordFields();
+    if (validationError) {
+      setPasswordError(validationError);
+      return;
+    }
+
+    setIsSendingCode(true);
+    try {
+      await requestChangeCode({ currentPassword });
+      setIsCodeSent(true);
+      setPasswordNotice(
+        `${profile?.email ?? "E-posta adresinize"} adresine 6 haneli doğrulama kodu gönderildi.`
+      );
+    } catch (error) {
+      setPasswordError(resolveErrorMessage(error));
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordNotice(null);
+
+    if (!isCodeSent) {
+      setPasswordError("Önce e-posta doğrulama kodu isteyin.");
+      return;
+    }
+    const validationError = validatePasswordFields();
+    if (validationError) {
+      setPasswordError(validationError);
+      return;
+    }
+    if (verificationCode.trim().length !== 6) {
+      setPasswordError("6 haneli doğrulama kodunu girin.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword({
+        currentPassword,
+        newPassword,
+        code: verificationCode.trim(),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setVerificationCode("");
+      setIsCodeSent(false);
+      setPasswordNotice("Şifreniz başarıyla güncellendi.");
+    } catch (error) {
+      setPasswordError(resolveErrorMessage(error));
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -184,37 +280,111 @@ export default function AccountProfilePage() {
         <Card className="rounded-3xl border-border bg-card shadow-xs">
           <ProfileCardHeader icon={LockClosedIcon} title="Şifre Değiştir" />
           <CardContent className="p-6">
-            <form onSubmit={(event) => event.preventDefault()} className="space-y-4">
-              <p className="text-xs text-muted-foreground">Şifre değiştirme şu anda kullanılamıyor.</p>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              {passwordError && (
+                <div className="flex items-center gap-2 rounded-2xl bg-rose-500/10 p-3.5 text-xs text-rose-600 dark:text-rose-400">
+                  <ExclamationTriangleIcon className="h-4 w-4 shrink-0" />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+              {passwordNotice && (
+                <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckBadgeIcon className="h-4 w-4 shrink-0" />
+                  <span>{passwordNotice}</span>
+                </div>
+              )}
 
               <Field id="curr-pass" label="Mevcut Şifre">
                 <Input
                   id="curr-pass"
                   type="password"
                   autoComplete="current-password"
-                  disabled
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="••••••••"
                 />
               </Field>
 
-              <Field id="new-pass" label="Yeni Şifre">
+              <Field
+                id="new-pass"
+                label="Yeni Şifre"
+                hint={
+                  <p className="text-[11px] text-muted-foreground">
+                    En az 8 karakter olmalıdır.
+                  </p>
+                }
+              >
                 <Input
                   id="new-pass"
                   type="password"
                   autoComplete="new-password"
-                  disabled
-                  placeholder="En az 6 karakter"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
                 />
               </Field>
 
-              <Button
-                type="submit"
-                variant="outline"
-                disabled
-                className="rounded-2xl font-semibold border-border"
-              >
-                Şifreyi Güncelle
-              </Button>
+              <Field id="new-pass-confirm" label="Yeni Şifre Tekrar">
+                <Input
+                  id="new-pass-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </Field>
+
+              {isCodeSent && (
+                <Field
+                  id="pass-code"
+                  label="Doğrulama Kodu"
+                  hint={
+                    <p className="text-[11px] text-muted-foreground">
+                      E-posta adresinize gönderilen 6 haneli kodu girin.
+                    </p>
+                  }
+                >
+                  <Input
+                    id="pass-code"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) =>
+                      setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    placeholder="000000"
+                    className="font-mono text-base tracking-[0.3em]"
+                  />
+                </Field>
+              )}
+
+              <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSendCode}
+                  disabled={isSendingCode || isChangingPassword}
+                  className="rounded-2xl gap-2 font-semibold border-border"
+                >
+                  <EnvelopeIcon className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    {isSendingCode
+                      ? "Gönderiliyor..."
+                      : isCodeSent
+                      ? "Kodu Tekrar Gönder"
+                      : "E-posta Doğrula"}
+                  </span>
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isChangingPassword || isSendingCode || !isCodeSent}
+                  className="rounded-2xl font-semibold shadow-md sm:flex-1"
+                >
+                  {isChangingPassword ? "Güncelleniyor..." : "Şifreyi Güncelle"}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
