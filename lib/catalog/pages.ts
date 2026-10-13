@@ -17,7 +17,8 @@ function pageArguments(params: CatalogSearchParams, categorySlug?: string) {
 export async function getCatalogPage(params: CatalogSearchParams, categorySlug?: string) {
   "use cache";
   cacheTag("products", "categories");
-  cacheLife({ stale: 0, revalidate: 30, expire: 60 });
+  // Sipariş kaynaklı stok değişimi tag'i invalidate etmiyor; bu pencere listeleme için tazelik sınırı.
+  cacheLife({ stale: 300, revalidate: 300, expire: 3600 });
   const args = pageArguments(params, categorySlug);
   const [result, attributes, options] = await Promise.all([
     fetchQuery(api.catalog.page, args),

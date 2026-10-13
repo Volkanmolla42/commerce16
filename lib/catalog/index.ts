@@ -120,7 +120,6 @@ export async function getRecommendationCatalog(limit = 100): Promise<Product[]> 
     title: product.title,
     price: product.price,
     availableForSale: product.availableForSale,
-    attributes: product.attributes,
     categorySlug: product.categorySlug,
     images: getProductImages(product).slice(0, 1),
     updatedAt: product.updatedAt,

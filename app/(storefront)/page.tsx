@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   const [{ storeName, slogan, logoUrl }, products, categories] = await Promise.all([
     getStoreSettings(),
-    getRecommendationCatalog(),
+    getRecommendationCatalog(30),
     getCategories(),
   ]);
 
