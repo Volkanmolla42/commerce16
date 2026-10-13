@@ -86,6 +86,270 @@ export function AccountAddressesSkeleton() {
   );
 }
 
+type AddressDoc = NonNullable<ReturnType<typeof useQuery<typeof api.addresses.getMyAddresses>>>[number];
+
+interface AddressFormData {
+  title: string;
+  fullName: string;
+  phone: string;
+  city: string;
+  provinceId: string;
+  district: string;
+  districtId: string;
+  addressLine1: string;
+  isDefault: boolean;
+}
+
+function AddressCardItem({
+  addr,
+  onEdit,
+  onDelete,
+  onSetDefault,
+}: {
+  addr: AddressDoc;
+  onEdit: (addr: AddressDoc) => void;
+  onDelete: (id: Id<"addresses">) => void;
+  onSetDefault: (id: Id<"addresses">) => void;
+}) {
+  return (
+    <Card className="relative flex flex-col justify-between rounded-3xl border border-border bg-card p-6 shadow-xs transition hover:border-muted-foreground/40">
+      <div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-base text-foreground">{addr.title}</span>
+            {addr.isDefault && (
+              <Badge variant="secondary" className="text-xs font-medium">
+                Varsayılan
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-1 text-xs">
+          <p className="font-semibold text-foreground">{addr.fullName}</p>
+          <p className="text-muted-foreground">{addr.phone}</p>
+          <p className="text-foreground leading-relaxed pt-1">{addr.addressLine1}</p>
+          <p className="text-muted-foreground font-medium">
+            {addr.district} / {addr.city}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4">
+        <div className="flex gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(addr)}
+            className="h-8 rounded-xl border-border px-3 text-xs font-medium gap-1.5"
+          >
+            <PencilSquareIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Düzenle</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDelete(addr._id)}
+            className="h-8 rounded-xl border-border px-3 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+            <span>Sil</span>
+          </Button>
+        </div>
+
+        {!addr.isDefault && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onSetDefault(addr._id)}
+            className="h-8 text-xs text-primary hover:text-primary font-medium"
+          >
+            Varsayılan Yap
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function AddressEditDialog({
+  isOpen,
+  onOpenChange,
+  isEditing,
+  errorMessage,
+  isSaving,
+  form,
+  setForm,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  isEditing: boolean;
+  errorMessage: string | null;
+  isSaving: boolean;
+  form: AddressFormData;
+  setForm: React.Dispatch<React.SetStateAction<AddressFormData>>;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  const districtOptions = getProvinceById(form.provinceId)?.districts ?? [];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg rounded-3xl p-6">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold">
+            {isEditing ? "Adresi Düzenle" : "Yeni Teslimat Adresi"}
+          </DialogTitle>
+        </DialogHeader>
+
+        {errorMessage && (
+          <div className="rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
+            {errorMessage}
+          </div>
+        )}
+
+        <form onSubmit={onSubmit} className="space-y-4 pt-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2 space-y-2">
+              <Label htmlFor="addr-title" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Adres Başlığı *
+              </Label>
+              <Input
+                id="addr-title"
+                required
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="Örn: Ev, İşyeri, Yazlık"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="addr-name" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Alıcı Ad Soyad *
+              </Label>
+              <Input
+                id="addr-name"
+                required
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                placeholder="Ad Soyad"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="addr-phone" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Telefon Numarası *
+              </Label>
+              <Input
+                id="addr-phone"
+                required
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="05XX XXX XX XX"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="addr-city" className="text-xs uppercase tracking-wider text-muted-foreground">
+                İl *
+              </Label>
+              <select
+                id="addr-city"
+                required
+                value={form.provinceId}
+                onChange={(e) => {
+                  const province = getProvinceById(e.target.value);
+                  setForm({
+                    ...form,
+                    provinceId: e.target.value,
+                    city: province?.name ?? "",
+                    districtId: "",
+                    district: "",
+                  });
+                }}
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                <option value="" disabled>İl seçin</option>
+                {TURKEY_PROVINCES.map((province) => (
+                  <option key={province.id} value={province.id}>{province.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="addr-district" className="text-xs uppercase tracking-wider text-muted-foreground">
+                İlçe *
+              </Label>
+              <select
+                id="addr-district"
+                required
+                value={form.districtId}
+                disabled={!form.provinceId}
+                onChange={(e) => {
+                  const district = getDistrictById(form.provinceId, e.target.value);
+                  setForm({
+                    ...form,
+                    districtId: e.target.value,
+                    district: district?.name ?? "",
+                  });
+                }}
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="" disabled>İlçe seçin</option>
+                {[...districtOptions].sort((a, b) => a.name.localeCompare(b.name, "tr-TR")).map((district) => (
+                  <option key={district.id} value={district.id}>{district.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2 space-y-2">
+              <Label htmlFor="addr-line1" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Açık Adres (Cadde, Sokak, No, Daire) *
+              </Label>
+              <textarea
+                id="addr-line1"
+                rows={2}
+                required
+                value={form.addressLine1}
+                onChange={(e) => setForm({ ...form, addressLine1: e.target.value })}
+                placeholder="Caferağa Mah. Moda Cad. No: 10 Daire: 4"
+                className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-[border-color,background-color,box-shadow] duration-150"
+              />
+            </div>
+
+            <div className="sm:col-span-2 flex items-center space-x-2 pt-1">
+              <input
+                type="checkbox"
+                id="addr-default"
+                checked={form.isDefault}
+                onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-primary accent-primary cursor-pointer"
+              />
+              <Label htmlFor="addr-default" className="text-xs text-muted-foreground cursor-pointer select-none">
+                Bu adresi varsayılan teslimat adresi olarak ayarla
+              </Label>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="rounded-xl"
+            >
+              Vazgeç
+            </Button>
+            <Button type="submit" disabled={isSaving} className="rounded-xl font-semibold shadow-md">
+              {isSaving ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AccountAddressesPage() {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const profile = useQuery(api.users.getMyProfile);
@@ -102,7 +366,7 @@ export default function AccountAddressesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<AddressFormData>({
     title: "Ev",
     fullName: "",
     phone: "",
@@ -131,7 +395,7 @@ export default function AccountAddressesPage() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (addr: NonNullable<typeof addresses>[number]) => {
+  const openEditModal = (addr: AddressDoc) => {
     setEditingAddressId(addr._id);
     const province = getProvinceById(addr.provinceId) ?? getProvinceByName(addr.city);
     const district = getDistrictById(province?.id, addr.districtId) ?? getDistrictByName(province?.id, addr.district);
@@ -197,9 +461,9 @@ export default function AccountAddressesPage() {
         });
       }
       setIsModalOpen(false);
+      setIsSaving(false);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Adres kaydedilemedi.");
-    } finally {
       setIsSaving(false);
     }
   };
@@ -221,8 +485,6 @@ export default function AccountAddressesPage() {
     }
   };
 
-  const districtOptions = getProvinceById(form.provinceId)?.districts ?? [];
-
   if (!authLoading && !isAuthenticated) {
     return <AccountLoginCard />;
   }
@@ -234,70 +496,13 @@ export default function AccountAddressesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {addresses.map((addr) => (
-            <Card
+            <AddressCardItem
               key={addr._id}
-              className="relative flex flex-col justify-between rounded-3xl border border-border bg-card p-6 shadow-xs transition hover:border-muted-foreground/40"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-base text-foreground">
-                      {addr.title}
-                    </span>
-                    {addr.isDefault && (
-                      <Badge variant="secondary" className="text-xs font-medium">
-                        Varsayılan
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-1 text-xs">
-                  <p className="font-semibold text-foreground">{addr.fullName}</p>
-                  <p className="text-muted-foreground">{addr.phone}</p>
-                  <p className="text-foreground leading-relaxed pt-1">
-                    {addr.addressLine1}
-                  </p>
-                  <p className="text-muted-foreground font-medium">
-                    {addr.district} / {addr.city}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4">
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEditModal(addr)}
-                    className="h-8 rounded-xl border-border px-3 text-xs font-medium gap-1.5"
-                  >
-                    <PencilSquareIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>Düzenle</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(addr._id)}
-                    className="h-8 rounded-xl border-border px-3 text-xs font-medium text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5"
-                  >
-                    <TrashIcon className="h-3.5 w-3.5" />
-                    <span>Sil</span>
-                  </Button>
-                </div>
-
-                {!addr.isDefault && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSetDefault(addr._id)}
-                    className="h-8 text-xs text-primary hover:text-primary font-medium"
-                  >
-                    Varsayılan Yap
-                  </Button>
-                )}
-              </div>
-            </Card>
+              addr={addr}
+              onEdit={openEditModal}
+              onDelete={handleDelete}
+              onSetDefault={handleSetDefault}
+            />
           ))}
 
           <button
@@ -314,160 +519,16 @@ export default function AccountAddressesPage() {
         </div>
       )}
 
-      {/* Adres Ekleme / Düzenleme Dialog */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-lg rounded-3xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
-              {editingAddressId ? "Adresi Düzenle" : "Yeni Teslimat Adresi"}
-            </DialogTitle>
-          </DialogHeader>
-
-          {errorMessage && (
-            <div className="rounded-xl bg-destructive/10 p-3 text-xs text-destructive">
-              {errorMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleSave} className="space-y-4 pt-2">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 space-y-2">
-                <Label htmlFor="addr-title" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Adres Başlığı *
-                </Label>
-                <Input
-                  id="addr-title"
-                  required
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Örn: Ev, İşyeri, Yazlık"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="addr-name" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Alıcı Ad Soyad *
-                </Label>
-                <Input
-                  id="addr-name"
-                  required
-                  value={form.fullName}
-                  onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                  placeholder="Ad Soyad"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="addr-phone" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Telefon Numarası *
-                </Label>
-                <Input
-                  id="addr-phone"
-                  required
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="05XX XXX XX XX"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="addr-city" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  İl *
-                </Label>
-                <select
-                  id="addr-city"
-                  required
-                  value={form.provinceId}
-                  onChange={(e) => {
-                    const province = getProvinceById(e.target.value);
-                    setForm({
-                      ...form,
-                      provinceId: e.target.value,
-                      city: province?.name ?? "",
-                      districtId: "",
-                      district: "",
-                    });
-                  }}
-                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-                >
-                  <option value="" disabled>İl seçin</option>
-                  {TURKEY_PROVINCES.map((province) => (
-                    <option key={province.id} value={province.id}>{province.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="addr-district" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  İlçe *
-                </Label>
-                <select
-                  id="addr-district"
-                  required
-                  value={form.districtId}
-                  disabled={!form.provinceId}
-                  onChange={(e) => {
-                    const district = getDistrictById(form.provinceId, e.target.value);
-                    setForm({
-                      ...form,
-                      districtId: e.target.value,
-                      district: district?.name ?? "",
-                    });
-                  }}
-                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="" disabled>İlçe seçin</option>
-                  {[...districtOptions].sort((a, b) => a.name.localeCompare(b.name, "tr-TR")).map((district) => (
-                    <option key={district.id} value={district.id}>{district.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-2 space-y-2">
-                <Label htmlFor="addr-line1" className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Açık Adres (Cadde, Sokak, No, Daire) *
-                </Label>
-                <textarea
-                  id="addr-line1"
-                  rows={2}
-                  required
-                  value={form.addressLine1}
-                  onChange={(e) => setForm({ ...form, addressLine1: e.target.value })}
-                  placeholder="Caferağa Mah. Moda Cad. No: 10 Daire: 4"
-                  className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-[border-color,background-color,box-shadow] duration-150"
-                />
-              </div>
-
-              <div className="sm:col-span-2 flex items-center space-x-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="addr-default"
-                  checked={form.isDefault}
-                  onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300 text-primary accent-primary cursor-pointer"
-                />
-                <Label htmlFor="addr-default" className="text-xs text-muted-foreground cursor-pointer select-none">
-                  Bu adresi varsayılan teslimat adresi olarak ayarla
-                </Label>
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-xl"
-              >
-                Vazgeç
-              </Button>
-              <Button type="submit" disabled={isSaving} className="rounded-xl font-semibold shadow-md">
-                {isSaving ? "Kaydediliyor..." : "Kaydet"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <AddressEditDialog
+        isOpen={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        isEditing={Boolean(editingAddressId)}
+        errorMessage={errorMessage}
+        isSaving={isSaving}
+        form={form}
+        setForm={setForm}
+        onSubmit={handleSave}
+      />
     </div>
   );
 }

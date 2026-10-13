@@ -125,30 +125,197 @@ function CartContent() {
     );
   }
 
-  if (items.length === 0) {
-    return (
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
-        <Card className="mx-auto max-w-md text-center p-8 border-border/80 bg-card/60 shadow-lg backdrop-blur-xs rounded-3xl">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <ShoppingBagIcon className="h-10 w-10" />
+type CartItem = ReturnType<typeof useCart>["items"][number];
+
+function CartEmptyState() {
+  return (
+    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
+      <Card className="mx-auto max-w-md text-center p-8 border-border/80 bg-card/60 shadow-lg backdrop-blur-xs rounded-3xl">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <ShoppingBagIcon className="h-10 w-10" />
+        </div>
+        <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
+          Sepetiniz Boş
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Henüz sepetinize bir ürün eklemediniz. İlginizi çeken koleksiyonları keşfetmeye hemen başlayın!
+        </p>
+        <div className="mt-8">
+          <Button asChild size="lg" className="rounded-full shadow-md font-semibold px-8">
+            <Link href="/search" className="gap-2">
+              <span>Alışverişe Başla</span>
+              <ArrowRightIcon className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function CartItemRow({
+  item,
+  onUpdateQuantity,
+  onRemove,
+  isAtMaxStock,
+}: {
+  item: CartItem;
+  onUpdateQuantity: (productId: string, quantity: number, variantId?: string) => void;
+  onRemove: (productId: string, variantId?: string) => void;
+  isAtMaxStock: boolean;
+}) {
+  const unitPrice = getProductUnitPrice(item.product, item.variantId);
+  const lineTotal = (parseFloat(unitPrice || "0") * item.quantity).toFixed(2);
+
+  return (
+    <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className="flex items-center gap-4 min-w-0 flex-1">
+        <Link
+          href={`/product/${item.product.slug}`}
+          className="flex-none overflow-hidden rounded-2xl border border-border bg-muted/30"
+        >
+          {item.product.images[0] ? (
+            <Image
+              src={item.product.images[0].url}
+              width={96}
+              height={96}
+              alt={item.product.title}
+              className="h-20 w-20 object-cover sm:h-24 sm:w-24"
+            />
+          ) : (
+            <div className="flex h-20 w-20 items-center justify-center text-muted-foreground sm:h-24 sm:w-24">
+              <ShoppingBagIcon className="h-8 w-8" />
+            </div>
+          )}
+        </Link>
+
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/product/${item.product.slug}`}
+            className="text-sm sm:text-base font-semibold leading-snug text-foreground hover:underline line-clamp-2"
+          >
+            {item.product.title}
+          </Link>
+          <div className="mt-1 text-sm font-semibold text-foreground">
+            {formatMoney(unitPrice)}
           </div>
-          <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
-            Sepetiniz Boş
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Henüz sepetinize bir ürün eklemediniz. İlginizi çeken koleksiyonları keşfetmeye hemen başlayın!
-          </p>
-          <div className="mt-8">
-            <Button asChild size="lg" className="rounded-full shadow-md font-semibold px-8">
-              <Link href="/search" className="gap-2">
-                <span>Alışverişe Başla</span>
-                <ArrowRightIcon className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </Card>
+        </div>
       </div>
-    );
+
+      <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t border-border/60 sm:border-0">
+        <div className="flex items-center rounded-xl border border-border bg-muted/40">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg hover:bg-background"
+            onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1, item.variantId)}
+            aria-label="Azalt"
+          >
+            <MinusIcon className="h-3.5 w-3.5" />
+          </Button>
+          <span className="px-3 text-xs font-bold text-foreground">{item.quantity}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={isAtMaxStock}
+            className="h-8 w-8 rounded-lg hover:bg-background disabled:opacity-20 disabled:cursor-not-allowed disabled:pointer-events-none"
+            onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1, item.variantId)}
+            aria-label="Arttır"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <div className="min-w-[80px] text-right font-bold text-foreground">
+          {formatMoney(lineTotal)}
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onRemove(item.product.id, item.variantId)}
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          aria-label="Ürünü Sil"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CartSummaryCard({ totalAmount }: { totalAmount: number }) {
+  return (
+    <Card className="sticky top-24 rounded-3xl border-border/80 bg-card p-6 shadow-sm space-y-5">
+      <CardHeader className="p-0">
+        <CardTitle className="text-lg font-bold text-foreground">Sipariş Özeti</CardTitle>
+      </CardHeader>
+      <Separator />
+
+      <CardContent className="p-0 space-y-4 text-sm">
+        <div className="flex justify-between text-muted-foreground">
+          <span>Ara Toplam</span>
+          <span className="font-semibold text-foreground">{formatMoney(totalAmount)}</span>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <span>Kargo</span>
+          <span className="font-medium text-emerald-500">Ücretsiz</span>
+        </div>
+        <Separator />
+        <div className="flex justify-between text-lg font-bold text-foreground">
+          <span>Genel Toplam</span>
+          <span className="text-primary">{formatMoney(totalAmount)}</span>
+        </div>
+
+        <div className="hidden pt-2 md:block">
+          <Button asChild size="lg" className="w-full rounded-2xl shadow-lg font-semibold gap-2 h-12">
+            <Link href="/checkout">
+              <span>Ödemeye Geç</span>
+              <ArrowRightIcon className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+
+        <div className="pt-2 space-y-2 border-t border-border/60 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <ShieldCheckIcon className="size-4 text-primary" />
+            <span>256-Bit SSL ile güvenli ödeme</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <TruckIcon className="size-4 text-primary" />
+            <span>Sigortalı ve özenli paketleme</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowPathIcon className="size-4 text-primary" />
+            <span>14 gün içinde koşulsuz kolay iade</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CartMobileCheckoutBar({ totalAmount }: { totalAmount: number }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-4 border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+      <span className="shrink-0 text-sm font-semibold text-foreground">
+        {formatMoney(totalAmount)}
+      </span>
+      <Button asChild size="lg" className="h-12 min-w-0 flex-1 rounded-xl text-sm font-semibold shadow-none gap-2">
+        <Link href="/checkout">
+          <span>Ödemeye Geç</span>
+          <ArrowRightIcon className="h-4 w-4" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+  if (items.length === 0) {
+    return <CartEmptyState />;
   }
 
   return (
@@ -163,176 +330,26 @@ function CartContent() {
         {/* Ürün Listesi */}
         <div className="lg:col-span-8">
           <Card className="divide-y divide-border/60 border-border/80 bg-card shadow-sm overflow-hidden rounded-3xl">
-            {items.map((item) => {
-              const unitPrice = getProductUnitPrice(item.product, item.variantId);
-              const lineTotal = (
-                parseFloat(unitPrice || "0") * item.quantity
-              ).toFixed(2);
-              const isAtMaxStock = item.quantity >= getItemMaxStock(item.product.id, item.variantId);
-
-              return (
-                <div
-                  key={`${item.product.id}:${item.variantId ?? ""}`}
-                  className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
-                >
-                  <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <Link
-                      href={`/product/${item.product.slug}`}
-                      className="flex-none overflow-hidden rounded-2xl border border-border bg-muted/30"
-                    >
-                      {item.product.images[0] ? (
-                        <Image
-                          src={item.product.images[0].url}
-                          width={96}
-                          height={96}
-                          alt={item.product.title}
-                          className="h-20 w-20 object-cover sm:h-24 sm:w-24"
-                        />
-                      ) : (
-                        <div className="flex h-20 w-20 items-center justify-center text-muted-foreground sm:h-24 sm:w-24">
-                          <ShoppingBagIcon className="h-8 w-8" />
-                        </div>
-                      )}
-                    </Link>
-
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/product/${item.product.slug}`}
-                        className="text-sm sm:text-base font-semibold leading-snug text-foreground hover:underline line-clamp-2"
-                      >
-                        {item.product.title}
-                      </Link>
-                      <div className="mt-1 text-sm font-semibold text-foreground">
-                        {formatMoney(unitPrice)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t border-border/60 sm:border-0">
-                    {/* Adet Kontrolü */}
-                    <div className="flex items-center rounded-xl border border-border bg-muted/40">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-lg hover:bg-background"
-                        onClick={() =>
-                          updateQuantity(item.product.id, item.quantity - 1, item.variantId)
-                        }
-                        aria-label="Azalt"
-                      >
-                        <MinusIcon className="h-3.5 w-3.5" />
-                      </Button>
-                      <span className="px-3 text-xs font-bold text-foreground">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        disabled={isAtMaxStock}
-                        className="h-8 w-8 rounded-lg hover:bg-background disabled:opacity-20 disabled:cursor-not-allowed disabled:pointer-events-none"
-                        onClick={() =>
-                          updateQuantity(item.product.id, item.quantity + 1, item.variantId)
-                        }
-                        aria-label="Arttır"
-                      >
-                        <PlusIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-
-                    {/* Satır Toplamı */}
-                    <div className="min-w-[80px] text-right font-bold text-foreground">
-                      {formatMoney(lineTotal)}
-                    </div>
-
-                    {/* Sil Butonu */}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeItem(item.product.id, item.variantId)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      aria-label="Ürünü Sil"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+            {items.map((item) => (
+              <CartItemRow
+                key={`${item.product.id}:${item.variantId ?? ""}`}
+                item={item}
+                onUpdateQuantity={updateQuantity}
+                onRemove={removeItem}
+                isAtMaxStock={item.quantity >= getItemMaxStock(item.product.id, item.variantId)}
+              />
+            ))}
           </Card>
         </div>
 
         {/* Sipariş Özeti */}
         <div className="lg:col-span-4">
-          <Card className="sticky top-24 rounded-3xl border-border/80 bg-card p-6 shadow-sm space-y-5">
-            <CardHeader className="p-0">
-              <CardTitle className="text-lg font-bold text-foreground">
-                Sipariş Özeti
-              </CardTitle>
-            </CardHeader>
-            <Separator />
-
-            <CardContent className="p-0 space-y-4 text-sm">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Ara Toplam</span>
-                <span className="font-semibold text-foreground">
-                  {formatMoney(totalAmount)}
-                </span>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Kargo</span>
-                <span className="font-medium text-emerald-500">Ücretsiz</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold text-foreground">
-                <span>Genel Toplam</span>
-                <span className="text-primary">{formatMoney(totalAmount)}</span>
-              </div>
-
-              <div className="hidden pt-2 md:block">
-                <Button asChild size="lg" className="w-full rounded-2xl shadow-lg font-semibold gap-2 h-12">
-                  <Link href="/checkout">
-                    <span>Ödemeye Geç</span>
-                    <ArrowRightIcon className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-
-              {/* Güven Rozetleri */}
-              <div className="pt-2 space-y-2 border-t border-border/60 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <ShieldCheckIcon className="size-4 text-primary" />
-                  <span>256-Bit SSL ile güvenli ödeme</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TruckIcon className="size-4 text-primary" />
-                  <span>Sigortalı ve özenli paketleme</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <ArrowPathIcon className="size-4 text-primary" />
-                  <span>14 gün içinde koşulsuz kolay iade</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <CartSummaryCard totalAmount={totalAmount} />
         </div>
       </div>
       <CartRecommendationShelf />
 
-      {/* Mobil: ürün sayfasındaki satın alma çubuğu gibi sabit ödeme çubuğu */}
-      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-4 border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
-        <span className="shrink-0 text-sm font-semibold text-foreground">
-          {formatMoney(totalAmount)}
-        </span>
-        <Button asChild size="lg" className="h-12 min-w-0 flex-1 rounded-xl text-sm font-semibold shadow-none gap-2">
-          <Link href="/checkout">
-            <span>Ödemeye Geç</span>
-            <ArrowRightIcon className="h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
+      <CartMobileCheckoutBar totalAmount={totalAmount} />
     </div>
   );
 }

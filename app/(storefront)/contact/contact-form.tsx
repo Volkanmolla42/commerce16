@@ -47,9 +47,9 @@ export default function ContactForm() {
       setPhone("");
       setSubject("");
       setMessage("");
+      setLoading(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Mesajınız iletilirken bir hata oluştu. Lütfen tekrar deneyiniz.");
-    } finally {
       setLoading(false);
     }
   };

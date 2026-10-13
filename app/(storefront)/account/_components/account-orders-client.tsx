@@ -146,7 +146,7 @@ export default function AccountOrdersPage() {
             <div className="space-y-3">
               {order.items.map((item, idx) => (
                 <div
-                  key={idx}
+                  key={`${item.productId}-${item.variantId ?? idx}`}
                   className="flex items-center justify-between gap-4 border-b border-border/50 pb-3 last:border-b-0 last:pb-0"
                 >
                   <div className="flex items-center gap-3 min-w-0">

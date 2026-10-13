@@ -26,9 +26,9 @@ function UnsubscribeContent() {
     try {
       await unsubscribe({ token });
       setIsDone(true);
+      setIsSubmitting(false);
     } catch {
       setError("İşlem tamamlanamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
-    } finally {
       setIsSubmitting(false);
     }
   };
