@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import Grid from "@/components/grid";
-import { ProductCard, productShelfGridClassName } from "@/components/product/product-card";
+import { ProductGrid } from "@/components/product/product-grid";
 import { useCart } from "@/components/cart/cart-context";
 import type { CartItem } from "@/components/cart/cart-context";
 import { Button } from "@/components/ui";
@@ -69,65 +68,72 @@ function ShelfCartAction({
   );
 }
 
-function Shelf({ title, products, showCartActions = false, upsellSources, layout = "scroll" }: {
+export function Shelf({ title, products, showCartActions = false, upsellSources, layout = "scroll", bordered = true, headerAction }: {
   title: string;
   products: Product[];
   showCartActions?: boolean;
   upsellSources?: Map<string, CartItem>;
   layout?: "scroll" | "centered";
+  bordered?: boolean;
+  headerAction?: ReactNode;
 }) {
   const { addItem, replaceItem } = useCart();
   if (products.length === 0) return null;
+
+  const resolveProduct = (product: Product) => {
+    const defaultVariant = getSelectedVariant(product, new URLSearchParams());
+    const upsellSource = upsellSources?.get(product.id);
+    const params = upsellSource
+      ? new URLSearchParams({ cartReplaceProductId: upsellSource.product.id })
+      : null;
+    if (params && upsellSource?.variantId) {
+      params.set("cartReplaceVariantId", upsellSource.variantId);
+    }
+    return {
+      defaultVariant,
+      upsellSource,
+      needsVariant: Boolean(product.variants?.length && !defaultVariant),
+      href: params ? `/product/${product.slug}?${params.toString()}` : `/product/${product.slug}`,
+      selectedProduct: defaultVariant
+        ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getVariantImages(product, defaultVariant) }
+        : product,
+    };
+  };
+
   return (
-    <section className="mt-12 border-t border-neutral-200 py-8 dark:border-neutral-800" aria-label={title}>
-      <h2 className={`${layout === "centered" ? "mx-auto max-w-5xl" : ""} mb-5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white`}>{title}</h2>
-      <Grid className={layout === "centered"
-        ? `mx-auto ${products.length === 1 ? "max-w-xs grid-cols-1" : products.length === 2 ? "max-w-2xl grid-cols-2" : "max-w-5xl grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
-        : productShelfGridClassName}>
-        {products.map((product) => {
-          const defaultVariant = getSelectedVariant(product, new URLSearchParams());
-          const needsVariant = Boolean(product.variants?.length && !defaultVariant);
-          const upsellSource = upsellSources?.get(product.id);
-          const replacementParams = upsellSource
-            ? new URLSearchParams({ cartReplaceProductId: upsellSource.product.id })
-            : null;
-          if (replacementParams && upsellSource?.variantId) {
-            replacementParams.set("cartReplaceVariantId", upsellSource.variantId);
-          }
-          const productHref = replacementParams
-            ? `/product/${product.slug}?${replacementParams.toString()}`
-            : `/product/${product.slug}`;
-          const selectedProduct = defaultVariant
-            ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getVariantImages(product, defaultVariant) }
-            : product;
-          const handleAdd = (origin: HTMLElement) => {
-            if (upsellSource) {
-              replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id);
-              return;
-            }
-            addItem(selectedProduct, 1, defaultVariant?.id);
-            void burstCartConfetti(origin);
-          };
+    <section className={`py-8 ${bordered ? "mt-12 border-t border-neutral-200 dark:border-neutral-800" : ""}`} aria-label={title}>
+      <div className={`${layout === "centered" ? "mx-auto max-w-5xl" : ""} mb-5 flex items-center justify-between gap-4`}>
+        <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{title}</h2>
+        {headerAction}
+      </div>
+      <ProductGrid
+        products={products}
+        layout={layout === "centered" ? "grid" : "scroll"}
+        className={layout === "centered"
+          ? `mx-auto ${products.length === 1 ? "max-w-xs grid-cols-1" : products.length === 2 ? "max-w-2xl grid-cols-2" : "max-w-5xl grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
+          : undefined}
+        imageSizes={layout === "centered" ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
+        prioritizeFirst={layout === "centered"}
+        href={(product) => resolveProduct(product).href}
+        action={showCartActions ? (product) => {
+          const { defaultVariant, upsellSource, needsVariant, selectedProduct, href } = resolveProduct(product);
           return (
-            <Grid.Item key={product.id} square={false}>
-              <ProductCard
-                product={product}
-                href={productHref}
-                imageSizes={layout === "centered" ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
-                priority={layout === "centered"}
-                action={showCartActions ? (
-                  <ShelfCartAction
-                    productHref={productHref}
-                    needsVariant={needsVariant}
-                    upsellSource={upsellSource}
-                    onAdd={handleAdd}
-                  />
-                ) : undefined}
-              />
-            </Grid.Item>
+            <ShelfCartAction
+              productHref={href}
+              needsVariant={needsVariant}
+              upsellSource={upsellSource}
+              onAdd={(origin) => {
+                if (upsellSource) {
+                  replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id);
+                  return;
+                }
+                addItem(selectedProduct, 1, defaultVariant?.id);
+                void burstCartConfetti(origin);
+              }}
+            />
           );
-        })}
-      </Grid>
+        } : undefined}
+      />
     </section>
   );
 }

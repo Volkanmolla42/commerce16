@@ -1,7 +1,6 @@
 "use client";
 
 import { productPurchaseBarClassName } from "./product-layout";
-
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -152,61 +151,62 @@ export function ProductDescription({ product }: { product: Product }) {
         </div>
       )}
 
-      <div data-product-purchase-bar className={productPurchaseBarClassName}>
-        <Price
-          amount={priceRange.min}
-          maxAmount={priceRange.max}
-          className="max-w-[40%] shrink-0 text-sm font-semibold text-foreground md:hidden"
-        />
-        <div className="min-w-0 flex-1">
-          {needsVariantSelection && isAvailableForSale ? (
-            <Button
-              className="h-12 w-full rounded-xl"
-              onClick={() => {
-                optionsRef.current?.scrollIntoView({
-                  behavior: window.matchMedia(
-                    "(prefers-reduced-motion: reduce)",
-                  ).matches
-                    ? "instant"
-                    : "smooth",
-                  block: "center",
-                });
-                optionsRef.current
-                  ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-                  ?.focus({ preventScroll: true });
-              }}
-            >
-              Seçenekleri seç{" "}
-              <ArrowRightIcon className="size-4" aria-hidden="true" />
-            </Button>
-          ) : (
-            <AddToCart
-              onAdded={notifyProductAddedToCart}
-              hideCartLinkOnMobile
+      <div className="md:mt-5 md:flex md:items-center md:gap-3">
+        <div data-product-purchase-bar className={`${productPurchaseBarClassName} md:flex-1`}>
+          <Price
+            amount={priceRange.min}
+            maxAmount={priceRange.max}
+            className="max-w-[40%] shrink-0 text-sm font-semibold text-foreground md:hidden"
+          />
+          <div className="min-w-0 flex-1">
+            {needsVariantSelection && isAvailableForSale ? (
+              <Button
+                className="h-12 w-full rounded-xl"
+                onClick={() => {
+                  optionsRef.current?.scrollIntoView({
+                    behavior: window.matchMedia(
+                      "(prefers-reduced-motion: reduce)",
+                    ).matches
+                      ? "instant"
+                      : "smooth",
+                    block: "center",
+                  });
+                  optionsRef.current
+                    ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+                    ?.focus({ preventScroll: true });
+                }}
+              >
+                Seçenekleri seç{" "}
+                <ArrowRightIcon className="size-4" aria-hidden="true" />
+              </Button>
+            ) : (
+              <AddToCart
+                onAdded={notifyProductAddedToCart}
+                product={purchaseProduct}
+                variant={variant}
+                replaceCartItem={
+                  replacementSource
+                    ? {
+                      productId: replacementSource.product.id,
+                      variantId: replacementSource.variantId,
+                      quantity: replacementSource.quantity,
+                    }
+                    : undefined
+                }
+              />
+            )}
+          </div>
+        </div>
+        {!isCartReplacement && !needsVariantSelection && isAvailableForSale && (!variant || variant.availableForSale) && (
+          <div className="mt-3 md:mt-0 md:flex-1">
+            <QuickBuyButton
               product={purchaseProduct}
               variant={variant}
-              replaceCartItem={
-                replacementSource
-                  ? {
-                    productId: replacementSource.product.id,
-                    variantId: replacementSource.variantId,
-                    quantity: replacementSource.quantity,
-                  }
-                  : undefined
-              }
+              buttonVariant="outline"
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
-      {!isCartReplacement && !needsVariantSelection && isAvailableForSale && (!variant || variant.availableForSale) && (
-        <div className="mt-3">
-          <QuickBuyButton
-            product={purchaseProduct}
-            variant={variant}
-            buttonVariant="outline"
-          />
-        </div>
-      )}
       <section className="mt-8  border-t border-neutral-200 pt-6 dark:border-neutral-800">
         <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
           Teslimat ve iade

@@ -9,8 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Button, Card, Input } from "@/components/ui";
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import Grid from "@/components/grid";
-import ProductGridItems from "@/components/layout/product-grid-items";
+import { ProductGrid } from "@/components/product/product-grid";
 import { CategorySelect, SortMenu } from "./catalog-selection";
 import { createUrl } from "@/lib/utils";
 import type { Category, Product } from "@/lib/catalog/types";
@@ -538,9 +537,10 @@ export function FacetedProductGrid({
             ) : null}
 
             {products.length > 0 ? (
-              <Grid className="grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-                <ProductGridItems products={products} />
-              </Grid>
+              <ProductGrid
+                products={products}
+                className="grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
+              />
             ) : (
               <Card className="rounded-3xl border-dashed bg-card/40 px-6 py-12 text-center shadow-none sm:px-10 sm:py-16">
                 <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl border border-border bg-muted/50 text-muted-foreground">

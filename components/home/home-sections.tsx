@@ -9,8 +9,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import type { Category, Product } from "@/lib/catalog/types";
-import Grid from "@/components/grid";
-import ProductGridItems from "@/components/layout/product-grid-items";
+import { ProductGrid } from "@/components/product/product-grid";
 import { getProductImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 
@@ -175,17 +174,15 @@ export function HomeProductShelf({ title, products }: { title: string; products:
           Tümünü Gör
         </Link>
       </div>
-      <Grid className={fitsRow
-        ? `${shelfWidth} ${compactColumns} gap-3 sm:gap-4`
-        : "grid-flow-col auto-cols-[minmax(11rem,72vw)] gap-3 overflow-x-auto pb-3 [scroll-snap-type:x_mandatory] [scrollbar-width:thin] [&>*]:[scroll-snap-align:start] sm:auto-cols-[14rem] sm:gap-4 lg:auto-cols-[16rem]"}>
-        <ProductGridItems
-          products={products}
-          imageSizes={products.length === 1
-            ? "(min-width: 640px) 384px, calc(100vw - 2rem)"
-            : fitsRow ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
-          prioritizeFirst
-        />
-      </Grid>
+      <ProductGrid
+        products={products}
+        layout={fitsRow ? "grid" : "scroll"}
+        className={fitsRow ? `${shelfWidth} ${compactColumns} gap-3 sm:gap-4` : undefined}
+        imageSizes={products.length === 1
+          ? "(min-width: 640px) 384px, calc(100vw - 2rem)"
+          : fitsRow ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
+        prioritizeFirst
+      />
     </section>
   );
 }

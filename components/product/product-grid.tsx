@@ -1,23 +1,57 @@
 "use client";
 
+import clsx from "clsx";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Price from "@/components/price";
-import { getProductPriceRange } from "@/lib/catalog/variants";
 import { getProductImages } from "@/lib/catalog/product-images";
+import { getProductPriceRange } from "@/lib/catalog/variants";
 import type { Product } from "@/lib/catalog/types";
 
-/** Tüm ürün raflarının kullandığı ortak yatay kaydırma düzeni — kart genişlikleri tek yerden yönetilir. */
-export const productShelfGridClassName =
+const defaultImageSizes =
+  "(min-width: 1536px) 386px, (min-width: 1024px) calc(33.333vw - 126px), (min-width: 768px) calc(50vw - 181px), calc(50vw - 1.5rem)";
+
+const scrollGridClassName =
   "grid-flow-col auto-cols-[minmax(11rem,72vw)] gap-3 overflow-x-auto pb-3 [scroll-snap-type:x_mandatory] [scrollbar-width:thin] [&>*]:[scroll-snap-align:start] sm:auto-cols-[14rem] sm:gap-4 lg:auto-cols-[16rem]";
 
-/**
- * Tek ürün kartı görünümü: görsel, başlık, fiyat ve favori butonu.
- * `action` verilirse kartın altına eylem butonu (sepete ekle vb.) eklenir.
- */
-export function ProductCard({
+/** Ürünleri tek biçimde render eden liste. `layout="scroll"` yatay raf, varsayılan ızgara. */
+export function ProductGrid({
+  products,
+  layout = "grid",
+  className,
+  imageSizes = defaultImageSizes,
+  prioritizeFirst = true,
+  href,
+  action,
+}: {
+  products: Product[];
+  layout?: "grid" | "scroll";
+  className?: string;
+  imageSizes?: string;
+  prioritizeFirst?: boolean;
+  href?: (product: Product) => string;
+  action?: (product: Product) => ReactNode;
+}) {
+  return (
+    <ul className={clsx("grid gap-4", layout === "scroll" && scrollGridClassName, className)}>
+      {products.map((product, index) => (
+        <li key={product.slug} className="animate-fade-in">
+          <ProductCard
+            product={product}
+            href={href?.(product)}
+            imageSizes={imageSizes}
+            priority={prioritizeFirst && index < 2}
+            action={action?.(product)}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ProductCard({
   product,
   href,
   imageSizes,

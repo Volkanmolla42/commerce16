@@ -10,13 +10,23 @@ import { ProductImagePreview } from "./product-image-transition";
 
 export function ProductGallerySkeleton() {
   return (
-    <div
-      aria-hidden="true"
-      className={`${productGalleryClassName} bg-muted motion-safe:animate-pulse [&:has(img)]:animate-none`}
-    >
-      <Suspense fallback={null}>
-        <ProductImagePreview />
-      </Suspense>
+    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:gap-4">
+      <div
+        aria-hidden="true"
+        className={`${productGalleryClassName} order-1 bg-muted motion-safe:animate-pulse md:order-2 md:min-w-0 md:flex-1 [&:has(img)]:animate-none`}
+      >
+        <Suspense fallback={null}>
+          <ProductImagePreview />
+        </Suspense>
+      </div>
+      <div
+        aria-hidden="true"
+        className="hidden md:order-1 md:flex md:w-24 md:shrink-0 md:flex-col md:items-center md:gap-2 md:py-2"
+      >
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="size-20 rounded-xl bg-muted motion-safe:animate-pulse" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -55,9 +65,14 @@ export function ProductDescriptionSkeleton() {
             </div>
           ))}
         </div>
-        <div data-product-purchase-bar className={productPurchaseBarClassName}>
-          <div className="h-5 w-20 shrink-0 rounded bg-muted md:hidden" />
-          <div className="h-12 min-w-0 flex-1 rounded-xl bg-muted" />
+        <div className="md:mt-5 md:flex md:items-center md:gap-3">
+          <div data-product-purchase-bar className={`${productPurchaseBarClassName} md:flex-1`}>
+            <div className="h-5 w-20 shrink-0 rounded bg-muted md:hidden" />
+            <div className="h-12 min-w-0 flex-1 rounded-xl bg-muted" />
+          </div>
+          <div className="mt-3 md:mt-0 md:flex-1">
+            <div className="h-12 min-w-0 rounded-xl bg-muted" />
+          </div>
         </div>
         <div className="mt-6 border-y border-border py-4">
           <div className="flex min-h-11 items-center justify-between">

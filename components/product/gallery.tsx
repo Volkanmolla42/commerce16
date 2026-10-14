@@ -98,9 +98,9 @@ export function Gallery({ product }: { product: Product }) {
     imageIndex === 0 ? images.length - 1 : imageIndex - 1;
 
   return (
-    <div className="min-w-0">
+    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:gap-4">
       <div
-        className={`${productGalleryClassName} bg-neutral-100 dark:bg-neutral-900`}
+        className={`${productGalleryClassName} order-1 bg-neutral-100 md:order-2 md:min-w-0 md:flex-1 dark:bg-neutral-900`}
       >
         {activeImage && failedImage !== activeImage.url ? (
           <button
@@ -165,7 +165,7 @@ export function Gallery({ product }: { product: Product }) {
       {images.length > 1 ? (
         <ul
           aria-label="Diğer ürün görselleri"
-          className="no-scrollbar mt-3 flex max-w-full items-center gap-2 overflow-x-auto px-1 py-2"
+          className="no-scrollbar order-2 flex max-w-full items-center gap-2 overflow-x-auto px-1 py-2 md:order-1 md:max-h-[min(76vh,760px)] md:w-24 md:shrink-0 md:flex-col md:items-center md:overflow-x-hidden md:overflow-y-auto md:px-2 md:py-2"
         >
           {images.map((image, index) => {
             const isActive = index === imageIndex;

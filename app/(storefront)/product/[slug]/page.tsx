@@ -3,20 +3,18 @@ import {
   productGridClassName,
   productDetailsClassName,
 } from "@/components/product/product-layout";
-import Grid from "@/components/grid";
-import ProductGridItems from "@/components/layout/product-grid-items";
-import { productShelfGridClassName } from "@/components/product/product-layout";
 import { Gallery } from "@/components/product/gallery";
+import {
+  BoughtTogetherShelf,
+  ProductViewTracker,
+  Shelf,
+} from "@/components/product/recommendation-shelves";
 import { ProductDescription } from "@/components/product/product-description";
 import {
   ProductSkeleton,
   ProductGallerySkeleton,
   ProductDescriptionSkeleton,
 } from "@/components/product/product-skeleton";
-import {
-  BoughtTogetherShelf,
-  ProductViewTracker,
-} from "@/components/product/recommendation-shelves";
 import {
   getProduct,
   getProductRecommendations,
@@ -256,25 +254,18 @@ function RelatedProducts({
   if (!products.length) return null;
 
   return (
-    <section className="py-8" aria-label="Benzer Ürünler">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-          Benzer Ürünler
-        </h2>
+    <Shelf
+      title="Benzer Ürünler"
+      products={products}
+      bordered={false}
+      headerAction={
         <Link
           href="/search"
-          className="text-xs font-medium text-muted-foreground transition hover:text-foreground hover:underline"
+          className="shrink-0 text-xs font-medium text-muted-foreground transition hover:text-foreground hover:underline"
         >
           Daha Fazla Gör
         </Link>
-      </div>
-      <Grid className={productShelfGridClassName}>
-        <ProductGridItems
-          products={products}
-          imageSizes="(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"
-          prioritizeFirst={false}
-        />
-      </Grid>
-    </section>
+      }
+    />
   );
 }
