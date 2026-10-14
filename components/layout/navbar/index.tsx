@@ -1,17 +1,21 @@
-import { getMenu, getStoreSettings } from "@/lib/catalog";
+import { getCategories, getMenu, getStoreSettings } from "@/lib/catalog";
 import Link from "next/link";
 import { Suspense } from "react";
 import Image from "next/image";
 import StoreInitial from "@/components/store-initial";
 import MobileMenu from "./mobile-menu";
 import { AllCategoriesMenu } from "./all-categories-menu";
-import Search, { SearchSkeleton } from "./search";
+import { HeaderSearch, HeaderSearchFallback } from "./header-search";
 import { UserNav } from "./user-nav";
 import { CartButton } from "@/components/cart/cart-button";
 import { FavoritesLink } from "@/components/favorites/favorites-link";
 
 export async function Navbar() {
-  const [menu, settings] = await Promise.all([getMenu(), getStoreSettings()]);
+  const [menu, categoryList, settings] = await Promise.all([
+    getMenu(),
+    getCategories(),
+    getStoreSettings(),
+  ]);
   const categories = menu.filter((item) => item.path !== "/search");
 
   return (
@@ -20,7 +24,11 @@ export async function Navbar() {
         {/* Sol: mobil menü + mağaza adı + masaüstü kategoriler */}
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:flex-none lg:gap-6">
           <Suspense fallback={null}>
-            <MobileMenu menu={menu} storeName={settings.storeName} />
+            <MobileMenu
+              categories={categoryList}
+              storeName={settings.storeName}
+              logoUrl={settings.logoUrl}
+            />
           </Suspense>
 
           <Link
@@ -63,19 +71,15 @@ export async function Navbar() {
           ) : null}
         </div>
 
-        {/* Arama: mobilde alt satır, masaüstünde satır içi */}
-        <div className="order-last w-full min-w-0 md:order-none md:w-auto md:max-w-md md:flex-1">
-          <Suspense fallback={<SearchSkeleton />}>
-            <Search />
-          </Suspense>
-        </div>
+        {/* Arama: mobilde alt satır (yalnızca ana sayfa + arama sayfalarında), masaüstünde satır içi */}
+        <Suspense fallback={<HeaderSearchFallback />}>
+          <HeaderSearch />
+        </Suspense>
 
         {/* Sağ: profil, favoriler, sepet */}
         <div className="flex shrink-0 items-center gap-2.5">
           <UserNav />
-          <div className="hidden sm:block">
-            <FavoritesLink />
-          </div>
+          <FavoritesLink />
           <CartButton />
         </div>
       </div>

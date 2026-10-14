@@ -1,7 +1,7 @@
 "use client";
 
 import { useCart, type CartItem } from "@/components/cart/cart-context";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,9 +29,11 @@ import {
   Separator,
   Badge,
 } from "@/components/ui";
+import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/layout/mobile-summary-bar";
 import { formatMoney } from "@/lib/format-money";
+import { formatPhoneInput } from "@/lib/format-phone-input";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
-import { useQuickBuyDraft } from "@/components/cart/quick-buy-store";
+import { useQuickBuyDraft, clearQuickBuyItem } from "@/components/cart/quick-buy-store";
 import { getCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackPixelInitiateCheckout } from "@/lib/analytics/meta-pixel";
@@ -60,29 +62,27 @@ function OrderItemsList({ items }: { items: CartItem[] }) {
                   width={56}
                   height={56}
                   alt={item.product.title}
-                  className="size-full object-cover"
+                  className="size-full object-contain"
                 />
               ) : (
                 <div className="flex size-full items-center justify-center text-muted-foreground">
                   <ShoppingBagIcon className="size-6" />
                 </div>
               )}
-              <span className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow-xs">
-                {item.quantity}
-              </span>
             </div>
 
             <div className="min-w-0 flex-1">
-              <h3 className="line-clamp-2 text-xs sm:text-sm font-medium leading-snug text-foreground">
+              <h3 className="text-xs font-medium leading-snug text-foreground sm:text-sm">
                 {item.product.title}
               </h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {item.quantity} adet × {formatMoney(unitPrice)}
-              </p>
-            </div>
-
-            <div className="shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-              {formatMoney(lineTotal)}
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {item.quantity} adet × {formatMoney(unitPrice)}
+                </p>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                  {formatMoney(lineTotal)}
+                </span>
+              </div>
             </div>
           </div>
         );
@@ -124,10 +124,9 @@ function CouponSection({
             }
           }}
           maxLength={32}
-          autoCapitalize="characters"
           placeholder="Kupon kodunuz"
           aria-describedby={`${idPrefix}-coupon-status`}
-          className="h-11 text-sm uppercase placeholder:normal-case font-medium min-w-0 flex-1"
+          className="h-11 text-sm font-medium min-w-0 flex-1"
         />
         <Button
           type="button"
@@ -164,26 +163,21 @@ function CouponSection({
 }
 
 function PriceSummaryRows({
-  totalAmount,
   couponDiscountKurus,
   couponPreview,
   appliedCouponCode,
   payableAmount,
   paymentFee = 0,
 }: {
-  totalAmount: number;
   couponDiscountKurus: number;
   couponPreview: CouponPreview;
   appliedCouponCode: string;
   payableAmount: number;
   paymentFee?: number;
 }) {
+  const hasAdjustments = couponDiscountKurus > 0 || paymentFee > 0;
   return (
     <div className="space-y-2 pt-1 text-sm">
-      <div className="flex justify-between text-muted-foreground">
-        <span>Ara Toplam</span>
-        <span className="font-medium tabular-nums text-foreground">{formatMoney(totalAmount)}</span>
-      </div>
       {couponDiscountKurus > 0 && (
         <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
           <span>Kupon İndirimi ({couponPreview?.valid ? couponPreview.code : appliedCouponCode})</span>
@@ -196,7 +190,7 @@ function PriceSummaryRows({
           <span className="font-medium tabular-nums text-foreground">+{formatMoney(paymentFee)}</span>
         </div>
       )}
-      <Separator className="my-2" />
+      {hasAdjustments && <Separator className="my-2" />}
       <div className="flex items-baseline justify-between pt-1">
         <span className="text-base font-semibold text-foreground">Toplam</span>
         <span className="text-lg font-bold tabular-nums text-foreground sm:text-xl">
@@ -207,9 +201,26 @@ function PriceSummaryRows({
   );
 }
 
+function SubmitButtonContent({ isSubmitting }: { isSubmitting: boolean }) {
+  if (isSubmitting) {
+    return (
+      <>
+        <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+        <span>Sipariş İşleniyor...</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <LockClosedIcon className="size-4" />
+      <span>Siparişi Tamamla</span>
+    </>
+  );
+}
+
 function CheckoutContent() {
   const router = useRouter();
-  const { items: cartItems } = useCart();
+  const { items: cartItems, clearCart } = useCart();
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
   const quickBuy = useQuickBuyDraft();
   const items = isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems;
@@ -218,7 +229,6 @@ function CheckoutContent() {
     (sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity,
     0
   );
-  const totalAmount = subtotalKurus / 100;
   const { isAuthenticated } = useConvexAuth();
 
   const profile = useQuery(api.users.getMyProfile);
@@ -240,7 +250,6 @@ function CheckoutContent() {
   );
   const couponDiscountKurus = couponPreview?.valid ? couponPreview.discountKurus : 0;
   const payableKurus = Math.max(0, subtotalKurus - couponDiscountKurus);
-  const payableAmount = payableKurus / 100;
 
   const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"paytr" | "bank_transfer" | "cash_on_delivery" | null>(null);
@@ -290,9 +299,15 @@ function CheckoutContent() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [preInformationAccepted, setPreInformationAccepted] = useState(false);
   const [emailReminderConsent, setEmailReminderConsent] = useState(false);
+
+  useEffect(() => {
+    if (!errorMessage) return;
+    errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [errorMessage]);
 
   useEffect(() => {
     if (items.length > 0) {
@@ -478,11 +493,16 @@ function CheckoutContent() {
         },
       });
 
+      if (!isQuickBuy) {
+        clearCart();
+      }
+      clearQuickBuyItem();
+
       if (recoverySessionKey && emailReminderConsent) {
         await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
       }
 
-      router.push(`/checkout/success/${orderId}`);
+      router.replace(`/checkout/success/${orderId}`);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
     } finally {
@@ -532,6 +552,7 @@ function CheckoutContent() {
         <div className="space-y-6 lg:col-span-7">
           {errorMessage && (
             <div
+              ref={errorRef}
               role="alert"
               className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium text-destructive animate-fade-in"
             >
@@ -542,15 +563,10 @@ function CheckoutContent() {
 
           {/* MOBİL SİPARİŞ ÖZETİ (Mobilde en başta, açık ve net) */}
           <Card className="rounded-2xl border-border bg-card p-4 sm:p-5 shadow-xs space-y-4 lg:hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingBagIcon className="size-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">
-                  Sipariş Özeti ({totalCount} Ürün)
-                </span>
-              </div>
-              <span className="text-sm font-bold tabular-nums text-foreground">
-                {formatMoney(payableAmount)}
+            <div className="flex items-center gap-2">
+              <ShoppingBagIcon className="size-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">
+                Sipariş Özeti ({totalCount} Ürün)
               </span>
             </div>
 
@@ -575,7 +591,6 @@ function CheckoutContent() {
 
             {/* Fiyat Dökümü */}
             <PriceSummaryRows
-              totalAmount={totalAmount}
               couponDiscountKurus={couponDiscountKurus}
               couponPreview={couponPreview}
               appliedCouponCode={appliedCouponCode}
@@ -641,7 +656,7 @@ function CheckoutContent() {
                   type="tel"
                   required
                   value={phone}
-                  onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                  onChange={(e) => setDraft({ ...draft, phone: formatPhoneInput(e.target.value) })}
                   placeholder="05XX XXX XX XX"
                   className="h-11 text-base sm:text-sm rounded-xl"
                 />
@@ -1221,7 +1236,6 @@ function CheckoutContent() {
 
             <Separator />
             <PriceSummaryRows
-              totalAmount={totalAmount}
               couponDiscountKurus={couponDiscountKurus}
               couponPreview={couponPreview}
               appliedCouponCode={appliedCouponCode}
@@ -1233,57 +1247,30 @@ function CheckoutContent() {
               type="submit"
               size="lg"
               disabled={isSubmitting}
-              className="mt-4 w-full h-12 rounded-xl shadow-md font-semibold text-sm gap-2 cursor-pointer transition hover:opacity-95"
+              className="mt-4 w-full h-12 rounded-2xl shadow-lg font-semibold gap-2 cursor-pointer"
             >
-              {isSubmitting ? (
-                <>
-                  <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  <span>Sipariş İşleniyor...</span>
-                </>
-              ) : (
-                <>
-                  <LockClosedIcon className="size-4" />
-                  <span>Siparişi Tamamla ({formatMoney(finalPayableAmount)})</span>
-                </>
-              )}
+              <SubmitButtonContent isSubmitting={isSubmitting} />
             </Button>
           </Card>
         </div>
       </form>
 
       {/* MOBİL SABİT ALT BUTON ÇUBUĞU */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3.5 backdrop-blur-md shadow-2xl lg:hidden safe-area-bottom">
-        <div className="mx-auto flex max-w-(--breakpoint-2xl) items-center justify-between gap-4 px-1">
-          <div className="min-w-0 flex-1">
-            <span className="text-xs text-muted-foreground font-medium block">
-              Toplam Tutar
-            </span>
-            <div className="text-lg font-bold tabular-nums text-foreground truncate">
-              {formatMoney(finalPayableAmount)}
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            form="checkout-form"
-            size="lg"
-            disabled={isSubmitting}
-            className="h-12 px-6 rounded-xl font-semibold text-sm gap-2 shrink-0 shadow-md cursor-pointer"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                <span>İşleniyor...</span>
-              </>
-            ) : (
-              <>
-                <LockClosedIcon className="size-4" />
-                <span>Siparişi Tamamla</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <MobileSummaryBar
+        label="Toplam Tutar"
+        amount={formatMoney(finalPayableAmount)}
+        hideFrom="lg"
+      >
+        <Button
+          type="submit"
+          form="checkout-form"
+          size="lg"
+          disabled={isSubmitting}
+          className={mobileSummaryActionClassName}
+        >
+          <SubmitButtonContent isSubmitting={isSubmitting} />
+        </Button>
+      </MobileSummaryBar>
     </div>
   );
 }

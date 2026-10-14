@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { canSelectOption, hasVariantOptionCombination } from "@/lib/catalog/variants";
 import { ProductOption, ProductVariant } from "@/lib/catalog/types";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 export function VariantSelector({
   options,
@@ -12,7 +12,6 @@ export function VariantSelector({
   options: ProductOption[];
   variants: ProductVariant[];
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const hasNoOptionsOrJustOneOption =
     !options.length ||
@@ -33,7 +32,8 @@ export function VariantSelector({
         params.delete(optionKey);
       }
     }
-    router.replace(`?${params.toString()}`, { scroll: false });
+    params.delete("image");
+    window.history.replaceState(null, "", `?${params.toString()}`);
   };
 
   return options.map((option) => (

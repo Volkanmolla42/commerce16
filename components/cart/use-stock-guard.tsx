@@ -46,10 +46,12 @@ export function useStockGuard(items: CartItem[], store: CartStore) {
 
   function clearAllStockKeys() {
     autoRemovedKeys.current.clear();
+    setAlertItems([]);
+    setIsAlertOpen(false);
   }
 
   useEffect(() => {
-    if (!liveValidation) return;
+    if (!liveValidation || items.length === 0) return;
     const toAlert: RemovedCartItem[] = [];
     for (const entry of liveValidation) {
       const matching = items.find((item) =>

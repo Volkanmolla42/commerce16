@@ -1172,7 +1172,7 @@ function ProductEditor({
                           <tr>
                             <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
                             <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Fiyat (₺) <span className="text-destructive">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">Fiyat (TL) <span className="text-destructive">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Stok</th>
                             <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-destructive">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
@@ -1201,7 +1201,7 @@ function ProductEditor({
                         </div>
                         <label className="flex min-h-9 items-center gap-2 text-xs font-medium text-foreground"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" />Satışta</label>
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1.5"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (₺) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
+                          <div className="space-y-1.5"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (TL) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
                           <div className="space-y-1.5"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-muted-foreground">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
                         </div>
                         <div className="space-y-1.5"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-muted-foreground">SKU <span className="text-destructive">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>

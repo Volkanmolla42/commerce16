@@ -2,9 +2,6 @@ import type { Metadata } from "next";
 import ContentPageLayout from "@/components/layout/content-page-layout";
 import { getStoreSettings } from "@/lib/catalog";
 import {
-  SparklesIcon,
-  ShieldCheckIcon,
-  HeartIcon,
   MapPinIcon,
   PhoneIcon,
   EnvelopeIcon,
@@ -50,39 +47,6 @@ export default async function AboutPage() {
             Müşteri memnuniyetini her zaman ön planda tutarak, satış öncesinde ve sonrasında kesintisiz
             destek sunmayı ilke ediniyoruz.
           </p>
-        </div>
-
-        {/* Pillars / Values */}
-        <div className="grid gap-4 sm:grid-cols-3 pt-2">
-          <div className="rounded-2xl border border-border bg-muted/40 p-5 space-y-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <ShieldCheckIcon className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-semibold text-foreground">Güvenli Alışveriş</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Tüm ödemeleriniz 256-Bit SSL şifreleme ve 3D Secure güvencesiyle korunur.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-muted/40 p-5 space-y-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <SparklesIcon className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-semibold text-foreground">Orijinal Ürünler</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Özenle seçilmiş, kalite standartlarına uygun %100 orijinal ürünler.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-muted/40 p-5 space-y-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <HeartIcon className="h-5 w-5" />
-            </div>
-            <h2 className="text-base font-semibold text-foreground">Müşteri Desteği</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Sorularınız ve talepleriniz için her zaman yanınızdayız.
-            </p>
-          </div>
         </div>
 
         {/* Contact Info */}

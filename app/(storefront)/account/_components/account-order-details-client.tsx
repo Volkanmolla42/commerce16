@@ -335,7 +335,7 @@ export default function AccountOrderDetailsClient({
                         alt={item.title}
                         fill
                         sizes="64px"
-                        className="object-cover"
+                        className="object-contain"
                       />
                     </div>
                   ) : (

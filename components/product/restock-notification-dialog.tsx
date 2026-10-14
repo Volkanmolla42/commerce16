@@ -84,14 +84,14 @@ export function RestockNotificationDialog({
         variant="outline"
         size="lg"
         onClick={() => setIsOpen(true)}
-        className={`h-11 w-full border-dashed border-primary/40 text-foreground hover:border-primary hover:bg-primary/5 font-medium gap-2 transition-colors ${className}`}
+        className={`h-12 w-full rounded-xl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 font-semibold gap-2 transition-colors shadow-none ${className}`}
       >
-        <BellIcon className="size-4 text-primary" aria-hidden="true" />
-        <span>Gelince Haber Ver</span>
+        <BellIcon className="size-5 text-primary shrink-0" aria-hidden="true" />
+        <span className="truncate">Gelince Haber Ver</span>
       </Button>
 
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md p-5 sm:p-6">
           <DialogHeader className="space-y-2">
             <div className="flex items-center gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

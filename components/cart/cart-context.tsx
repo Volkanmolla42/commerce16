@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useMutation } from "convex/react";
 import { cartStore, type CartItem, type CartStore } from "./cart-store";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
@@ -10,6 +10,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useStockGuard } from "./use-stock-guard";
 export type { CartItem } from "./cart-store";
 
+export type RemovedCartItem = { item: CartItem; index: number };
+
 type CartContextType = Pick<CartStore, "removeItem" | "clearCart"> & {
   items: CartItem[];
   totalCount: number;
@@ -18,9 +20,16 @@ type CartContextType = Pick<CartStore, "removeItem" | "clearCart"> & {
   replaceItem: CartStore["replaceItem"];
   updateQuantity: CartStore["updateQuantity"];
   getItemMaxStock: (productId: string, variantId?: string) => number;
+  removedItem: RemovedCartItem | null;
+  restoreLastRemoved: () => void;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+
+function findCartItem(items: CartItem[], productId: string, variantId?: string) {
+  const index = items.findIndex((item) => item.product.id === productId && item.variantId === variantId);
+  return index >= 0 ? { item: items[index], index } : null;
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const store = cartStore;
@@ -28,6 +37,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const lastSessionKey = useRef<string | null>(null);
   const syncActiveCart = useMutation(api.activeCarts.sync);
   const { getItemMaxStock, releaseStockKey, clearAllStockKeys, alert } = useStockGuard(items, store);
+  const [removedItem, setRemovedItem] = useState<RemovedCartItem | null>(null);
 
   // Otomatik kaldırılan bir satır kullanıcı tarafından yeniden ekleniyorsa stok hafızasını serbest bırak.
   const addItem = useCallback<CartStore["addItem"]>((product, quantity, variantId) => {
@@ -39,15 +49,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     store.replaceItem(sourceProductId, sourceVariantId, product, quantity, variantId);
   }, [releaseStockKey, store]);
   const removeItem = useCallback<CartStore["removeItem"]>((productId, variantId) => {
+    const removed = findCartItem(store.getSnapshot(), productId, variantId);
     releaseStockKey(productId, variantId);
     store.removeItem(productId, variantId);
+    if (removed) setRemovedItem(removed);
   }, [releaseStockKey, store]);
   const clearCart = useCallback<CartStore["clearCart"]>(() => {
     clearAllStockKeys();
     store.clearCart();
+    setRemovedItem(null);
   }, [clearAllStockKeys, store]);
   const updateQuantity = useCallback<CartStore["updateQuantity"]>((productId, quantity, variantId) => {
+    const removed = Number.isSafeInteger(quantity) && quantity <= 0
+      ? findCartItem(store.getSnapshot(), productId, variantId)
+      : null;
     store.updateQuantity(productId, Math.min(getItemMaxStock(productId, variantId), quantity), variantId);
+    if (removed) setRemovedItem(removed);
   }, [getItemMaxStock, store]);
 
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -77,8 +94,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timeout);
   }, [items, syncActiveCart]);
 
+  useEffect(() => {
+    if (!removedItem) return;
+    const timeout = window.setTimeout(() => setRemovedItem(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [removedItem]);
+
+  const restoreLastRemoved = useCallback(() => {
+    if (!removedItem) return;
+    store.restoreItem(removedItem.item, removedItem.index);
+    setRemovedItem(null);
+  }, [removedItem, store]);
+
   return (
-    <CartContext.Provider value={{ ...store, addItem, replaceItem, removeItem, clearCart, updateQuantity, getItemMaxStock, items, totalCount, totalAmount }}>
+    <CartContext.Provider value={{ ...store, addItem, replaceItem, removeItem, clearCart, updateQuantity, getItemMaxStock, items, totalCount, totalAmount, removedItem, restoreLastRemoved }}>
       {children}
       {alert}
     </CartContext.Provider>

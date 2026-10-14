@@ -30,8 +30,6 @@ export function FavoriteProducts() {
           <ProductGridItems
             products={favoriteProducts}
             imageSizes="(min-width: 1280px) 18vw, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, 50vw"
-            cardLayout="stacked"
-            imageFit="cover"
           />
         </Grid>
       ) : (

@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui";
 import { Id } from "@/convex/_generated/dataModel";
+import { formatPhoneInput } from "@/lib/format-phone-input";
 
 const DEFAULT_PROVINCE = getProvinceByName("İstanbul")!;
 
@@ -244,7 +245,7 @@ function AddressEditDialog({
                 id="addr-phone"
                 required
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
                 placeholder="05XX XXX XX XX"
               />
             </div>

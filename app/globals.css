@@ -268,3 +268,27 @@ body:has(.admin-theme[data-admin-theme="dark"]) {
     animation-duration: 0s !important;
   }
 }
+
+/* Yazdırma: yalnızca içerik kâğıda çıkar, site kabuğu ve etkileşimli öğeler gizlenir. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  header,
+  footer {
+    display: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}

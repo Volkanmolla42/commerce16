@@ -1,4 +1,5 @@
 import { getGoogleShoppingProducts, getStoreSettings } from "@/lib/catalog";
+import { formatMoney } from "@/lib/format-money";
 import { baseUrl } from "@/lib/utils";
 
 function cleanCdata(text: string): string {
@@ -12,7 +13,7 @@ function formatGooglePrice(priceStr: string): string {
 }
 
 function getProductDescription(title: string, price: string, attributes?: { key: string; value: string | number | boolean | string[] }[]): string {
-  const parts = [`${title} ürününü ${price} TL fiyatıyla inceleyin ve güvenle satın alın.`];
+  const parts = [`${title} ürününü ${formatMoney(price)} fiyatıyla inceleyin ve güvenle satın alın.`];
   if (attributes && attributes.length > 0) {
     const attrTexts = attributes
       .map((attr) => `${attr.key}: ${Array.isArray(attr.value) ? attr.value.join(", ") : String(attr.value)}`)

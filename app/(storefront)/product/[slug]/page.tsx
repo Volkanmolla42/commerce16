@@ -3,7 +3,9 @@ import {
   productGridClassName,
   productDetailsClassName,
 } from "@/components/product/product-layout";
-import { GridTileImage } from "@/components/grid/tile";
+import Grid from "@/components/grid";
+import ProductGridItems from "@/components/layout/product-grid-items";
+import { productShelfGridClassName } from "@/components/product/product-layout";
 import { Gallery } from "@/components/product/gallery";
 import { ProductDescription } from "@/components/product/product-description";
 import {
@@ -11,7 +13,6 @@ import {
   ProductGallerySkeleton,
   ProductDescriptionSkeleton,
 } from "@/components/product/product-skeleton";
-import { FavoriteButton } from "@/components/favorites/favorite-button";
 import {
   BoughtTogetherShelf,
   ProductViewTracker,
@@ -26,8 +27,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { baseUrl } from "@/lib/utils";
-import { getProductImages } from "@/lib/catalog/product-images";
-import { ProductImageLink } from "@/components/product/product-image-transition";
+import { formatMoney } from "@/lib/format-money";
 
 function getProductUrl(slug: string) {
   return new URL(`/product/${slug}`, baseUrl).toString();
@@ -49,7 +49,7 @@ function getAbsoluteHttpImageUrls(images: string[]) {
 function getProductDescription(
   product: NonNullable<Awaited<ReturnType<typeof getProduct>>>,
 ) {
-  return `${product.title} ürününü ${product.price} TL fiyatıyla inceleyin.`;
+  return `${product.title} ürününü ${formatMoney(product.price)} fiyatıyla inceleyin.`;
 }
 
 export async function generateMetadata(
@@ -152,16 +152,16 @@ async function ProductContent({
       },
       ...(product.categorySlug
         ? [
-            {
-              "@type": "ListItem",
-              position: 2,
-              name: product.categorySlug,
-              item: new URL(
-                `/search/${product.categorySlug}`,
-                baseUrl,
-              ).toString(),
-            },
-          ]
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: product.categorySlug,
+            item: new URL(
+              `/search/${product.categorySlug}`,
+              baseUrl,
+            ).toString(),
+          },
+        ]
         : []),
       {
         "@type": "ListItem",
@@ -268,39 +268,13 @@ function RelatedProducts({
           Daha Fazla Gör
         </Link>
       </div>
-      <ul className="flex w-full gap-4 overflow-x-auto pb-4 [scrollbar-width:thin]">
-        {products.map((product) => (
-          <li
-            key={product.slug}
-            className="aspect-square w-full flex-none min-[475px]:w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5"
-          >
-            <div className="relative h-full w-full overflow-hidden rounded-xl border border-border/80 bg-muted/20">
-              <ProductImageLink
-                productId={product.id}
-                className="relative block h-full w-full"
-                href={`/product/${product.slug}`}
-              >
-                <GridTileImage
-                  alt={product.title}
-                  label={{
-                    title: product.title,
-                    amount: product.price,
-                    currencyCode: "TRY",
-                  }}
-                  src={getProductImages(product)[0]?.url}
-                  transitionImage
-                  fill
-                  sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, (min-width: 475px) 50vw, 100vw"
-                />
-              </ProductImageLink>
-              <FavoriteButton
-                product={product}
-                className="absolute right-3 top-3 z-10 size-9"
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+      <Grid className={productShelfGridClassName}>
+        <ProductGridItems
+          products={products}
+          imageSizes="(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"
+          prioritizeFirst={false}
+        />
+      </Grid>
     </section>
   );
 }

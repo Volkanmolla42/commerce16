@@ -11,13 +11,9 @@ import {
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { Product } from "@/lib/catalog/types";
-import {
-  getProductImages,
-  getProductImagesForSelection,
-} from "@/lib/catalog/product-images";
-import { getSelectedVariant } from "@/lib/catalog/variants";
+import { hasVariantOptionCombination } from "@/lib/catalog/variants";
 import { ProductImageTransition } from "./product-image-transition";
 
 const ProductLightbox = dynamic(() => import("./product-lightbox"), {
@@ -25,36 +21,76 @@ const ProductLightbox = dynamic(() => import("./product-lightbox"), {
 });
 
 export function Gallery({ product }: { product: Product }) {
-  const router = useRouter();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const searchParams = useSearchParams();
+  const images = product.images ?? [];
   const selection =
     product.options?.flatMap((option) => {
       const value = searchParams.get(option.name.toLocaleLowerCase("tr-TR"));
       return value ? [{ name: option.name, value }] : [];
     }) ?? [];
-  const matchingImages = getProductImagesForSelection(
-    product.images,
-    selection,
-  );
-  const images =
-    matchingImages.length || getSelectedVariant(product, searchParams)
-      ? matchingImages
-      : getProductImages(product);
+
+  const selectedVariantImageIndex =
+    selection.length > 0
+      ? images.findIndex((img) =>
+          img.selectedOptions?.length &&
+          img.selectedOptions.every((opt) =>
+            selection.some(
+              (s) =>
+                s.name.toLocaleLowerCase("tr-TR") ===
+                  opt.name.toLocaleLowerCase("tr-TR") && s.value === opt.value,
+            ),
+          ),
+        )
+      : -1;
+
+  const hasExplicitImage = searchParams.has("image");
   const requestedIndex = Number(searchParams.get("image") ?? 0);
   const imageIndex =
+    hasExplicitImage &&
     Number.isInteger(requestedIndex) &&
     requestedIndex >= 0 &&
     requestedIndex < images.length
       ? requestedIndex
-      : 0;
+      : selectedVariantImageIndex >= 0
+        ? selectedVariantImageIndex
+        : 0;
   const activeImage = images[imageIndex];
 
   const updateImage = (index: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("image", index.toString());
-    router.replace(`?${params.toString()}`, { scroll: false });
+    window.history.replaceState(null, "", `?${params.toString()}`);
+  };
+
+  const handleSelectVariantFromLightbox = (
+    optionsToSelect: { name: string; value: string }[],
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const opt of optionsToSelect) {
+      const key = opt.name.toLocaleLowerCase("tr-TR");
+      params.set(key, opt.value);
+    }
+    if (product.options && product.variants) {
+      for (const option of product.options) {
+        const optionKey = option.name.toLocaleLowerCase("tr-TR");
+        const selected = params.get(optionKey);
+        if (
+          selected &&
+          !hasVariantOptionCombination(
+            { options: product.options, variants: product.variants },
+            params,
+            option.name,
+            selected,
+          )
+        ) {
+          params.delete(optionKey);
+        }
+      }
+    }
+    params.delete("image");
+    window.history.replaceState(null, "", `?${params.toString()}`);
   };
 
   const nextImageIndex = imageIndex + 1 < images.length ? imageIndex + 1 : 0;
@@ -86,9 +122,9 @@ export function Gallery({ product }: { product: Product }) {
                 fetchPriority="high"
               />
             </ProductImageTransition>
-            <span className="absolute bottom-3 right-3 flex min-h-10 items-center gap-2 rounded-full bg-white/95 px-3 text-xs font-medium text-neutral-900 shadow-sm">
+            <span className="absolute bottom-2 right-2 flex size-9 items-center justify-center rounded-full bg-white/90 text-neutral-900 shadow-sm sm:w-auto sm:gap-1.5 sm:px-3">
               <ArrowsPointingOutIcon className="size-4" aria-hidden="true" />
-              Büyüt
+              <span className="hidden text-xs font-medium sm:inline">Büyüt</span>
             </span>
           </button>
         ) : (
@@ -99,7 +135,7 @@ export function Gallery({ product }: { product: Product }) {
         )}
 
         {images.length > 1 ? (
-          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium text-neutral-900">
+          <span className="absolute left-2 top-2 rounded-full bg-white/85 px-2 py-1 text-[11px] font-medium text-neutral-900">
             {imageIndex + 1} / {images.length}
           </span>
         ) : null}
@@ -110,17 +146,17 @@ export function Gallery({ product }: { product: Product }) {
               type="button"
               onClick={() => updateImage(previousImageIndex)}
               aria-label="Önceki ürün görseli"
-              className="absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-800 shadow-lg backdrop-blur-sm transition-[color,background-color,border-color,transform] duration-150 hover:bg-white active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white"
+              className="absolute left-2 top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200/70 bg-white/90 text-neutral-800 shadow-sm transition-[color,background-color,border-color,transform] duration-150 hover:bg-white active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700/70 dark:bg-neutral-900/90 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white"
             >
-              <ArrowLeftIcon className="h-5 w-5" />
+              <ArrowLeftIcon className="size-4" />
             </button>
             <button
               type="button"
               onClick={() => updateImage(nextImageIndex)}
               aria-label="Sonraki ürün görseli"
-              className="absolute right-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-800 shadow-lg backdrop-blur-sm transition-[color,background-color,border-color,transform] duration-150 hover:bg-white active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/95 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white"
+              className="absolute right-2 top-1/2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200/70 bg-white/90 text-neutral-800 shadow-sm transition-[color,background-color,border-color,transform] duration-150 hover:bg-white active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 dark:border-neutral-700/70 dark:bg-neutral-900/90 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white"
             >
-              <ArrowRightIcon className="h-5 w-5" />
+              <ArrowRightIcon className="size-4" />
             </button>
           </>
         ) : null}
@@ -170,6 +206,8 @@ export function Gallery({ product }: { product: Product }) {
           images={images}
           title={product.title}
           index={imageIndex}
+          searchParams={searchParams}
+          onSelectVariant={handleSelectVariantFromLightbox}
           onClose={(index) => {
             setLightboxOpen(false);
             if (index !== imageIndex) updateImage(index);

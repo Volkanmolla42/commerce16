@@ -157,7 +157,7 @@ export default function AccountOrdersPage() {
                           alt={item.title}
                           fill
                           sizes="48px"
-                          className="object-cover"
+                          className="object-contain"
                         />
                       </div>
                     ) : (

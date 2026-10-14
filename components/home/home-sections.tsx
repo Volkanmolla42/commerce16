@@ -1,6 +1,10 @@
 import {
+  ArrowPathIcon,
   ArrowUpRightIcon,
+  LockClosedIcon,
+  ShieldCheckIcon,
   TagIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,6 +13,32 @@ import Grid from "@/components/grid";
 import ProductGridItems from "@/components/layout/product-grid-items";
 import { getProductImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
+
+const valueProps = [
+  { icon: TruckIcon, title: "Hızlı Teslimat", description: "Özenli paketleme, hızlı kargo" },
+  { icon: ShieldCheckIcon, title: "Orijinal Ürün", description: "Doğrulanmış kalite güvencesi" },
+  { icon: ArrowPathIcon, title: "Kolay İade", description: "14 gün içinde koşulsuz iade" },
+  { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "3D Secure ödeme altyapısı" },
+];
+
+export function HomeValueProps() {
+  return (
+    <section aria-label="Mağaza güvenceleri" className="grid grid-cols-2 gap-x-6 gap-y-5 py-8 lg:grid-cols-4">
+      {valueProps.map((item) => {
+        const Icon = item.icon;
+        return (
+          <div key={item.title} className="flex items-center gap-3">
+            <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{item.title}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
 
 export function CategoryShortcuts({ categories }: { categories: Category[] }) {
   const visibleCategories = categories.filter((category) => category.slug !== "");
@@ -73,9 +103,6 @@ export function HomeHero({
         <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.08] tracking-tight text-balance sm:text-5xl xl:text-6xl">
           {heading}
         </h1>
-        <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground sm:mt-6 sm:text-base sm:leading-7">
-          Ürünleri keşfedin, seçenekleri inceleyin ve aradığınızı bulun.
-        </p>
         <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 sm:mt-9">
           <Link
             href="/search"
@@ -140,10 +167,7 @@ export function HomeProductShelf({ title, products }: { title: string; products:
   return (
     <section className="py-7 sm:py-9" aria-label={title}>
       <div className={`${shelfWidth} mb-4 flex items-center justify-between gap-4 sm:mb-5`}>
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">En çok tercih edilen popüler modeller</p>
-        </div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h2>
         <Link
           href="/search"
           className="shrink-0 rounded-md border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -160,8 +184,6 @@ export function HomeProductShelf({ title, products }: { title: string; products:
             ? "(min-width: 640px) 384px, calc(100vw - 2rem)"
             : fitsRow ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
           prioritizeFirst
-          cardLayout="stacked"
-          imageFit="cover"
         />
       </Grid>
     </section>

@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import Grid from "@/components/grid";
-import ProductGridItems from "@/components/layout/product-grid-items";
+import { ProductCard, productShelfGridClassName } from "@/components/product/product-card";
 import { useCart } from "@/components/cart/cart-context";
 import type { CartItem } from "@/components/cart/cart-context";
-import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { Button } from "@/components/ui";
-import { formatMoney } from "@/lib/format-money";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import type { Product } from "@/lib/catalog/types";
@@ -20,9 +17,8 @@ import {
   RECENT_PRODUCTS_EVENT,
   recordRecentProduct,
 } from "@/lib/catalog/recommendations";
-import { getProductPriceRange, getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
+import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
 import { getProductImages, getVariantImages } from "@/lib/catalog/product-images";
-import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
 import { trackPixelViewContent } from "@/lib/analytics/meta-pixel";
 
@@ -48,6 +44,31 @@ export function ProductViewTracker({
   return null;
 }
 
+function ShelfCartAction({
+  productHref,
+  needsVariant,
+  upsellSource,
+  onAdd,
+}: {
+  productHref: string;
+  needsVariant: boolean;
+  upsellSource?: CartItem;
+  onAdd: (origin: HTMLElement) => void;
+}) {
+  if (needsVariant) {
+    return (
+      <Button asChild size="sm" variant="outline" className="w-full">
+        <Link href={productHref}>{upsellSource ? "Seçeneği belirle" : "Seçenekleri seç"}</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button type="button" size="sm" className="w-full" onClick={(event) => onAdd(event.currentTarget)}>
+      {upsellSource ? "Sepettekiyle değiştir" : "Sepete ekle"}
+    </Button>
+  );
+}
+
 function Shelf({ title, products, showCartActions = false, upsellSources, layout = "scroll" }: {
   title: string;
   products: Product[];
@@ -60,77 +81,53 @@ function Shelf({ title, products, showCartActions = false, upsellSources, layout
   return (
     <section className="mt-12 border-t border-neutral-200 py-8 dark:border-neutral-800" aria-label={title}>
       <h2 className={`${layout === "centered" ? "mx-auto max-w-5xl" : ""} mb-5 text-2xl font-bold tracking-tight text-neutral-900 dark:text-white`}>{title}</h2>
-      {showCartActions ? (
-        <ul className="grid grid-flow-col auto-cols-[12rem] gap-4 overflow-x-auto pb-3 [scrollbar-width:thin] sm:auto-cols-[14rem]">
-          {products.map((product) => {
-            const defaultVariant = getSelectedVariant(product, new URLSearchParams());
-            const needsVariant = Boolean(product.variants?.length && !defaultVariant);
-            const upsellSource = upsellSources?.get(product.id);
-            const replacementParams = upsellSource
-              ? new URLSearchParams({ cartReplaceProductId: upsellSource.product.id })
-              : null;
-            if (replacementParams && upsellSource?.variantId) {
-              replacementParams.set("cartReplaceVariantId", upsellSource.variantId);
+      <Grid className={layout === "centered"
+        ? `mx-auto ${products.length === 1 ? "max-w-xs grid-cols-1" : products.length === 2 ? "max-w-2xl grid-cols-2" : "max-w-5xl grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
+        : productShelfGridClassName}>
+        {products.map((product) => {
+          const defaultVariant = getSelectedVariant(product, new URLSearchParams());
+          const needsVariant = Boolean(product.variants?.length && !defaultVariant);
+          const upsellSource = upsellSources?.get(product.id);
+          const replacementParams = upsellSource
+            ? new URLSearchParams({ cartReplaceProductId: upsellSource.product.id })
+            : null;
+          if (replacementParams && upsellSource?.variantId) {
+            replacementParams.set("cartReplaceVariantId", upsellSource.variantId);
+          }
+          const productHref = replacementParams
+            ? `/product/${product.slug}?${replacementParams.toString()}`
+            : `/product/${product.slug}`;
+          const selectedProduct = defaultVariant
+            ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getVariantImages(product, defaultVariant) }
+            : product;
+          const handleAdd = (origin: HTMLElement) => {
+            if (upsellSource) {
+              replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id);
+              return;
             }
-            const productHref = replacementParams
-              ? `/product/${product.slug}?${replacementParams.toString()}`
-              : `/product/${product.slug}`;
-            const priceRange = getProductPriceRange(product);
-            const imageUrl = getProductImages(product)[0]?.url;
-            const selectedProduct = defaultVariant
-              ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getVariantImages(product, defaultVariant) }
-              : product;
-            return (
-              <li key={product.id} className="min-w-0">
-                <article className="overflow-hidden rounded-2xl border border-border bg-card">
-                  <div className="relative aspect-square bg-muted/30">
-                    <ProductImageLink productId={product.id} href={productHref} aria-label={`${product.title} ürününü incele`} className="absolute inset-0">
-                      {imageUrl && (
-                        <ProductImageTransition><Image src={imageUrl} alt={product.title} fill sizes="(min-width: 768px) 224px, 192px" className="object-contain p-3" /></ProductImageTransition>
-                      )}
-                    </ProductImageLink>
-                    <FavoriteButton product={product} className="absolute right-3 top-3 z-10" />
-                  </div>
-                  <div className="space-y-3 p-3">
-                    <Link href={productHref} className="line-clamp-2 min-h-10 text-sm font-semibold text-foreground hover:underline">
-                      {product.title}
-                    </Link>
-                    <p className="text-sm font-bold text-foreground">{formatMoney(priceRange.min)}{Number(priceRange.min) !== Number(priceRange.max) ? ` ile ${formatMoney(priceRange.max)}` : ""}</p>
-                    {needsVariant ? (
-                      <Button asChild size="sm" variant="outline" className="w-full">
-                        <Link href={productHref}>{upsellSource ? "Seçeneği belirle" : "Seçenekleri seç"}</Link>
-                      </Button>
-                    ) : (
-                      <Button type="button" size="sm" className="w-full" onClick={(event) => {
-                        if (upsellSource) {
-                          replaceItem(upsellSource.product.id, upsellSource.variantId, selectedProduct, upsellSource.quantity, defaultVariant?.id);
-                        } else {
-                          addItem(selectedProduct, 1, defaultVariant?.id);
-                          void burstCartConfetti(event.currentTarget);
-                        }
-                      }}>
-                        {upsellSource ? "Sepettekiyle değiştir" : "Sepete ekle"}
-                      </Button>
-                    )}
-                  </div>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <Grid className={layout === "centered"
-          ? `mx-auto ${products.length === 1 ? "max-w-xs grid-cols-1" : products.length === 2 ? "max-w-2xl grid-cols-2" : "max-w-5xl grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
-          : "grid-flow-col auto-cols-[12rem] overflow-x-auto pb-3 [scrollbar-width:thin] sm:auto-cols-[14rem]"}>
-          <ProductGridItems
-            products={products}
-            imageSizes={layout === "centered" ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 640px) 224px, 192px"}
-            prioritizeFirst={layout === "centered"}
-            cardLayout="stacked"
-            imageFit={layout === "centered" ? "cover" : "contain"}
-          />
-        </Grid>
-      )}
+            addItem(selectedProduct, 1, defaultVariant?.id);
+            void burstCartConfetti(origin);
+          };
+          return (
+            <Grid.Item key={product.id} square={false}>
+              <ProductCard
+                product={product}
+                href={productHref}
+                imageSizes={layout === "centered" ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
+                priority={layout === "centered"}
+                action={showCartActions ? (
+                  <ShelfCartAction
+                    productHref={productHref}
+                    needsVariant={needsVariant}
+                    upsellSource={upsellSource}
+                    onAdd={handleAdd}
+                  />
+                ) : undefined}
+              />
+            </Grid.Item>
+          );
+        })}
+      </Grid>
     </section>
   );
 }

@@ -24,6 +24,7 @@ import {
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
 import { ArrowRight01Icon } from "hugeicons-react";
+import { formatPhoneInput } from "@/lib/format-phone-input";
 
 function resolveErrorMessage(error: unknown): string {
   if (error instanceof ConvexError) {
@@ -236,7 +237,7 @@ export default function AccountProfilePage() {
                       type="tel"
                       autoComplete="tel"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => setPhoneNumber(formatPhoneInput(e.target.value))}
                       placeholder="05XX XXX XX XX"
                     />
                   )}

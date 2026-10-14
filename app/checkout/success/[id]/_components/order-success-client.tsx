@@ -18,7 +18,6 @@ import {
   ArrowRightIcon,
   XCircleIcon,
   TruckIcon,
-  CreditCardIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
@@ -149,7 +148,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
               <OrderStatusBadge status={order.status} />
             </div>
 
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl break-words">
               Sipariş onayınız ve detaylar <span className="font-semibold text-foreground">{order.customerEmail}</span> adresine iletilecektir.
             </p>
 
@@ -163,9 +162,9 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
               >
                 <span>#{orderCode}</span>
                 {copied ? (
-                  <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <CheckIcon className="size-3.5 shrink-0 text-emerald-600 print:hidden dark:text-emerald-400" />
                 ) : (
-                  <DocumentDuplicateIcon className="size-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                  <DocumentDuplicateIcon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground print:hidden" />
                 )}
               </button>
               <span className="text-border">•</span>
@@ -173,7 +172,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
             </div>
           </div>
 
-          <div className="hidden lg:flex shrink-0">
+          <div className="hidden lg:flex shrink-0 print:hidden">
             <Button
               type="button"
               variant="outline"
@@ -221,7 +220,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                               alt={item.title}
                               fill
                               sizes="64px"
-                              className="object-cover"
+                              className="object-contain"
                             />
                           </div>
                         ) : (
@@ -264,7 +263,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                 {order.customerPhone && (
                   <p className="text-xs text-muted-foreground">{formatPhone(order.customerPhone)}</p>
                 )}
-                <p className="text-xs text-muted-foreground">{order.customerEmail}</p>
+                <p className="break-words text-xs text-muted-foreground">{order.customerEmail}</p>
               </div>
 
               <div className="space-y-1">
@@ -356,26 +355,11 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
             </Card>
           )}
 
-          {order.paymentMethod === "paytr" && (
-            <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-3">
-              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2 pb-3 border-b border-border">
-                <CreditCardIcon className="size-5 text-primary" />
-                <span>PayTR Kredi Kartı Ödemesi (Demo)</span>
-              </CardTitle>
-
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-xs text-emerald-900 dark:text-emerald-200 leading-relaxed">
-                <p className="font-semibold">Ödeme Başarıyla Tamamlandı (Demo Modu)</p>
-                <p className="mt-0.5 text-emerald-800 dark:text-emerald-300">
-                  Kart ödemeniz demo simülasyonu ile test edildi ve siparişinizin durumu doğrudan &quot;Ödendi&quot; olarak onaylandı.
-                </p>
-              </div>
-            </Card>
-          )}
         </div>
 
         {/* SAĞ KOLON: Özet & Aksiyonlar */}
         <div className="lg:col-span-4 space-y-6">
-          <Card className="rounded-3xl border-border bg-card p-6 shadow-xs sticky top-24">
+          <Card className="rounded-3xl border-border bg-card p-6 shadow-xs sticky top-24 print:static">
             <CardTitle className="text-base font-bold text-foreground pb-4 border-b border-border">
               Ödeme & Tutar Özeti
             </CardTitle>
@@ -385,13 +369,6 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                 <span>Ödeme Yöntemi</span>
                 <span className="font-semibold text-foreground">
                   {getOrderPaymentMethodTitle(order)}
-                </span>
-              </div>
-
-              <div className="flex justify-between text-muted-foreground">
-                <span>Ara Toplam</span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {formatMoney(totalAmountNum)}
                 </span>
               </div>
 
@@ -428,7 +405,7 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
               </div>
             </div>
 
-            <div className="pt-6 space-y-2.5">
+            <div className="pt-6 space-y-2.5 print:hidden">
               <Button asChild size="lg" className="w-full rounded-2xl font-semibold gap-2 shadow-xs cursor-pointer">
                 <Link href="/search">
                   <span>Alışverişe Devam Et</span>

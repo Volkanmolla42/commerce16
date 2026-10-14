@@ -1,4 +1,4 @@
-import { CategoryShortcuts, HomeHero, HomeProductShelf } from "@/components/home/home-sections";
+import { CategoryShortcuts, HomeHero, HomeProductShelf, HomeValueProps } from "@/components/home/home-sections";
 import { baseUrl } from "@/lib/utils";
 import { getCategories, getRecommendationCatalog, getStoreSettings } from "@/lib/catalog";
 import { PersonalizedRecommendationShelf } from "@/components/product/recommendation-shelves";
@@ -106,6 +106,7 @@ export default async function HomePage() {
         <CategoryShortcuts categories={categories} />
         <HomeProductShelf title="Öne Çıkan Ürünler" products={availableProducts.slice(0, 10)} />
         <PersonalizedRecommendationShelf products={products} />
+        <HomeValueProps />
       </div>
     </>
   );

@@ -9,6 +9,7 @@ import {
   PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Input, Label } from "@/components/ui";
+import { formatPhoneInput } from "@/lib/format-phone-input";
 
 export default function ContactForm() {
   const submitMessage = useMutation(api.contact.submitContactMessage);
@@ -127,7 +128,7 @@ export default function ContactForm() {
             id="contact-phone"
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
             placeholder="05XX XXX XX XX"
             className="h-10 text-sm"
           />

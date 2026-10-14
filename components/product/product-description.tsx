@@ -21,7 +21,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useCart } from "@/components/cart/cart-context";
 import { Button } from "@/components/ui";
 import { notifyProductAddedToCart } from "@/components/cart/product-cart-feedback";
-import { ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
+import { ArrowRightIcon } from "@heroicons/react/24/outline";
 
 export function ProductDescription({ product }: { product: Product }) {
   const searchParams = useSearchParams();
@@ -33,10 +33,10 @@ export function ProductDescription({ product }: { product: Product }) {
     searchParams.get("cartReplaceVariantId") ?? undefined;
   const replacementSource = replacementProductId
     ? items.find(
-        (item) =>
-          item.product.id === replacementProductId &&
-          item.variantId === replacementVariantId,
-      )
+      (item) =>
+        item.product.id === replacementProductId &&
+        item.variantId === replacementVariantId,
+    )
     : undefined;
   const selectedVariant = getSelectedVariant(product, searchParams);
   const [now, setNow] = useState(0);
@@ -108,39 +108,20 @@ export function ProductDescription({ product }: { product: Product }) {
   return (
     <section className="mx-auto w-full max-w-[560px]">
       <header className="border-b border-border pb-5">
-        <div className="flex items-start justify-between gap-5">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl xl:text-4xl">
-              {product.title}
-            </h1>
-          </div>
-          <FavoriteButton
-            product={product}
-            className="mt-1 shrink-0 border-neutral-300 bg-transparent text-neutral-600 shadow-none hover:bg-neutral-100 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-          />
-        </div>
-        <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl xl:text-4xl">
+          {product.title}
+        </h1>
+        <div className="mt-4 flex items-center justify-between gap-3">
           <Price
             amount={priceRange.min}
             maxAmount={priceRange.max}
             currencyCode="TRY"
             className="text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white"
-            currencyCodeClassName="sr-only"
           />
-          <p
-            className="flex items-center gap-1.5 text-xs text-muted-foreground"
-            role="status"
-          >
-            <span
-              className={`size-1.5 shrink-0 rounded-full ${isAvailableForSale && (!variant || variant.availableForSale) ? "bg-emerald-500" : "bg-neutral-400"}`}
-              aria-hidden="true"
-            />
-            {isAvailableForSale
-              ? variant && !variant.availableForSale
-                ? "Seçili seçenek tükendi"
-                : "Stokta"
-              : "Şu anda stokta yok"}
-          </p>
+          <FavoriteButton
+            product={product}
+            className="shrink-0 border-neutral-300 bg-transparent text-neutral-600 shadow-none hover:bg-neutral-100 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
+          />
         </div>
         {purchaseActivity && purchaseActivity.buyerCount > 0 && (
           <div
@@ -175,7 +156,6 @@ export function ProductDescription({ product }: { product: Product }) {
         <Price
           amount={priceRange.min}
           maxAmount={priceRange.max}
-          currencyCodeClassName="sr-only"
           className="max-w-[40%] shrink-0 text-sm font-semibold text-foreground md:hidden"
         />
         <div className="min-w-0 flex-1">
@@ -208,10 +188,10 @@ export function ProductDescription({ product }: { product: Product }) {
               replaceCartItem={
                 replacementSource
                   ? {
-                      productId: replacementSource.product.id,
-                      variantId: replacementSource.variantId,
-                      quantity: replacementSource.quantity,
-                    }
+                    productId: replacementSource.product.id,
+                    variantId: replacementSource.variantId,
+                    quantity: replacementSource.quantity,
+                  }
                   : undefined
               }
             />
@@ -227,35 +207,29 @@ export function ProductDescription({ product }: { product: Product }) {
           />
         </div>
       )}
-      <div className="mt-6 divide-y divide-border border-y border-border">
-        <details className="group py-4">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
-            Teslimat ve iade{" "}
-            <ChevronDownIcon
-              className="size-4 transition-transform group-open:rotate-180"
-              aria-hidden="true"
-            />
-          </summary>
-          <p className="pb-2 text-sm leading-6 text-muted-foreground">
-            Sipariş öncesinde teslimat, cayma hakkı ve iade koşullarını
-            inceleyebilirsiniz.
-          </p>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            <Link
-              href="/pre-information-form"
-              className="inline-flex min-h-11 items-center underline underline-offset-4"
-            >
-              Teslimat bilgileri
-            </Link>
-            <Link
-              href="/distance-sales-agreement"
-              className="inline-flex min-h-11 items-center underline underline-offset-4"
-            >
-              İade koşulları
-            </Link>
-          </div>
-        </details>
-      </div>
+      <section className="mt-8  border-t border-neutral-200 pt-6 dark:border-neutral-800">
+        <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
+          Teslimat ve iade
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Sipariş öncesinde teslimat, cayma hakkı ve iade koşullarını
+          inceleyebilirsiniz.
+        </p>
+        <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+          <Link
+            href="/pre-information-form"
+            className="inline-flex min-h-11 items-center underline underline-offset-4"
+          >
+            Teslimat bilgileri
+          </Link>
+          <Link
+            href="/distance-sales-agreement"
+            className="inline-flex min-h-11 items-center underline underline-offset-4"
+          >
+            İade koşulları
+          </Link>
+        </div>
+      </section>
 
       {visibleAttributes.length > 0 && category !== undefined && (
         <section className="mt-8 border-t border-neutral-200 pt-6 dark:border-neutral-800">

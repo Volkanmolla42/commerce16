@@ -126,8 +126,7 @@ export function useProductCartFeedback(target: RefObject<HTMLElement | null>) {
       timer = setTimeout(() => setConfirmed(false), 1800);
     };
     const onAdded = () => {
-      if (!target.current || !window.matchMedia("(max-width: 767px)").matches)
-        return;
+      if (!target.current) return;
       cancelFlight?.();
       clearTimeout(timer);
       setConfirmed(false);

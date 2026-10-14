@@ -14,9 +14,7 @@ export default function ContentPageLayout({ children }: { children: ReactNode })
           <span>Ana Sayfaya Dön</span>
         </Link>
       </div>
-      <div className="rounded-3xl border border-border bg-card p-6 sm:p-10 shadow-xs">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

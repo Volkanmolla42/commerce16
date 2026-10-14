@@ -3,6 +3,7 @@ import { assertAdminApiSecret } from "./adminAuth";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import schema from "./schema";
 import type { Doc } from "./_generated/dataModel";
+import { formatMoney } from "../lib/format-money";
 
 const couponValidator = schema.doc("coupons");
 const couponCodePattern = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
@@ -55,7 +56,7 @@ function quoteCouponRecord(coupon: Doc<"coupons">, subtotalKurus: number, now: n
     return { valid: false, message: "Kupon kullanım limitine ulaştı." };
   }
   if (coupon.minOrderAmountKurus !== undefined && subtotalKurus < coupon.minOrderAmountKurus) {
-    return { valid: false, message: `Bu kupon için sepet tutarı en az ${(coupon.minOrderAmountKurus / 100).toFixed(2)} TL olmalı.` };
+    return { valid: false, message: `Bu kupon için sepet tutarı en az ${formatMoney(coupon.minOrderAmountKurus / 100)} olmalı.` };
   }
 
   let discountKurus = coupon.discountType === "percentage"

@@ -2,11 +2,14 @@ const STORE_CURRENCY = "TRY";
 
 export function formatMoney(amount: number | string, currency = STORE_CURRENCY) {
   const value = typeof amount === "number" ? amount : Number(amount);
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-  }).format(Number.isFinite(value) ? value : 0);
+  const safeValue = Number.isFinite(value) ? value : 0;
+  // Kuruş yoksa ondalık gösterme ("888 TL"), varsa iki hane ("888,50 TL").
+  const fractionDigits = Number.isInteger(safeValue) ? 0 : 2;
+  const formatted = new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(safeValue);
+  return `${formatted} ${currency === "TRY" ? "TL" : currency}`;
 }
 
 /**

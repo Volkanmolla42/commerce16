@@ -209,10 +209,10 @@ function FacetControls({
         <legend className="pb-1 text-sm font-semibold text-foreground">Fiyat aralığı</legend>
         <div className="grid grid-cols-2 gap-2.5">
           <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">En az (₺)</span>
+            <span className="text-xs font-medium text-muted-foreground">En az (TL)</span>
             <Input
               aria-label="En düşük fiyat"
-              placeholder="₺0"
+              placeholder="0"
               className="h-10 text-xs sm:text-sm rounded-xl border-border/80 bg-muted/20 focus:bg-background"
               inputMode="decimal"
               min="0"
@@ -224,10 +224,10 @@ function FacetControls({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">En çok (₺)</span>
+            <span className="text-xs font-medium text-muted-foreground">En çok (TL)</span>
             <Input
               aria-label="En yüksek fiyat"
-              placeholder="₺9999"
+              placeholder="9999"
               className="h-10 text-xs sm:text-sm rounded-xl border-border/80 bg-muted/20 focus:bg-background"
               inputMode="decimal"
               min="0"
@@ -539,7 +539,7 @@ export function FacetedProductGrid({
 
             {products.length > 0 ? (
               <Grid className="grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-                <ProductGridItems products={products} cardLayout="stacked" />
+                <ProductGridItems products={products} />
               </Grid>
             ) : (
               <Card className="rounded-3xl border-dashed bg-card/40 px-6 py-12 text-center shadow-none sm:px-10 sm:py-16">

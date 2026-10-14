@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Fragment, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -8,17 +8,15 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type { Product } from "@/lib/catalog/types";
 import { setCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { useCart } from "@/components/cart/cart-context";
+import { CartUndoRow } from "@/components/cart/cart-undo-row";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowPathIcon,
   ArrowRightIcon,
   MinusIcon,
   PlusIcon,
-  ShieldCheckIcon,
   ShoppingBagIcon,
   TrashIcon,
-  TruckIcon,
 } from "@heroicons/react/24/outline";
 import {
   Button,
@@ -29,13 +27,14 @@ import {
   Separator,
 } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
+import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/layout/mobile-summary-bar";
 import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
 import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
 
 function CartContent() {
   const router = useRouter();
   const restoreToken = useSearchParams().get("recover");
-  const { items, addItem, updateQuantity, removeItem, totalAmount, getItemMaxStock } =
+  const { items, addItem, updateQuantity, removeItem, totalAmount, getItemMaxStock, removedItem, restoreLastRemoved } =
     useCart();
   const restoreHandled = useRef(false);
   const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
@@ -180,7 +179,7 @@ function CartItemRow({
               width={96}
               height={96}
               alt={item.product.title}
-              className="h-20 w-20 object-cover sm:h-24 sm:w-24"
+              className="h-20 w-20 object-contain sm:h-24 sm:w-24"
             />
           ) : (
             <div className="flex h-20 w-20 items-center justify-center text-muted-foreground sm:h-24 sm:w-24">
@@ -202,7 +201,18 @@ function CartItemRow({
         </div>
       </div>
 
-      <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t border-border/60 sm:border-0">
+      <div className="flex items-center gap-3 border-t border-border/60 pt-2 sm:border-0 sm:pt-0">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onRemove(item.product.id, item.variantId)}
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          aria-label="Ürünü Sil"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </Button>
+
         <div className="flex items-center rounded-xl border border-border bg-muted/40">
           <Button
             type="button"
@@ -228,20 +238,9 @@ function CartItemRow({
           </Button>
         </div>
 
-        <div className="min-w-[80px] text-right font-bold text-foreground">
+        <div className="ml-auto min-w-[80px] text-right font-bold tabular-nums text-foreground">
           {formatMoney(lineTotal)}
         </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => onRemove(item.product.id, item.variantId)}
-          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-          aria-label="Ürünü Sil"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );
@@ -279,20 +278,6 @@ function CartSummaryCard({ totalAmount }: { totalAmount: number }) {
           </Button>
         </div>
 
-        <div className="pt-2 space-y-2 border-t border-border/60 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <ShieldCheckIcon className="size-4 text-primary" />
-            <span>256-Bit SSL ile güvenli ödeme</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <TruckIcon className="size-4 text-primary" />
-            <span>Sigortalı ve özenli paketleme</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ArrowPathIcon className="size-4 text-primary" />
-            <span>14 gün içinde koşulsuz kolay iade</span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
@@ -300,22 +285,33 @@ function CartSummaryCard({ totalAmount }: { totalAmount: number }) {
 
 function CartMobileCheckoutBar({ totalAmount }: { totalAmount: number }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-4 border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
-      <span className="shrink-0 text-sm font-semibold text-foreground">
-        {formatMoney(totalAmount)}
-      </span>
-      <Button asChild size="lg" className="h-12 min-w-0 flex-1 rounded-xl text-sm font-semibold shadow-none gap-2">
+    <MobileSummaryBar label="Toplam Tutar" amount={formatMoney(totalAmount)}>
+      <Button asChild size="lg" className={mobileSummaryActionClassName}>
         <Link href="/checkout">
           <span>Ödemeye Geç</span>
           <ArrowRightIcon className="h-4 w-4" />
         </Link>
       </Button>
-    </div>
+    </MobileSummaryBar>
   );
 }
 
   if (items.length === 0) {
-    return <CartEmptyState />;
+    return (
+      <>
+        {removedItem ? (
+          <div className="mx-auto mt-8 max-w-(--breakpoint-2xl) px-4 sm:mt-12">
+            <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
+              <CartUndoRow
+                title={removedItem.item.product.title}
+                onUndo={restoreLastRemoved}
+              />
+            </div>
+          </div>
+        ) : null}
+        <CartEmptyState />
+      </>
+    );
   }
 
   return (
@@ -330,15 +326,28 @@ function CartMobileCheckoutBar({ totalAmount }: { totalAmount: number }) {
         {/* Ürün Listesi */}
         <div className="lg:col-span-8">
           <Card className="divide-y divide-border/60 border-border/80 bg-card shadow-sm overflow-hidden rounded-3xl">
-            {items.map((item) => (
-              <CartItemRow
-                key={`${item.product.id}:${item.variantId ?? ""}`}
-                item={item}
-                onUpdateQuantity={updateQuantity}
-                onRemove={removeItem}
-                isAtMaxStock={item.quantity >= getItemMaxStock(item.product.id, item.variantId)}
-              />
+            {items.map((item, index) => (
+              <Fragment key={`${item.product.id}:${item.variantId ?? ""}`}>
+                {removedItem?.index === index ? (
+                  <CartUndoRow
+                    title={removedItem.item.product.title}
+                    onUndo={restoreLastRemoved}
+                  />
+                ) : null}
+                <CartItemRow
+                  item={item}
+                  onUpdateQuantity={updateQuantity}
+                  onRemove={removeItem}
+                  isAtMaxStock={item.quantity >= getItemMaxStock(item.product.id, item.variantId)}
+                />
+              </Fragment>
             ))}
+            {removedItem && removedItem.index >= items.length ? (
+              <CartUndoRow
+                title={removedItem.item.product.title}
+                onUndo={restoreLastRemoved}
+              />
+            ) : null}
           </Card>
         </div>
 

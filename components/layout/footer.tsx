@@ -6,24 +6,13 @@ import { Menu } from "@/lib/catalog/types";
 import { cacheTag } from "next/cache";
 import { CookiePreferencesButton } from "@/components/privacy/cookie-consent-manager";
 import {
-  ArrowPathIcon,
   EnvelopeIcon,
-  LockClosedIcon,
   MapPinIcon,
   PhoneIcon,
-  ShieldCheckIcon,
-  TruckIcon,
 } from "@heroicons/react/24/outline";
 
 import { formatDate } from "@/lib/format-date";
 import { formatPhone } from "@/lib/orders";
-
-const valueProps = [
-  { icon: TruckIcon, title: "Hızlı Teslimat", description: "Özenli paketleme, hızlı kargo" },
-  { icon: ShieldCheckIcon, title: "Orijinal Ürün", description: "Doğrulanmış kalite güvencesi" },
-  { icon: ArrowPathIcon, title: "Kolay İade", description: "14 gün içinde koşulsuz iade" },
-  { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "3D Secure ödeme altyapısı" },
-];
 
 export default async function Footer() {
   "use cache";
@@ -39,24 +28,6 @@ export default async function Footer() {
 
   return (
     <footer className="w-full border-t border-neutral-200 bg-neutral-50 pb-24 text-sm dark:border-neutral-800 dark:bg-neutral-900 md:pb-0">
-      {/* Güven şeridi */}
-      <div className="border-b border-neutral-200 dark:border-neutral-800">
-        <div className="mx-auto grid max-w-(--breakpoint-2xl) grid-cols-2 gap-x-6 gap-y-5 px-4 py-7 sm:px-6 lg:grid-cols-4 lg:px-8">
-          {valueProps.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.title} className="flex items-center gap-3">
-                <Icon className="size-5 shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{item.description}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Ana kolonlar */}
       <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-12 lg:gap-x-12">
@@ -80,9 +51,11 @@ export default async function Footer() {
               <span className="text-sm font-semibold uppercase tracking-wider">{settings.storeName}</span>
             </Link>
 
-            <p className="max-w-sm text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-              {settings.slogan || "Müşteri memnuniyetini ön planda tutan güvenilir ve hızlı online alışveriş deneyimi."}
-            </p>
+            {settings.slogan ? (
+              <p className="max-w-sm text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                {settings.slogan}
+              </p>
+            ) : null}
 
             {hasContact && (
               <ul className="mt-1 flex flex-col gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">

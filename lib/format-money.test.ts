@@ -3,8 +3,11 @@ import { formatMoney, kurusToLira, toKurus } from "./format-money";
 
 describe("format-money utils", () => {
   it("formats currency correctly", () => {
-    expect(formatMoney(100)).toContain("100");
-    expect(formatMoney("250.50")).toContain("250");
+    expect(formatMoney(100)).toBe("100 TL");
+    expect(formatMoney("250.50")).toBe("250,50 TL");
+    expect(formatMoney("888.00")).toBe("888 TL");
+    expect(formatMoney(1234.5)).toBe("1.234,50 TL");
+    expect(formatMoney(undefined as unknown as number)).toBe("0 TL");
   });
 
   it("converts kurus to lira", () => {

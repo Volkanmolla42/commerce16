@@ -132,6 +132,14 @@ export const cartStore = {
   removeItem(productId: string, variantId?: string) {
     change((current) => current.filter((item) => !matches(item, productId, variantId)));
   },
+  restoreItem(item: CartItem, index: number) {
+    change((current) => {
+      if (current.some((existing) => matches(existing, item.product.id, item.variantId))) return current;
+      const next = [...current];
+      next.splice(Math.max(0, Math.min(index, next.length)), 0, item);
+      return next;
+    });
+  },
   updateQuantity(productId: string, quantity: number, variantId?: string) {
     if (!Number.isSafeInteger(quantity)) return;
     change((current) => {
