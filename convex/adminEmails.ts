@@ -80,7 +80,7 @@ export const listTemplatesAdmin = query({
         accountHolder,
         iban,
       })),
-      bankTransferInstructions: payments.bankTransfer.description,
+      bankTransferInstructions: payments.bankTransfer.description ?? "",
     };
 
     return EMAIL_TEMPLATES.map((template) => {

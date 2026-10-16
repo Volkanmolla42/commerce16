@@ -53,7 +53,7 @@ export const getOrderEmailPayload = internalQuery({
           iban: account.iban,
         }))
       );
-      bankTransferInstructions = bankTransfer.description.trim();
+      bankTransferInstructions = (bankTransfer.description || "").trim();
     }
 
     return {
