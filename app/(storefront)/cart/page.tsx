@@ -30,12 +30,13 @@ import { formatMoney } from "@/lib/format-money";
 import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/layout/mobile-summary-bar";
 import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
 import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
+import { FreeShippingBar } from "@/components/cart/free-shipping-bar";
 
 type CartItem = ReturnType<typeof useCart>["items"][number];
 
 function CartEmptyState() {
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
+    <div className="mx-auto max-w-screen-2xl px-4 py-16 sm:py-24">
       <Card className="mx-auto max-w-md text-center p-8 border-border/80 bg-card/60 shadow-lg backdrop-blur-xs rounded-3xl">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <ShoppingBagIcon className="h-10 w-10" />
@@ -153,7 +154,19 @@ function CartItemRow({
   );
 }
 
-function CartSummaryCard({ totalAmount }: { totalAmount: number }) {
+function CartSummaryCard({
+  totalAmount,
+  threshold,
+  shippingFee,
+}: {
+  totalAmount: number;
+  threshold?: number;
+  shippingFee?: number;
+}) {
+  const isFreeShipping = (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
+  const calculatedShippingFee = isFreeShipping ? 0 : (shippingFee ?? 0);
+  const finalTotal = totalAmount + calculatedShippingFee;
+
   return (
     <Card className="sticky top-24 rounded-3xl border-border/80 bg-card p-6 shadow-sm space-y-5">
       <CardHeader className="p-0">
@@ -168,12 +181,16 @@ function CartSummaryCard({ totalAmount }: { totalAmount: number }) {
         </div>
         <div className="flex justify-between text-muted-foreground">
           <span>Kargo</span>
-          <span className="font-medium text-emerald-500">Ücretsiz</span>
+          {isFreeShipping ? (
+            <span className="font-medium text-emerald-500">Ücretsiz</span>
+          ) : (
+            <span className="font-medium text-foreground">{formatMoney(calculatedShippingFee)}</span>
+          )}
         </div>
         <Separator />
         <div className="flex justify-between text-lg font-bold text-foreground">
           <span>Genel Toplam</span>
-          <span className="text-primary">{formatMoney(totalAmount)}</span>
+          <span className="text-primary font-bold">{formatMoney(finalTotal)}</span>
         </div>
 
         <div className="hidden pt-2 md:block">
@@ -190,9 +207,21 @@ function CartSummaryCard({ totalAmount }: { totalAmount: number }) {
   );
 }
 
-function CartMobileCheckoutBar({ totalAmount }: { totalAmount: number }) {
+function CartMobileCheckoutBar({
+  totalAmount,
+  threshold,
+  shippingFee,
+}: {
+  totalAmount: number;
+  threshold?: number;
+  shippingFee?: number;
+}) {
+  const isFreeShipping = (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
+  const calculatedShippingFee = isFreeShipping ? 0 : (shippingFee ?? 0);
+  const finalTotal = totalAmount + calculatedShippingFee;
+
   return (
-    <MobileSummaryBar label="Toplam Tutar" amount={formatMoney(totalAmount)}>
+    <MobileSummaryBar label="Toplam Tutar" amount={formatMoney(finalTotal)}>
       <Button asChild size="lg" className={mobileSummaryActionClassName}>
         <Link href="/checkout">
           <span>Ödemeye Geç</span>
@@ -209,6 +238,7 @@ function CartContent() {
   const { items, addItem, updateQuantity, removeItem, totalAmount, getItemMaxStock, removedItem, restoreLastRemoved } =
     useCart();
   const restoreHandled = useRef(false);
+  const settings = useQuery(api.settings.getStoreSettings, {});
   const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
   const [restoreState, setRestoreState] = useState<{
     token: string;
@@ -289,7 +319,7 @@ function CartContent() {
 
   if (restoreToken) {
     return (
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">
+      <div className="mx-auto max-w-screen-2xl px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">
         <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent mb-3" />
         <p>Sepetiniz geri yükleniyor...</p>
       </div>
@@ -300,7 +330,7 @@ function CartContent() {
     return (
       <>
         {removedItem ? (
-          <div className="mx-auto mt-8 max-w-(--breakpoint-2xl) px-4 sm:mt-12">
+          <div className="mx-auto mt-8 max-w-screen-2xl px-4 sm:mt-12">
             <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
               <CartUndoRow
                 title={removedItem.item.product.title}
@@ -315,14 +345,17 @@ function CartContent() {
   }
 
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 pt-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pt-12 md:pb-12">
+    <div className="mx-auto max-w-screen-2xl px-4 pt-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pt-12 md:pb-12">
       <div className="border-b border-border/60 pb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
           Sepetim
         </h1>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+      {/* Ücretsiz Kargo İlerleme Baremi */}
+      <FreeShippingBar totalAmount={totalAmount} className="mt-6 mb-2" />
+
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
         {/* Ürün Listesi */}
         <div className="lg:col-span-8">
           <Card className="divide-y divide-border/60 border-border/80 bg-card shadow-sm overflow-hidden rounded-3xl">
@@ -353,19 +386,27 @@ function CartContent() {
 
         {/* Sipariş Özeti */}
         <div className="lg:col-span-4">
-          <CartSummaryCard totalAmount={totalAmount} />
+          <CartSummaryCard
+            totalAmount={totalAmount}
+            threshold={settings?.freeShippingThreshold}
+            shippingFee={settings?.shippingFee}
+          />
         </div>
       </div>
       <CartRecommendationShelf />
 
-      <CartMobileCheckoutBar totalAmount={totalAmount} />
+      <CartMobileCheckoutBar
+        totalAmount={totalAmount}
+        threshold={settings?.freeShippingThreshold}
+        shippingFee={settings?.shippingFee}
+      />
     </div>
   );
 }
 
 export default function CartPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">Sepetiniz yükleniyor...</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-screen-2xl px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">Sepetiniz yükleniyor...</div>}>
       <CartContent />
     </Suspense>
   );

@@ -17,6 +17,7 @@ import { OrderStatusBadge } from "./order-status-badge";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
 import { ArrowRight01Icon, ShoppingBag01Icon } from "hugeicons-react";
+import { OrderReviewModal } from "@/components/account/order-review-modal";
 
 export function AccountOrdersSkeleton() {
   return (
@@ -127,6 +128,13 @@ export default function AccountOrdersPage() {
 
             <div className="flex items-center gap-3">
               <OrderStatusBadge status={order.status} />
+              {order.status === "delivered" && (
+                <OrderReviewModal
+                  orderId={order._id}
+                  items={order.items}
+                  customerName={order.customerName}
+                />
+              )}
               <Button
                 asChild
                 variant="outline"

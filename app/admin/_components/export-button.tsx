@@ -5,9 +5,9 @@ import { Button } from "@/components/ui";
 
 export function CsvExportButton({ type, label }: { type: string; label: string }) {
   return (
-    <Button asChild variant="outline" className="min-h-10 gap-1.5 px-3">
+    <Button asChild variant="outline" className="min-h-8 gap-1.5 px-3">
       <a href={`/api/admin/export?type=${type}`} download aria-label={label}>
-        <ArrowDownTrayIcon aria-hidden="true" className="size-4" />
+        <ArrowDownTrayIcon aria-hidden="true" className="size-3" />
         <span>CSV</span>
       </a>
     </Button>

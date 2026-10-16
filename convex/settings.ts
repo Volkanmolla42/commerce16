@@ -18,6 +18,8 @@ const settingsShape = v.object({
   announcement: v.string(),
   isOpen: v.boolean(),
   lowStockThreshold: v.number(),
+  freeShippingThreshold: v.number(),
+  shippingFee: v.number(),
 });
 
 function withDefaults(settings?: {
@@ -30,6 +32,8 @@ function withDefaults(settings?: {
   announcement?: string;
   isOpen?: boolean;
   lowStockThreshold?: number;
+  freeShippingThreshold?: number;
+  shippingFee?: number;
 } | null) {
   return {
     storeName: settings?.storeName?.trim() || defaultStoreName,
@@ -42,6 +46,8 @@ function withDefaults(settings?: {
     announcement: settings?.announcement ?? "",
     isOpen: settings?.isOpen ?? true,
     lowStockThreshold: settings?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD,
+    freeShippingThreshold: settings?.freeShippingThreshold ?? 0,
+    shippingFee: settings?.shippingFee ?? 0,
   };
 }
 
@@ -92,6 +98,8 @@ export const updateStoreSettings = mutation({
     announcement: v.string(),
     isOpen: v.boolean(),
     lowStockThreshold: v.number(),
+    freeShippingThreshold: v.optional(v.number()),
+    shippingFee: v.optional(v.number()),
   },
   returns: settingsShape,
   handler: async (ctx, args) => {
@@ -122,6 +130,8 @@ export const updateStoreSettings = mutation({
       announcement: clean(args.announcement, 160),
       isOpen: args.isOpen,
       lowStockThreshold: args.lowStockThreshold,
+      freeShippingThreshold: Math.max(0, args.freeShippingThreshold ?? 0),
+      shippingFee: Math.max(0, args.shippingFee ?? 0),
     };
 
     const existing = await ctx.db

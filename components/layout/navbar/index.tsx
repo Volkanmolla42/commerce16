@@ -20,7 +20,7 @@ export async function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="mx-auto flex max-w-(--breakpoint-2xl) flex-wrap items-center justify-between gap-x-2 gap-y-2.5 px-3 py-2 sm:px-4 sm:py-3.5">
+      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-x-2 gap-y-2.5 px-3 py-2 sm:px-4 sm:py-3.5">
         {/* Sol: mobil menü + mağaza adı + masaüstü kategoriler */}
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:flex-none lg:gap-6">
           <Suspense fallback={null}>

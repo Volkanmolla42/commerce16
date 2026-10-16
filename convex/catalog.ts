@@ -19,24 +19,56 @@ const availabilityValidator = v.union(v.literal("all"), v.literal("active"), v.l
 const imageValidator = v.object({
   url: v.string(), selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
 });
+const cardOptionValidator = v.object({
+  id: v.string(), name: v.string(), values: v.array(v.string()),
+});
+const cardVariantValidator = v.object({
+  id: v.string(),
+  title: v.string(),
+  availableForSale: v.boolean(),
+  price: v.object({ amount: v.string(), currencyCode: v.string() }),
+  selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
+  stockQuantity: v.optional(v.number()),
+  sku: v.optional(v.string()),
+  barcode: v.optional(v.string()),
+});
 const cardValidator = v.object({
   id: v.id("products"), title: v.string(), slug: v.string(), price: v.string(),
   priceRange: v.object({ min: v.string(), max: v.string() }), images: v.array(imageValidator),
   availableForSale: v.boolean(),
   updatedAt: v.string(), categorySlug: v.optional(v.string()),
+  options: v.optional(v.array(cardOptionValidator)),
+  variants: v.optional(v.array(cardVariantValidator)),
 });
 
 async function card(ctx: QueryCtx, product: Doc<"products">) {
   const priceRange = getProductPriceRange(product);
   const image = getImagesForVariant(product.images, [])[0];
   const imageUrl = image ? await ctx.storage.getUrl(image.storageId) : null;
-  return { id: product._id, title: product.title, slug: product.slug, price: priceRange.min,
+  return {
+    id: product._id,
+    title: product.title,
+    slug: product.slug,
+    price: priceRange.min,
     priceRange,
     images: imageUrl && image
       ? [{ url: imageUrl, ...(image.selectedOptions ? { selectedOptions: image.selectedOptions } : {}) }]
       : [],
     availableForSale: product.availableForSale,
-    updatedAt: product.updatedAt, categorySlug: product.categorySlug };
+    updatedAt: product.updatedAt,
+    categorySlug: product.categorySlug,
+    options: product.options,
+    variants: product.variants?.map((v) => ({
+      id: v.id,
+      title: v.title,
+      availableForSale: v.availableForSale,
+      price: { amount: typeof v.price === "string" ? v.price : (v.price as { amount: string }).amount, currencyCode: "TRY" },
+      selectedOptions: v.selectedOptions,
+      stockQuantity: v.stockQuantity,
+      sku: v.sku,
+      barcode: v.barcode,
+    })),
+  };
 }
 
 export const page = query({

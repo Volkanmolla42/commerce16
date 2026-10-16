@@ -195,10 +195,11 @@ export const createOrder = mutation({
     if (args.shippingAddress && args.shippingAddress.trim().length > 500) {
       throw new Error("Teslimat adresi en fazla 500 karakter olabilir.");
     }
+    const storeSettings = await readStoreSettings(ctx);
     let recordedLegalAcceptance = undefined;
     if (args.legalAcceptance) {
       const { distanceSalesAgreement: agreement, preInformationForm: preInformation } =
-        getLegalDocuments(await readStoreSettings(ctx));
+        getLegalDocuments(storeSettings);
       if (args.legalAcceptance.accepted !== true ||
         (args.legalAcceptance.distanceSalesAgreementVersion && args.legalAcceptance.distanceSalesAgreementVersion !== agreement.version) ||
         (args.legalAcceptance.preInformationFormVersion && args.legalAcceptance.preInformationFormVersion !== preInformation.version)) {
@@ -302,7 +303,12 @@ export const createOrder = mutation({
       }
     }
 
-    const finalPayableCents = payableCents + additionalFeeCents;
+    const freeShippingThreshold = storeSettings.freeShippingThreshold ?? 0;
+    const isFreeShipping = freeShippingThreshold <= 0 || (totalCents / 100) >= freeShippingThreshold;
+    const shippingFee = isFreeShipping ? 0 : (storeSettings.shippingFee ?? 0);
+    const shippingFeeCents = Math.round(shippingFee * 100);
+
+    const finalPayableCents = payableCents + additionalFeeCents + shippingFeeCents;
     if (!Number.isSafeInteger(finalPayableCents) || Math.abs(Number(args.total) - finalPayableCents / 100) > 0.01) {
       throw new Error("Sepet tutarı değişti. Sepetinizi kontrol edin.");
     }
@@ -361,6 +367,7 @@ export const createOrder = mutation({
         paymentMethodTitle,
         ...(paymentFee !== undefined ? { paymentFee } : {}),
       } : {}),
+      ...(shippingFee > 0 ? { shippingFee } : {}),
       ...(analyticsSessionId ? { analyticsSessionId } : {}),
       shippingAddress: args.shippingAddress,
       ...(recordedLegalAcceptance ? { legalAcceptance: recordedLegalAcceptance } : {}),
@@ -436,23 +443,18 @@ async function changeOrderStatus(
   if (!order) throw new Error("Sipariş bulunamadı.");
   if (order.status === status) return null;
 
-  const transitions: Record<OrderStatus, readonly OrderStatus[]> = {
-    pending: ["paid", "cancelled"],
-    paid: ["shipped", "cancelled"],
-    shipped: ["delivered", "cancelled"],
-    delivered: [],
-    cancelled: [],
-  };
-  if (!transitions[order.status].includes(status)) {
-    throw new Error("Sipariş bu durumdan seçilen duruma geçirilemiyor.");
-  }
-
   const canceling = order.status !== "cancelled" && status === "cancelled";
+  const unCanceling = order.status === "cancelled" && status !== "cancelled";
+
   if (canceling) {
     await releaseCouponReservation(ctx, order);
     // Stok sipariş oluşturulurken rezerve edilmişti; her iptalde geri yüklenir.
     await adjustInventoryForOrder(ctx, order, 1);
+  } else if (unCanceling) {
+    // İptal edilen sipariş tekrar aktif duruma alınırsa stok yeniden düşülür.
+    await adjustInventoryForOrder(ctx, order, -1);
   }
+
   if (!canceling && status !== "pending" && status !== "cancelled") {
     await commitCouponReservation(ctx, order);
   }

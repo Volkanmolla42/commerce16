@@ -12,27 +12,48 @@ import { ProductGrid } from "@/components/product/product-grid";
 import { getProductImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 
-const valueProps = [
-  { icon: TruckIcon, title: "Ücretsiz Kargo", description: "Tüm siparişlerde" },
-  { icon: ArrowPathIcon, title: "14 Gün Cayma Hakkı", description: "Teslimattan itibaren" },
-  { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "Kart bilgileriniz saklanmaz" },
-];
+import { formatMoney } from "@/lib/format-money";
 
-export function HomeValueProps() {
+export function HomeValueProps({
+  freeShippingThreshold = 0,
+}: {
+  freeShippingThreshold?: number;
+}) {
+  const shippingDescription =
+    freeShippingThreshold > 0
+      ? `${formatMoney(freeShippingThreshold)} ve üzeri`
+      : "Tüm siparişlerde";
+
+  const valueProps = [
+    { icon: TruckIcon, title: "Ücretsiz Kargo", description: shippingDescription },
+    { icon: ArrowPathIcon, title: "14 Gün Cayma Hakkı", description: "Teslimattan itibaren" },
+    { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "Kart bilgileriniz saklanmaz" },
+  ];
+
   return (
-    <section aria-label="Mağaza güvenceleri" className="grid grid-cols-2 gap-x-6 gap-y-5 py-8 sm:grid-cols-3">
-      {valueProps.map((item) => {
-        const Icon = item.icon;
-        return (
-          <div key={item.title} className="flex items-center gap-3">
-            <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">{item.title}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
+    <section
+      aria-label="Mağaza güvenceleri"
+      className="my-10 rounded-2xl border border-border/60 bg-muted/20 px-6 py-6"
+    >
+      <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-3 sm:gap-x-8 sm:divide-x sm:divide-border/60">
+        {valueProps.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.title}
+              className="flex items-center justify-start sm:justify-center gap-3.5 sm:px-4"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background border border-border/60 shadow-xs">
+                <Icon className="size-5 text-foreground" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </section>
   );
 }

@@ -286,6 +286,8 @@ export async function POST(request: NextRequest) {
           typeof value === "string" ? value : "";
         const logoStorageId = text(input.logoStorageId);
         const lowStockThreshold = Number(input.lowStockThreshold);
+        const freeShippingThreshold = Number(input.freeShippingThreshold);
+        const shippingFee = Number(input.shippingFee);
         const result = await client.mutation(api.settings.updateStoreSettings, {
           adminSecret,
           storeName,
@@ -297,6 +299,8 @@ export async function POST(request: NextRequest) {
           announcement: text(input.announcement),
           isOpen: input.isOpen !== false,
           lowStockThreshold: Number.isSafeInteger(lowStockThreshold) ? lowStockThreshold : DEFAULT_LOW_STOCK_THRESHOLD,
+          freeShippingThreshold: Number.isFinite(freeShippingThreshold) ? freeShippingThreshold : 0,
+          shippingFee: Number.isFinite(shippingFee) ? shippingFee : 0,
         });
         revalidateTag("store-settings", { expire: 0 });
         revalidatePath("/", "layout");

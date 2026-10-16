@@ -15,7 +15,13 @@ import {
   MapPinIcon,
   PrinterIcon,
   TruckIcon,
+  ListBulletIcon,
+  ViewColumnsIcon,
+  CalendarDaysIcon,
+  CreditCardIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { OrdersKanban } from "./_components/orders-kanban";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { isRetryableOrderEvent } from "@/convex/emails/events";
 import {
@@ -36,10 +42,14 @@ import {
   getOrderCode,
   getOrderPaymentMethodTitle,
   formatWhatsAppUrl,
+  formatPhone,
+  resolveCarrierTrackingUrl,
   CARRIER_OPTIONS,
+  getOrderPriceBreakdown,
 } from "@/lib/orders";
 import { formatDateTime } from "@/lib/format-date";
 import { formatMoney } from "@/lib/format-money";
+import { OrderPriceSummary } from "@/components/orders/order-price-summary";
 import { adminPath } from "@/lib/admin/routes";
 
 type Order = Doc<"orders"> & {
@@ -52,16 +62,48 @@ const statuses: OrderStatus[] = ["pending", "paid", "shipped", "delivered", "can
 
 const LIST_COLUMNS = "lg:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_110px_150px_88px]";
 
-function availableStatusOptions(order: Order) {
-  const options: OrderStatus[] = [order.status];
-  if (order.status === "pending") {
-    options.push("paid", "cancelled");
-  } else if (order.status === "paid") {
-    options.push("shipped", "cancelled");
-  } else if (order.status === "shipped") {
-    options.push("delivered", "cancelled");
+type DateRangeFilter = "all" | "today" | "yesterday" | "last7days" | "thisMonth" | "thisYear";
+
+const dateRangeOptions: { id: DateRangeFilter; label: string }[] = [
+  { id: "all", label: "Tüm Zamanlar" },
+  { id: "today", label: "Bugün" },
+  { id: "yesterday", label: "Dün" },
+  { id: "last7days", label: "Son 7 Gün" },
+  { id: "thisMonth", label: "Bu Ay" },
+  { id: "thisYear", label: "Bu Yıl" },
+];
+
+function matchesDateRange(creationTime: number, range: DateRangeFilter): boolean {
+  if (range === "all") return true;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  if (range === "today") {
+    return creationTime >= startOfToday;
   }
-  return options;
+
+  if (range === "yesterday") {
+    const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+    return creationTime >= startOfYesterday && creationTime < startOfToday;
+  }
+
+  if (range === "last7days") {
+    const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    return creationTime >= sevenDaysAgo;
+  }
+
+  if (range === "thisMonth") {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    return creationTime >= startOfMonth;
+  }
+
+  if (range === "thisYear") {
+    const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+    return creationTime >= startOfYear;
+  }
+
+  return true;
 }
 
 const emailEventLabels: Record<OrderEmailEvent, string> = {
@@ -210,11 +252,13 @@ function OrderDetails({
 
   const shortCode = getOrderCode(order);
   const whatsAppUrl = formatWhatsAppUrl(order.customerPhone);
+  const trackingUrl = resolveCarrierTrackingUrl(order.carrier, order.trackingNumber);
+  const priceBreakdown = getOrderPriceBreakdown(order);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto p-5 sm:p-6">
-        {/* Header */}
+      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto p-5 sm:p-6 space-y-4">
+        {/* Header: Kimlik, Tarih, Yazdır & Durum Değiştirici */}
         <DialogHeader className="border-b border-border pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -226,7 +270,7 @@ function OrderDetails({
                   type="button"
                   onClick={() => copyToClipboard(order._id, "orderId")}
                   className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                  title="Kimliği Kopyala"
+                  title="Sipariş ID Kopyala"
                 >
                   {copiedKey === "orderId" ? (
                     <span className="flex items-center gap-1 text-[11px] text-emerald-500 font-medium">
@@ -249,7 +293,7 @@ function OrderDetails({
                 size="sm"
                 onClick={handlePrint}
                 className="h-8 gap-1.5 text-xs rounded-md cursor-pointer"
-                title="Yazdır"
+                title="Siparişi Yazdır"
               >
                 <PrinterIcon className="size-3.5" />
                 <span>Yazdır</span>
@@ -273,7 +317,7 @@ function OrderDetails({
                   }}
                   className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-semibold text-foreground outline-none focus-visible:border-ring disabled:opacity-50 cursor-pointer"
                 >
-                  {availableStatusOptions(order).map((s) => (
+                  {statuses.map((s) => (
                     <option key={s} value={s}>
                       {orderStatusLabels[s]}
                     </option>
@@ -284,229 +328,305 @@ function OrderDetails({
           </div>
         </DialogHeader>
 
-        <div className="mt-4 space-y-4">
-          {/* Kargo Bilgileri Kartı */}
-          {(order.carrier || order.trackingNumber) ? (
-            <div className="rounded-xl border border-border bg-muted/30 p-3.5 text-xs flex items-center justify-between">
+        {/* 1. ÖNCELİK: Operasyonel Durum & Eylem Şeridi */}
+        {order.status === "pending" && order.paymentMethod === "cash_on_delivery" && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-foreground">Kapıda Ödeme</span>
+                <span className="inline-flex items-center font-mono text-[11px] font-semibold bg-background border border-border px-2 py-0.5 rounded-md text-foreground tabular-nums">
+                  Tahsil Edilecek: {formatMoney(priceBreakdown.total)}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Müşteri kargocuya nakit/kart ile ödeyecektir. Ürünleri paketleyip kargolayabilirsiniz.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => onOpenShippingDialog(order)}
+              className="h-8 text-xs shrink-0 cursor-pointer"
+            >
+              <TruckIcon className="mr-1.5 size-3.5" /> Kargo Girişi Yap
+            </Button>
+          </div>
+        )}
+
+        {order.status === "pending" && order.paymentMethod === "bank_transfer" && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
+            <div className="space-y-1">
+              <p className="font-bold text-foreground">Havale / EFT Bekleniyor</p>
+              <p className="text-xs text-muted-foreground">
+                Hesabınıza <strong className="tabular-nums text-foreground">{formatMoney(priceBreakdown.total)}</strong> geçtiğinde siparişi &ldquo;Ödendi&rdquo; yapınız.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isUpdatingStatus}
+              onClick={() => void onUpdateStatus(order, "paid")}
+              className="h-8 text-xs shrink-0 cursor-pointer"
+            >
+              Ödeme Alındı Olarak İşaretle
+            </Button>
+          </div>
+        )}
+
+        {order.status === "paid" && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
+            <div className="space-y-1">
+              <p className="font-bold text-foreground">Ödeme Onaylandı — Kargolanmaya Hazır</p>
+              <p className="text-xs text-muted-foreground">
+                Sipariş bedeli tahsil edildi ({formatMoney(priceBreakdown.total)}). Kargo takip bilgisini girerek siparişi kargoya verin.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => onOpenShippingDialog(order)}
+              className="h-8 text-xs shrink-0 cursor-pointer"
+            >
+              <TruckIcon className="mr-1.5 size-3.5" /> Kargola &amp; Takip No Gir
+            </Button>
+          </div>
+        )}
+
+        {(order.carrier || order.trackingNumber) && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <TruckIcon className="size-4 text-primary shrink-0" />
               <div>
-                <div className="font-semibold text-foreground flex items-center gap-1.5">
-                  <TruckIcon className="size-4 text-primary" />
-                  <span>Kargo: {order.carrier || "Belirtilmedi"}</span>
-                </div>
+                <span className="font-semibold text-foreground">{order.carrier || "Kargo"}</span>
                 {order.trackingNumber && (
-                  <p className="mt-1 font-mono text-muted-foreground">
-                    Takip No: <strong className="text-foreground">{order.trackingNumber}</strong>
-                  </p>
+                  <span className="ml-2 font-mono text-muted-foreground font-semibold">
+                    #{order.trackingNumber}
+                  </span>
                 )}
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {trackingUrl && (
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary hover:underline text-xs"
+                >
+                  Kargom Nerede? →
+                </a>
+              )}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onOpenShippingDialog(order)}
                 className="h-7 text-xs cursor-pointer"
               >
-                Düzenle
+                Kargo Bilgisini Düzenle
               </Button>
-            </div>
-          ) : order.status === "paid" ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 text-xs flex items-center justify-between">
-              <div>
-                <p className="font-medium text-amber-700 dark:text-amber-400">
-                  Ödeme alındı. Sipariş kargolanmayı bekliyor.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => onOpenShippingDialog(order)}
-                className="h-7 text-xs cursor-pointer"
-              >
-                Kargo Girişi Yap
-              </Button>
-            </div>
-          ) : null}
-
-          {/* Sipariş Kalemleri */}
-          <section className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
-              <ShoppingBagIcon className="size-3.5" /> Ürünler ({order.items.length})
-            </h3>
-
-            <div className="divide-y divide-border rounded-xl border border-border bg-card/60 overflow-hidden">
-              {order.items.map((item, index) => {
-                const parts = item.title.split("—");
-                const mainTitle = parts[0]?.trim() || item.title;
-                const variantInfo = parts.length > 1 ? parts.slice(1).join("—").trim() : null;
-
-                return (
-                  <div
-                    key={`${item.productId}-${index}`}
-                    className="flex items-center gap-3.5 p-3.5 text-sm hover:bg-muted/20 transition-colors"
-                  >
-                    {item.image ? (
-                      <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          fill
-                          sizes="56px"
-                          className="object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
-                        <ShoppingBagIcon className="size-5 opacity-40" />
-                      </div>
-                    )}
-
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-foreground text-sm leading-snug line-clamp-1">
-                          {mainTitle}
-                        </p>
-                        {variantInfo && (
-                          <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
-                            {variantInfo}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-2.5 text-xs text-muted-foreground">
-                        <span>{item.quantity} adet × {formatMoney(item.price)}</span>
-                        {item.sku && (
-                          <>
-                            <span>•</span>
-                            <span className="font-mono text-[11px]">SKU: {item.sku}</span>
-                          </>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2.5 pt-0.5 text-xs">
-                        <Link
-                          href={adminPath(`products`)}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                        >
-                          <PencilSquareIcon className="size-3" />
-                          <span>Ürün</span>
-                        </Link>
-                        <span className="text-border text-[10px]">•</span>
-                        <Link
-                          href={`/search?q=${encodeURIComponent(mainTitle)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:underline"
-                        >
-                          <ArrowTopRightOnSquareIcon className="size-3" />
-                          <span>Mağaza</span>
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 text-right pl-2">
-                      <p className="font-bold tabular-nums text-foreground text-sm">
-                        {formatMoney(Number(item.price) * item.quantity)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* İki Kolon: Müşteri & Teslimat */}
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            {/* Müşteri Bilgileri */}
-            <div className="rounded-xl border border-border bg-card/60 p-3.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
-                  <EnvelopeIcon className="size-3.5" /> Müşteri
-                </h3>
-                <Link
-                  href={adminPath(`customers?q=${encodeURIComponent(order.customerEmail)}`)}
-                  className="text-[11px] font-medium text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Profil →
-                </Link>
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="font-semibold text-foreground text-sm">{order.customerName}</p>
-
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <a
-                    href={`mailto:${order.customerEmail}`}
-                    className="truncate text-foreground hover:text-primary hover:underline font-medium"
-                  >
-                    {order.customerEmail}
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(order.customerEmail, "email")}
-                    className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
-                    title="Kopyala"
-                  >
-                    {copiedKey === "email" ? (
-                      <span className="text-emerald-500 text-[11px] font-medium">Kopyalandı</span>
-                    ) : (
-                      <ClipboardDocumentIcon className="size-3.5" />
-                    )}
-                  </button>
-                </div>
-
-                {order.customerPhone && (
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/60 text-xs">
-                    <span className="font-mono text-foreground">{order.customerPhone}</span>
-                    <div className="flex items-center gap-2">
-                      {whatsAppUrl && (
-                        <a
-                          href={whatsAppUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
-                        >
-                          <WhatsAppIcon className="size-3.5" />
-                          <span>WhatsApp</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Teslimat Adresi */}
-            <div className="rounded-xl border border-border bg-card/60 p-3.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
-                  <MapPinIcon className="size-3.5" /> Teslimat Adresi
-                </h3>
-                {order.shippingAddress && (
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(order.shippingAddress!, "address")}
-                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    {copiedKey === "address" ? (
-                      <span className="text-emerald-500 font-medium">Kopyalandı</span>
-                    ) : (
-                      <>
-                        <ClipboardDocumentIcon className="size-3" />
-                        <span>Kopyala</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                {order.shippingAddress || "Adres belirtilmemiş."}
-              </p>
             </div>
           </div>
+        )}
 
-          {/* E-posta Bildirim Durumları */}
-          <section className="rounded-xl border border-border bg-card/60 p-3.5 space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
-              <EnvelopeIcon className="size-3.5" /> E-posta Bildirimleri
-            </h3>
+        {/* 2. ÖNCELİK: Sipariş Kalemleri (Paketleme & Hazırlama) */}
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
+            <ShoppingBagIcon className="size-3.5" /> Paketlenecek Ürünler ({order.items.length})
+          </h3>
+
+          <div className="divide-y divide-border rounded-xl border border-border bg-card/60 overflow-hidden">
+            {order.items.map((item, index) => {
+              const parts = item.title.split("—");
+              const mainTitle = parts[0]?.trim() || item.title;
+              const variantInfo = parts.length > 1 ? parts.slice(1).join("—").trim() : null;
+
+              return (
+                <div
+                  key={`${item.productId}-${index}`}
+                  className="flex items-center gap-3.5 p-3.5 text-sm hover:bg-muted/20 transition-colors"
+                >
+                  {item.image ? (
+                    <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        sizes="56px"
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                      <ShoppingBagIcon className="size-5 opacity-40" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-foreground text-sm leading-snug line-clamp-1">
+                        {mainTitle}
+                      </p>
+                      {variantInfo && (
+                        <span className="inline-flex items-center rounded-md bg-muted text-foreground border border-border px-2 py-0.5 text-xs font-medium">
+                          {variantInfo}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2.5 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        {item.quantity} adet × {formatMoney(item.price)}
+                      </span>
+                      {item.sku && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-[11px] bg-muted/70 px-1.5 py-0.5 rounded">
+                            SKU: {item.sku}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 pt-0.5 text-xs">
+                      <Link
+                        href={adminPath(`products`)}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                      >
+                        <PencilSquareIcon className="size-3" />
+                        <span>Ürün</span>
+                      </Link>
+                      <span className="text-border text-[10px]">•</span>
+                      <Link
+                        href={`/search?q=${encodeURIComponent(mainTitle)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        <ArrowTopRightOnSquareIcon className="size-3" />
+                        <span>Mağaza</span>
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 text-right pl-2">
+                    <p className="font-bold tabular-nums text-foreground text-sm">
+                      {formatMoney(Number(item.price) * item.quantity)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 3. ÖNCELİK: Teslimat Adresi & Müşteri İletişim (Kargo Etiketi) */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          {/* Teslimat Adresi (Kargo Gönderiminin En Kritik Parçası) */}
+          <div className="rounded-xl border border-border bg-card/60 p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
+                <MapPinIcon className="size-3.5 text-primary" /> Teslimat Adresi
+              </h3>
+              {order.shippingAddress && (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(order.shippingAddress!, "address")}
+                  className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedKey === "address" ? (
+                    <span className="text-emerald-500 font-medium">Kopyalandı</span>
+                  ) : (
+                    <>
+                      <ClipboardDocumentIcon className="size-3" />
+                      <span>Adresi Kopyala</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed text-foreground bg-muted/30 p-2.5 rounded-lg border border-border/50">
+              {order.shippingAddress || "Adres belirtilmemiş."}
+            </p>
+          </div>
+
+          {/* Müşteri İletişimi */}
+          <div className="rounded-xl border border-border bg-card/60 p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
+                <EnvelopeIcon className="size-3.5 text-primary" /> Müşteri &amp; İletişim
+              </h3>
+              <Link
+                href={adminPath(`customers?q=${encodeURIComponent(order.customerEmail)}`)}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Profil →
+              </Link>
+            </div>
+
+            <div className="space-y-2">
+              <p className="font-semibold text-foreground text-sm">{order.customerName}</p>
+
+              {order.customerPhone && (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-mono font-medium text-foreground">
+                    {formatPhone(order.customerPhone)}
+                  </span>
+                  {whatsAppUrl && (
+                    <a
+                      href={whatsAppUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-foreground hover:text-primary transition-colors bg-muted/60 hover:bg-muted border border-border px-2 py-0.5 rounded-md"
+                    >
+                      <WhatsAppIcon className="size-3.5 text-emerald-500" />
+                      <span>WhatsApp</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/60">
+                <a
+                  href={`mailto:${order.customerEmail}`}
+                  className="truncate text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  {order.customerEmail}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(order.customerEmail, "email")}
+                  className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
+                  title="E-posta Kopyala"
+                >
+                  {copiedKey === "email" ? (
+                    <span className="text-emerald-500 text-[11px] font-medium">Kopyalandı</span>
+                  ) : (
+                    <ClipboardDocumentIcon className="size-3.5" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. ÖNCELİK: Finansal Tutar & Hesap Özeti (Sıfır Kod Tekrarı: OrderPriceSummary) */}
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground pb-2 mb-2 border-b border-border">
+            Ödeme ve Tutar Dökümü
+          </h3>
+          <OrderPriceSummary order={order} variant="admin" />
+        </div>
+
+        {/* 5. ÖNCELİK: E-posta Bildirim Kayıtları (Katlanabilir, çalışma alanını işgal etmez) */}
+        <details className="group rounded-xl border border-border bg-card/40 overflow-hidden text-xs">
+          <summary className="flex items-center justify-between p-3.5 font-semibold text-muted-foreground hover:text-foreground cursor-pointer select-none transition-colors">
+            <span className="flex items-center gap-2">
+              <EnvelopeIcon className="size-3.5" />
+              <span>E-posta Bildirim Geçmişi ({(order.emailEvents ?? []).length})</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground transition-transform group-open:rotate-180">
+              ▼
+            </span>
+          </summary>
+          <div className="p-3.5 pt-0 space-y-2 border-t border-border/50">
             {(order.emailEvents ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">Bildirim kaydı bulunmuyor.</p>
             ) : (
@@ -519,56 +639,22 @@ function OrderDetails({
                   {emailEvent.error && <p className="text-xs text-destructive">{emailEvent.error}</p>}
                   {(isRetryableOrderEvent(emailEvent.event) &&
                     (emailEvent.status === "failed" || emailEvent.status === "not_configured")) && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs cursor-pointer"
-                      disabled={retryingEmailKey === `${order._id}:${emailEvent.event}`}
-                      onClick={() => onRetryEmail(emailEvent.event)}
-                    >
-                      {retryingEmailKey === `${order._id}:${emailEvent.event}` ? "Deneniyor..." : "Yeniden Dene"}
-                    </Button>
-                  )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs cursor-pointer"
+                        disabled={retryingEmailKey === `${order._id}:${emailEvent.event}`}
+                        onClick={() => onRetryEmail(emailEvent.event)}
+                      >
+                        {retryingEmailKey === `${order._id}:${emailEvent.event}` ? "Deneniyor..." : "Yeniden Dene"}
+                      </Button>
+                    )}
                 </div>
               ))
             )}
-          </section>
-
-          {/* Finansal Tutar */}
-          <div className="rounded-xl border border-border bg-card p-3.5">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
-                <span className="text-muted-foreground">Ödeme Yöntemi</span>
-                <span className="font-semibold text-foreground">
-                  {getOrderPaymentMethodTitle(order)}
-                </span>
-              </div>
-              {order.paymentFee !== undefined && order.paymentFee > 0 && (
-                <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
-                  <span className="text-muted-foreground">Kapıda Ödeme Hizmet Bedeli</span>
-                  <span className="font-semibold tabular-nums text-foreground">
-                    +{formatMoney(order.paymentFee)}
-                  </span>
-                </div>
-              )}
-              {order.couponCode && (
-                <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
-                  <span className="text-muted-foreground">İndirim Kuponu ({order.couponCode})</span>
-                  <span className="font-semibold tabular-nums text-emerald-500">
-                    −{formatMoney((order.couponDiscountKurus ?? 0) / 100)}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Toplam Tutar</span>
-                <span className="text-xl font-bold tabular-nums text-foreground">
-                  {formatMoney(order.total)}
-                </span>
-              </div>
-            </div>
           </div>
-        </div>
+        </details>
       </DialogContent>
     </Dialog>
   );
@@ -579,8 +665,11 @@ function AdminOrdersContent() {
   const searchParams = useSearchParams();
   const { data: orders, error, loading, refresh } = useAdminResource<Order[]>("orders");
 
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
+  const [dateFilter, setDateFilter] = useState<DateRangeFilter>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [selectedOrderOverride, setSelectedOrderOverride] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [shippingDialogOrder, setShippingDialogOrder] = useState<Order | null>(null);
@@ -618,8 +707,30 @@ function AdminOrdersContent() {
       `${order._id} ${order.customerName} ${order.customerEmail} ${order.customerPhone || ""}`
         .toLocaleLowerCase("tr-TR")
         .includes(term);
-    return matchesTerm && (statusFilter === "all" || order.status === statusFilter);
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesDate = matchesDateRange(order._creationTime, dateFilter);
+    const matchesPayment = paymentFilter === "all" || order.paymentMethod === paymentFilter;
+    return matchesTerm && matchesStatus && matchesDate && matchesPayment;
   });
+
+  const baseForCounts = (orders || []).filter((order) => {
+    const matchesTerm =
+      !term ||
+      `${order._id} ${order.customerName} ${order.customerEmail} ${order.customerPhone || ""}`
+        .toLocaleLowerCase("tr-TR")
+        .includes(term);
+    const matchesDate = matchesDateRange(order._creationTime, dateFilter);
+    const matchesPayment = paymentFilter === "all" || order.paymentMethod === paymentFilter;
+    return matchesTerm && matchesDate && matchesPayment;
+  });
+
+  const counts = baseForCounts.reduce<Record<string, number>>(
+    (acc, order) => {
+      acc[order.status] = (acc[order.status] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
 
   const updateStatus = async (
     order: Order,
@@ -659,14 +770,7 @@ function AdminOrdersContent() {
     }
   };
 
-  // Durum sayıları
-  const counts = (orders || []).reduce<Record<string, number>>(
-    (acc, order) => {
-      acc[order.status] = (acc[order.status] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
+
 
   return (
     <>
@@ -679,20 +783,20 @@ function AdminOrdersContent() {
       )}
 
       <Card className="overflow-hidden rounded-lg">
-        {/* Filtre ve Arama Barı */}
-        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-5 sm:items-center">
+        {/* 1. Satır: Durum Sekmeleri & Sipariş Sayısı */}
+        <div className="flex items-center justify-between gap-3 border-b border-border p-3 sm:px-5">
           {/* Durum Sekmeleri */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1 overflow-x-auto min-w-0 pb-1 sm:pb-0">
             <button
               type="button"
               onClick={() => setStatusFilter("all")}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${statusFilter === "all"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 ${statusFilter === "all"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
             >
               <span>Tümü</span>
-              <span className="font-mono text-[10px] opacity-80">{orders?.length ?? 0}</span>
+              <span className="font-mono text-[10px] opacity-80">{baseForCounts.length}</span>
             </button>
             {statuses.map((status) => {
               const count = counts[status] || 0;
@@ -701,9 +805,9 @@ function AdminOrdersContent() {
                   key={status}
                   type="button"
                   onClick={() => setStatusFilter(status)}
-                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${statusFilter === status
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 ${statusFilter === status
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                 >
                   <span>{orderStatusLabels[status]}</span>
@@ -713,33 +817,133 @@ function AdminOrdersContent() {
             })}
           </div>
 
-          {/* Arama Input */}
-          <div className="relative min-w-0">
-            <Label htmlFor="order-search" className="sr-only">
-              Sipariş ara
-            </Label>
-            <MagnifyingGlassIcon
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              id="order-search"
-              name="order-search"
-              type="search"
-              placeholder="Sipariş kodu, müşteri veya e-posta ara..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9 h-10 text-sm"
-            />
-          </div>
-
-          {/* CSV İndir */}
-          <div className="flex items-center justify-end">
+          {/* CSV İndir (Sağ Taraf) */}
+          <div className="shrink-0">
             <CsvExportButton type="orders" label="CSV İndir" />
           </div>
         </div>
 
-        {/* Siparişler Listesi */}
+        {/* 2. Satır: Filtreler (Sol) & Görünüm Geçişi / CSV İndir (Sağ) */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 sm:px-5 bg-muted/20 border-b border-border">
+          {/* Sol: Kompakt Arama & Seçim Filtreleri */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Arama Input (Kompakt Genişlik) */}
+            <div className="relative w-52 sm:w-64">
+              <Label htmlFor="order-search" className="sr-only">
+                Sipariş ara
+              </Label>
+              <MagnifyingGlassIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                id="order-search"
+                name="order-search"
+                type="search"
+                placeholder="Sipariş no, müşteri ara..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+
+            {/* Tarih Filtresi */}
+            <div className="relative shrink-0">
+              <Label htmlFor="order-date-filter" className="sr-only">
+                Tarih Filtresi
+              </Label>
+              <CalendarDaysIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <select
+                id="order-date-filter"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as DateRangeFilter)}
+                className="h-9 rounded-md border border-input bg-background pl-8 pr-7 text-xs font-medium text-foreground outline-none focus-visible:border-ring cursor-pointer"
+              >
+                {dateRangeOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ödeme Yöntemi Filtresi */}
+            <div className="relative shrink-0">
+              <Label htmlFor="order-payment-filter" className="sr-only">
+                Ödeme Yöntemi
+              </Label>
+              <CreditCardIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <select
+                id="order-payment-filter"
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background pl-8 pr-7 text-xs font-medium text-foreground outline-none focus-visible:border-ring cursor-pointer"
+              >
+                <option value="all">Tüm Ödemeler</option>
+                <option value="paytr">PayTR / Kart</option>
+                <option value="bank_transfer">Havale / EFT</option>
+                <option value="cash_on_delivery">Kapıda Ödeme</option>
+              </select>
+            </div>
+
+            {/* Filtreleri Sıfırla (Aktif filtre varsa) */}
+            {(dateFilter !== "all" || paymentFilter !== "all" || query.trim() !== "") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFilter("all");
+                  setPaymentFilter("all");
+                  setQuery("");
+                }}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline px-1 py-1 cursor-pointer transition-colors"
+              >
+                <XMarkIcon className="size-3.5" />
+                <span>Temizle</span>
+              </button>
+            )}
+          </div>
+
+          {/* Sağ: Görünüm Geçişi & Sipariş Sayısı */}
+          <div className="flex items-center justify-end gap-3 shrink-0 ml-auto">
+            <div className="inline-flex items-center rounded-lg border border-border p-0.5 bg-background">
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors cursor-pointer ${viewMode === "kanban"
+                  ? "bg-muted text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
+                title="Kanban Panosu"
+              >
+                <ViewColumnsIcon className="size-3.5" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors cursor-pointer ${viewMode === "list"
+                  ? "bg-muted text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
+                title="Liste Görünümü"
+              >
+                <ListBulletIcon className="size-3.5" />
+                <span className="hidden sm:inline">Liste</span>
+              </button>
+            </div>
+            <div className="text-xs font-mono text-muted-foreground tabular-nums shrink-0">
+              <span>{filteredOrders.length} sipariş</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Siparişler Listesi / Kanban */}
         {loading ? (
           <AdminLoading label="Siparişler" variant="table" />
         ) : filteredOrders.length === 0 ? (
@@ -747,6 +951,17 @@ function AdminOrdersContent() {
             <AdminEmpty
               title={query || statusFilter !== "all" ? "Eşleşen sipariş bulunamadı" : "Henüz sipariş yok"}
               description="Arama veya filtre kriterlerini değiştirip deneyin."
+            />
+          </div>
+        ) : viewMode === "kanban" ? (
+          <div className="py-3 w-full min-w-0 overflow-hidden">
+            <OrdersKanban
+              orders={filteredOrders}
+              statuses={statusFilter === "all" ? statuses : [statusFilter]}
+              onOpenOrder={openOrder}
+              onUpdateStatus={updateStatus}
+              onOpenShippingDialog={(o) => setShippingDialogOrder(o)}
+              updatingId={updatingId}
             />
           </div>
         ) : (
@@ -807,7 +1022,7 @@ function AdminOrdersContent() {
                     }}
                     className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground outline-none focus-visible:border-ring disabled:opacity-60 cursor-pointer"
                   >
-                    {availableStatusOptions(order).map((status) => (
+                    {statuses.map((status) => (
                       <option key={status} value={status}>
                         {orderStatusLabels[status]}
                       </option>

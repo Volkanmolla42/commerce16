@@ -5,7 +5,6 @@ import { api } from "@/convex/_generated/api";
 import { getProductSearchFields, rankSearchItems } from "./smart-search";
 import { getSimilarProducts } from "./recommendations";
 import { formatProduct } from "./format-product";
-import { getProductImages } from "./product-images";
 
 type ProductFilters = {
   category?: string;
@@ -25,6 +24,8 @@ export type StoreSettings = {
   announcement: string;
   isOpen: boolean;
   lowStockThreshold: number;
+  freeShippingThreshold: number;
+  shippingFee: number;
 };
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -114,16 +115,7 @@ export async function getProductRecommendations(product: Product): Promise<Produ
 
 export async function getRecommendationCatalog(limit = 100): Promise<Product[]> {
   const products = await getProducts();
-  return products.slice(0, limit).map((product) => ({
-    id: product.id,
-    slug: product.slug,
-    title: product.title,
-    price: product.price,
-    availableForSale: product.availableForSale,
-    categorySlug: product.categorySlug,
-    images: getProductImages(product).slice(0, 1),
-    updatedAt: product.updatedAt,
-  }));
+  return products.slice(0, limit);
 }
 
 export async function getCategories(): Promise<Category[]> {

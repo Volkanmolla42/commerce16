@@ -21,16 +21,17 @@ import {
   BanknotesIcon,
   CreditCardIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
+import { Button, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
 import { OrderStatusBadge } from "@/app/(storefront)/account/_components/order-status-badge";
 import { useCart } from "@/components/cart/cart-context";
 import { clearQuickBuyItem } from "@/components/cart/quick-buy-store";
 import { clearCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { OrderSuccessSkeleton } from "./order-success-skeleton";
-import { getOrderCode, getOrderPaymentMethodTitle, formatPhone } from "@/lib/orders";
+import { getOrderCode, formatPhone } from "@/lib/orders";
 import { formatDateTime } from "@/lib/format-date";
 import { formatIban } from "@/lib/iban";
+import { OrderPriceSummary } from "@/components/orders/order-price-summary";
 
 export default function OrderSuccessClient({ orderId }: { orderId: string }) {
   const { clearCart } = useCart();
@@ -129,11 +130,10 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
     minute: "2-digit",
   });
 
-  const totalAmountNum = parseFloat(order.total) || 0;
   const itemsCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="mx-auto max-w-(--breakpoint-xl) px-4 py-8 sm:px-6 sm:py-12 space-y-6">
+    <div className="mx-auto max-w-screen-xl px-4 py-8 sm:px-6 sm:py-12 space-y-6">
       {/* 1. ÜST ONAY KARTI - Proje Temasıyla Birebir Uyumlu */}
       <Card className="rounded-3xl border-border bg-card p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
@@ -382,45 +382,8 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
               Ödeme & Tutar Özeti
             </CardTitle>
 
-            <div className="space-y-3 pt-4 text-sm">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Ödeme Yöntemi</span>
-                <span className="font-semibold text-foreground">
-                  {getOrderPaymentMethodTitle(order)}
-                </span>
-              </div>
-
-              {order.paymentFee !== undefined && order.paymentFee > 0 && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Kapıda Ödeme Bedeli</span>
-                  <span className="font-semibold tabular-nums text-foreground">
-                    +{formatMoney(order.paymentFee)}
-                  </span>
-                </div>
-              )}
-
-              {order.couponCode && (
-                <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
-                  <span>Kupon ({order.couponCode})</span>
-                  <span>Uygulandı</span>
-                </div>
-              )}
-
-              <div className="flex justify-between text-muted-foreground">
-                <span>Kargo</span>
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  Ücretsiz
-                </span>
-              </div>
-
-              <Separator className="my-2" />
-
-              <div className="flex items-baseline justify-between pt-1">
-                <span className="text-base font-bold text-foreground">Toplam Tutar</span>
-                <span className="text-xl font-bold tabular-nums text-foreground">
-                  {formatMoney(totalAmountNum)}
-                </span>
-              </div>
+            <div className="pt-4">
+              <OrderPriceSummary order={order} variant="storefront" />
             </div>
 
             <div className="pt-6 space-y-2.5 print:hidden">

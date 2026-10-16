@@ -21,6 +21,7 @@ import { useCart } from "@/components/cart/cart-context";
 import { Button } from "@/components/ui";
 import { notifyProductAddedToCart } from "@/components/cart/product-cart-feedback";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
+import { StarRating } from "./star-rating";
 
 export function ProductDescription({ product }: { product: Product }) {
   const searchParams = useSearchParams();
@@ -50,6 +51,9 @@ export function ProductDescription({ product }: { product: Product }) {
     api.categories.getBySlug,
     product.categorySlug ? { slug: product.categorySlug } : "skip",
   );
+  const ratingSummary = useQuery(api.reviews.getSummary, {
+    productId: product.id as Id<"products">,
+  });
 
   useEffect(() => {
     const initialize = window.setTimeout(() => {
@@ -110,6 +114,18 @@ export function ProductDescription({ product }: { product: Product }) {
         <h1 className="text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl xl:text-4xl">
           {product.title}
         </h1>
+        <div className="mt-2.5 flex items-center gap-2">
+          <a
+            href="#degerlendirmeler"
+            className="group inline-flex items-center gap-1.5 transition-opacity hover:opacity-80"
+          >
+            <StarRating
+              rating={ratingSummary?.averageRating ?? 0}
+              reviewCount={ratingSummary?.reviewCount ?? 0}
+              size="sm"
+            />
+          </a>
+        </div>
         <div className="mt-4 flex items-center justify-between gap-3">
           <Price
             amount={priceRange.min}

@@ -101,12 +101,13 @@ export async function GET(request: NextRequest) {
         order.total,
         order.couponCode ?? "",
         order.couponDiscountKurus ? kurusToLira(order.couponDiscountKurus) : "",
+        order.shippingFee !== undefined && order.shippingFee !== null ? String(order.shippingFee) : "0",
         order.shippingAddress ?? "",
       ]);
       return csvResponse(
         "siparisler.csv",
         toCsv(
-          ["Sipariş No", "Tarih", "Durum", "Müşteri", "E-posta", "Telefon", "Ürün adedi", "Tutar (TL)", "Kupon", "İndirim (TL)", "Teslimat adresi"],
+          ["Sipariş No", "Tarih", "Durum", "Müşteri", "E-posta", "Telefon", "Ürün adedi", "Tutar (TL)", "Kupon", "İndirim (TL)", "Kargo (TL)", "Teslimat adresi"],
           rows,
         ),
       );

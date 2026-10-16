@@ -44,6 +44,7 @@ import type * as payments from "../payments.js";
 import type * as productSkus from "../productSkus.js";
 import type * as products from "../products.js";
 import type * as restock from "../restock.js";
+import type * as reviews from "../reviews.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
 import type * as welcome from "../welcome.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   productSkus: typeof productSkus;
   products: typeof products;
   restock: typeof restock;
+  reviews: typeof reviews;
   settings: typeof settings;
   users: typeof users;
   welcome: typeof welcome;

@@ -344,7 +344,7 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
             <div ref={setActionSlot} className="flex shrink-0 items-center gap-2" />
           </header>
 
-          <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
+          <main className="mx-auto w-full container px-4 py-6 sm:py-8">
             {logoutError && <p role="alert" className="mb-4 text-sm text-destructive">{logoutError}</p>}
             {children}
           </main>

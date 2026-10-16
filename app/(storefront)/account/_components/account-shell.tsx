@@ -5,7 +5,7 @@ import { SidebarProfile } from "./sidebar-profile";
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-8 sm:py-12">
+    <div className="mx-auto max-w-screen-2xl px-4 py-8 sm:py-12">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <aside className="w-full shrink-0 lg:w-64">
           <Card className="rounded-3xl border-border bg-card p-5 shadow-xs lg:sticky lg:top-24">

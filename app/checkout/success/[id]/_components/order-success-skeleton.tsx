@@ -10,7 +10,7 @@ function SkLine({ className = "" }: { className?: string }) {
 
 export function OrderSuccessSkeleton() {
   return (
-    <div className="mx-auto max-w-(--breakpoint-xl) px-4 py-8 sm:px-6 sm:py-12 space-y-6" aria-hidden>
+    <div className="mx-auto max-w-screen-xl px-4 py-8 sm:px-6 sm:py-12 space-y-6" aria-hidden>
       {/* Üst Onay Kartı İskeleti */}
       <Card className="rounded-3xl border-border bg-card p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">

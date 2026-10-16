@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [{ storeName, slogan, logoUrl }, products, categories] = await Promise.all([
+  const [{ storeName, slogan, logoUrl, freeShippingThreshold }, products, categories] = await Promise.all([
     getStoreSettings(),
     getRecommendationCatalog(30),
     getCategories(),
@@ -96,7 +96,7 @@ export default async function HomePage() {
           __html: JSON.stringify(featuredItemsJsonLd).replace(/</g, "\\u003c"),
         }}
       />
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4">
+      <div className="mx-auto max-w-screen-2xl px-4">
         <HomeHero
           storeName={storeName}
           slogan={slogan}
@@ -106,7 +106,7 @@ export default async function HomePage() {
         <CategoryShortcuts categories={categories} />
         <HomeProductShelf title="Öne Çıkan Ürünler" products={availableProducts.slice(0, 10)} />
         <PersonalizedRecommendationShelf products={products} />
-        <HomeValueProps />
+        <HomeValueProps freeShippingThreshold={freeShippingThreshold} />
       </div>
     </>
   );

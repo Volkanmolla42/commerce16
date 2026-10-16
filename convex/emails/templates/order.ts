@@ -55,6 +55,7 @@ export const orderEmailPayloadValidator = v.object({
   paymentMethod: v.union(v.literal("cash_on_delivery"), v.literal("bank_transfer"), v.literal("paytr"), v.null()),
   paymentMethodTitle: v.union(v.string(), v.null()),
   paymentFee: v.union(v.number(), v.null()),
+  shippingFee: v.optional(v.union(v.number(), v.null())),
   bankAccounts: v.array(bankAccountValidator),
   bankTransferInstructions: v.string(),
 });
@@ -182,8 +183,8 @@ function placedCopy(payload: OrderEmailPayload): OrderCopy {
 
 function totalRow(label: string, value: string, strong = false): string {
   return `<tr>
-  <td style="font-size:${strong ? "14px" : "13px"};color:${strong ? "#09090b" : "#52525b"};font-weight:${strong ? "700" : "400"};padding:${strong ? "10px 0 2px" : "3px 0"};${strong ? "border-top:1px solid #e4e4e7;" : ""}">${escapeHtml(label)}</td>
-  <td style="font-size:${strong ? "16px" : "13px"};color:#09090b;font-weight:${strong ? "700" : "600"};text-align:right;padding:${strong ? "10px 0 2px" : "3px 0"};${strong ? "border-top:1px solid #e4e4e7;" : ""}">${value}</td>
+  <td style="font-size:${strong ? "14px" : "13px"};color:${strong ? "#09090b" : "#52525b"};font-weight:${strong ? "700" : "400"};padding:${strong ? "8px 0 2px" : "3px 0"};${strong ? "border-top:1px solid #e4e4e7;" : ""}">${escapeHtml(label)}</td>
+  <td style="font-size:${strong ? "15px" : "13px"};color:#09090b;font-weight:${strong ? "700" : "600"};text-align:right;padding:${strong ? "8px 0 2px" : "3px 0"};white-space:nowrap;${strong ? "border-top:1px solid #e4e4e7;" : ""}">${value}</td>
 </tr>`;
 }
 
@@ -219,8 +220,8 @@ export function renderOrderEmail(payload: OrderEmailPayload): EmailContent {
   ${totalRow("Ara Toplam", escapeHtml(formatMoney(itemsSubtotal)))}
   ${discount > 0 ? totalRow(`İndirim Kuponu (${payload.couponCode || ""})`, `<span style="color:#16a34a;">-${escapeHtml(formatMoney(discount))}</span>`) : ""}
   ${payload.paymentMethodTitle ? totalRow("Ödeme Yöntemi", escapeHtml(payload.paymentMethodTitle)) : ""}
+  ${totalRow("Kargo", payload.shippingFee && payload.shippingFee > 0 ? `+${escapeHtml(formatMoney(payload.shippingFee))}` : "Ücretsiz")}
   ${payload.paymentFee && payload.paymentFee > 0 ? totalRow("Kapıda Ödeme Hizmet Bedeli", `+${escapeHtml(formatMoney(payload.paymentFee))}`) : ""}
-  ${totalRow("Kargo", "Ücretsiz")}
   ${totalRow("Toplam Tutar", escapeHtml(formatMoney(payload.total)), true)}
 </table>`;
 
@@ -324,6 +325,7 @@ export function renderOrderEmail(payload: OrderEmailPayload): EmailContent {
         (item) =>
           `• ${item.title}${item.meta ? ` (${item.meta})` : ""} — ${item.quantity} adet × ${formatMoney(item.price)} = ${formatMoney(Number(item.price) * item.quantity)}`
       ),
+      payload.shippingFee && payload.shippingFee > 0 ? `Kargo: +${formatMoney(payload.shippingFee)}` : "Kargo: Ücretsiz",
       payload.paymentFee ? `Kapıda Ödeme Hizmet Bedeli: +${formatMoney(payload.paymentFee)}` : null,
       "",
       `Toplam Tutar: ${formatMoney(payload.total)}`,
@@ -365,6 +367,7 @@ export function sampleOrderPayload(event: OrderEmailEvent, store: EmailPreviewSt
     paymentMethod: "bank_transfer",
     paymentMethodTitle: "Havale / EFT",
     paymentFee: null,
+    shippingFee: null,
     bankAccounts:
       event === "order_placed" ? store.bankAccounts : [],
     bankTransferInstructions: store.bankTransferInstructions,

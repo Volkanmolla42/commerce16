@@ -10,6 +10,7 @@ import {
   Shelf,
 } from "@/components/product/recommendation-shelves";
 import { ProductDescription } from "@/components/product/product-description";
+import { ProductReviews } from "@/components/product/product-reviews";
 import {
   ProductSkeleton,
   ProductGallerySkeleton,
@@ -204,6 +205,9 @@ async function ProductContent({
             </Suspense>
           </div>
         </div>
+
+        {/* Ürün Değerlendirmeleri ve Yıldız Puanlama */}
+        <ProductReviews productId={product.id} />
 
         {/* Product Recommendations & Upsells */}
         <Suspense fallback={null}>

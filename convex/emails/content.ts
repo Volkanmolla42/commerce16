@@ -57,13 +57,13 @@ export function renderEmail(options: {
   const align = options.align ?? "left";
   const colors = options.badge ? BADGE[options.badge.tone] : null;
   const badge = colors
-    ? `<span style="display:inline-block;padding:3px 10px;background-color:${colors.bg};color:${colors.fg};border-radius:9999px;font-size:11px;font-weight:600;border:1px solid ${colors.border};text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(options.badge!.text)}</span>`
+    ? `<span style="display:inline-block;padding:3px 8px;background-color:${colors.bg};color:${colors.fg};border-radius:9999px;font-size:10px;font-weight:600;border:1px solid ${colors.border};text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;">${escapeHtml(options.badge!.text)}</span>`
     : "";
   const blocks = (options.blocks ?? [])
     .filter(Boolean)
     .map(
       (block) =>
-        `<tr><td style="padding:0 28px 20px 28px;text-align:${align};">${block}</td></tr>`
+        `<tr><td class="email-block" style="padding:0 20px 14px 20px;text-align:${align};">${block}</td></tr>`
     )
     .join("");
 
@@ -73,18 +73,39 @@ export function renderEmail(options: {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(options.subject)}</title>
+  <style>
+    @media only screen and (max-width: 600px) {
+      .email-outer-td { padding: 8px 4px !important; }
+      .email-card { border-radius: 8px !important; }
+      .email-header { padding: 12px 14px !important; }
+      .email-hero { padding: 16px 14px 12px 14px !important; }
+      .email-hero-icon svg { width: 24px !important; height: 24px !important; }
+      .email-hero h1 { font-size: 18px !important; }
+      .email-hero p { font-size: 13px !important; }
+      .email-block { padding: 0 12px 12px 12px !important; }
+      .email-panel { padding: 10px 10px !important; }
+      .email-footer { padding: 12px 12px !important; }
+      .email-field-label { width: 85px !important; font-size: 12px !important; }
+      .email-field-val { font-size: 12px !important; }
+      .email-item-img { width: 42px !important; height: 42px !important; }
+      .email-item-img-td { width: 50px !important; }
+      .email-item-title { font-size: 12px !important; }
+      .email-item-sub { font-size: 11px !important; }
+      .email-item-price { font-size: 12px !important; }
+    }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:#fafafa;font-family:${FONT};color:#09090b;line-height:1.5;-webkit-font-smoothing:antialiased;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;padding:24px 12px;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fafafa;">
     <tr>
-      <td align="center">
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;border-collapse:separate;">
+      <td class="email-outer-td" align="center" style="padding:16px 8px;">
+        <table class="email-card" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;border-collapse:separate;">
           <tr>
-            <td style="padding:20px 28px;border-bottom:1px solid #f4f4f5;">
+            <td class="email-header" style="padding:14px 20px;border-bottom:1px solid #f4f4f5;">
               <table cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td style="vertical-align:middle;">
-                    <span style="font-size:16px;font-weight:700;color:#09090b;letter-spacing:-0.02em;">${escapeHtml(options.storeName)}</span>
+                    <span style="font-size:15px;font-weight:700;color:#09090b;letter-spacing:-0.02em;">${escapeHtml(options.storeName)}</span>
                   </td>
                   <td style="vertical-align:middle;text-align:right;">${badge}</td>
                 </tr>
@@ -92,15 +113,15 @@ export function renderEmail(options: {
             </td>
           </tr>
           <tr>
-            <td style="padding:28px 28px 16px 28px;text-align:${align};">
-              <div style="margin-bottom:14px;color:#09090b;">${options.icon}</div>
-              <h1 style="margin:0 0 8px 0;font-size:20px;font-weight:700;color:#09090b;letter-spacing:-0.02em;">${escapeHtml(options.title)}</h1>
-              <p style="margin:0;font-size:14px;color:#52525b;line-height:1.6;">${options.intro}</p>
+            <td class="email-hero" style="padding:20px 20px 14px 20px;text-align:${align};">
+              <div class="email-hero-icon" style="margin-bottom:10px;color:#09090b;">${options.icon}</div>
+              <h1 style="margin:0 0 6px 0;font-size:19px;font-weight:700;color:#09090b;letter-spacing:-0.02em;">${escapeHtml(options.title)}</h1>
+              <p style="margin:0;font-size:13px;color:#52525b;line-height:1.5;">${options.intro}</p>
             </td>
           </tr>
           ${blocks}
           <tr>
-            <td style="padding:18px 28px;background-color:#fafafa;border-top:1px solid #f4f4f5;text-align:center;">
+            <td class="email-footer" style="padding:14px 20px;background-color:#fafafa;border-top:1px solid #f4f4f5;text-align:center;">
               ${options.footer ?? ""}
               <p style="margin:0;font-size:11px;color:#a1a1aa;">© ${escapeHtml(options.storeName)} — Tüm hakları saklıdır.</p>
             </td>
@@ -122,8 +143,8 @@ export function panel(
   const colors = PANEL[tone];
   return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${colors.bg};border-radius:8px;border:1px solid ${colors.border};">
   <tr>
-    <td style="padding:16px 18px;">
-      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:${colors.label};margin-bottom:10px;">${escapeHtml(label)}</div>
+    <td class="email-panel" style="padding:12px 14px;">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:${colors.label};margin-bottom:8px;">${escapeHtml(label)}</div>
       ${rowsHtml}
     </td>
   </tr>
@@ -133,8 +154,8 @@ export function panel(
 /** Bilgi kutusu içinde etiket/değer satırı. */
 export function field(label: string, valueHtml: string): string {
   return `<tr>
-  <td style="width:110px;color:#71717a;padding:3px 0;font-size:13px;">${escapeHtml(label)}</td>
-  <td style="color:#09090b;padding:3px 0;font-size:13px;">${valueHtml}</td>
+  <td class="email-field-label" style="width:100px;color:#71717a;padding:3px 0;font-size:13px;vertical-align:top;">${escapeHtml(label)}</td>
+  <td class="email-field-val" style="color:#09090b;padding:3px 0;font-size:13px;vertical-align:top;">${valueHtml}</td>
 </tr>`;
 }
 
@@ -143,17 +164,17 @@ export function fieldTable(rows: string[]): string {
 }
 
 export function cta(href: string, label: string): string {
-  return `<div style="text-align:center;margin:28px 0 12px 0;">
-  <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:11px 28px;background-color:#09090b;color:#ffffff !important;text-decoration:none;font-size:13px;font-weight:600;border-radius:8px;letter-spacing:-0.01em;">${escapeHtml(label)}</a>
+  return `<div style="text-align:center;margin:20px 0 8px 0;">
+  <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 24px;background-color:#09090b;color:#ffffff !important;text-decoration:none;font-size:13px;font-weight:600;border-radius:8px;letter-spacing:-0.01em;">${escapeHtml(label)}</a>
 </div>`;
 }
 
 export function note(textHtml: string, align: "left" | "center" = "left"): string {
-  return `<p style="margin:16px 0 0 0;font-size:12px;color:#71717a;line-height:1.5;text-align:${align};">${textHtml}</p>`;
+  return `<p style="margin:12px 0 0 0;font-size:12px;color:#71717a;line-height:1.5;text-align:${align};">${textHtml}</p>`;
 }
 
 export function linkLine(href: string, label: string): string {
-  return `<p style="margin:20px 0 0 0;font-size:12px;color:#a1a1aa;text-align:center;"><a href="${escapeHtml(href)}" style="color:#71717a;text-decoration:underline;">${escapeHtml(label)}</a></p>`;
+  return `<p style="margin:16px 0 0 0;font-size:12px;color:#a1a1aa;text-align:center;"><a href="${escapeHtml(href)}" style="color:#71717a;text-decoration:underline;">${escapeHtml(label)}</a></p>`;
 }
 
 export interface EmailLineItem {
@@ -170,20 +191,20 @@ export function itemRows(items: EmailLineItem[]): string {
     .map((item) => {
       const itemTotal = Number(item.price) * item.quantity;
       const imageHtml = item.image
-        ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" width="52" height="52" style="display:block;width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #e4e4e7;margin-right:12px;" />`
-        : `<div style="width:52px;height:52px;border-radius:6px;background-color:#f4f4f5;border:1px solid #e4e4e7;color:#a1a1aa;font-size:10px;margin-right:12px;text-align:center;line-height:52px;">Görsel Yok</div>`;
+        ? `<img class="email-item-img" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" width="46" height="46" style="display:block;width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid #e4e4e7;" />`
+        : `<div class="email-item-img" style="width:46px;height:46px;border-radius:6px;background-color:#f4f4f5;border:1px solid #e4e4e7;color:#a1a1aa;font-size:9px;text-align:center;line-height:46px;">Görsel Yok</div>`;
 
       return `<tr>
-  <td style="padding:12px 0;border-bottom:1px solid #f4f4f5;vertical-align:middle;">
+  <td style="padding:8px 0;border-bottom:1px solid #f4f4f5;vertical-align:middle;">
     <table cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
-        <td style="width:64px;vertical-align:middle;">${imageHtml}</td>
-        <td style="vertical-align:middle;">
-          <div style="font-size:13px;font-weight:600;color:#09090b;line-height:1.4;">${escapeHtml(item.title)}</div>
-          ${item.meta ? `<div style="font-size:11px;color:#71717a;margin-top:2px;">${escapeHtml(item.meta)}</div>` : ""}
-          <div style="font-size:12px;color:#71717a;margin-top:2px;">${item.quantity} adet × ${escapeHtml(formatMoney(item.price))}</div>
+        <td class="email-item-img-td" style="width:54px;vertical-align:middle;padding-right:8px;">${imageHtml}</td>
+        <td style="vertical-align:middle;padding-right:8px;">
+          <div class="email-item-title" style="font-size:13px;font-weight:600;color:#09090b;line-height:1.35;">${escapeHtml(item.title)}</div>
+          ${item.meta ? `<div class="email-item-sub" style="font-size:11px;color:#71717a;margin-top:1px;">${escapeHtml(item.meta)}</div>` : ""}
+          <div class="email-item-sub" style="font-size:11px;color:#71717a;margin-top:1px;">${item.quantity} adet × ${escapeHtml(formatMoney(item.price))}</div>
         </td>
-        <td style="vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#09090b;">${escapeHtml(formatMoney(itemTotal))}</td>
+        <td class="email-item-price" style="vertical-align:middle;text-align:right;font-size:13px;font-weight:600;color:#09090b;white-space:nowrap;">${escapeHtml(formatMoney(itemTotal))}</td>
       </tr>
     </table>
   </td>

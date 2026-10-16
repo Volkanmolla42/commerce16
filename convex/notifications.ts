@@ -86,6 +86,7 @@ export const getOrderEmailPayload = internalQuery({
       paymentMethod: order.paymentMethod ?? null,
       paymentMethodTitle: order.paymentMethodTitle ?? null,
       paymentFee: order.paymentFee ?? null,
+      shippingFee: order.shippingFee ?? null,
       bankAccounts,
       bankTransferInstructions,
     };

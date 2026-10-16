@@ -29,7 +29,7 @@ export default async function Footer() {
   return (
     <footer className="w-full border-t border-neutral-200 bg-neutral-50 pb-24 text-sm dark:border-neutral-800 dark:bg-neutral-900 md:pb-0">
       {/* Ana kolonlar */}
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-screen-2xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-12 lg:gap-x-12">
           <div className="col-span-2 flex flex-col gap-4 lg:col-span-4">
             <Link
@@ -154,7 +154,7 @@ export default async function Footer() {
 
       {/* Alt bar */}
       <div className="border-t border-neutral-200 dark:border-neutral-800">
-        <div className="mx-auto flex max-w-(--breakpoint-2xl) flex-col items-center justify-between gap-4 px-4 py-6 sm:px-6 md:flex-row lg:px-8">
+        <div className="mx-auto flex max-w-screen-2xl flex-col items-center justify-between gap-4 px-4 py-6 sm:px-6 md:flex-row lg:px-8">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             &copy; {copyrightDate} {settings.storeName}. Tüm hakları saklıdır.
           </p>

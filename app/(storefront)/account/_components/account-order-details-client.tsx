@@ -14,10 +14,18 @@ import {
   XCircleIcon,
   MapPinIcon,
   CreditCardIcon,
+  TruckIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
-import { orderStatusLabels, getOrderCode, getOrderPaymentMethodTitle, formatPhone } from "@/lib/orders";
+import {
+  orderStatusLabels,
+  getOrderCode,
+  formatPhone,
+  resolveCarrierTrackingUrl,
+} from "@/lib/orders";
 import { formatDateTime } from "@/lib/format-date";
 import { formatMoney } from "@/lib/format-money";
+import { OrderPriceSummary } from "@/components/orders/order-price-summary";
 import {
   Button,
   Card,
@@ -29,65 +37,19 @@ import {
 import { OrderStatusBadge } from "./order-status-badge";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
-
-function OrderDetailsBackLink() {
-  return (
-    <Button
-      asChild
-      variant="ghost"
-      size="sm"
-      className="mb-2 -ml-3 text-xs text-muted-foreground hover:text-foreground"
-    >
-      <Link href="/account/orders">
-        <ArrowLeftIcon className="mr-1.5 h-3.5 w-3.5" /> Tüm Siparişlerime Dön
-      </Link>
-    </Button>
-  );
-}
+import { OrderReviewModal } from "@/components/account/order-review-modal";
 
 export function AccountOrderDetailsSkeleton() {
   const stepLabels = [
     "Sipariş Alındı",
-    orderStatusLabels.paid,
+    "Hazırlanıyor",
+    "Kargoya Verildi",
+    "Teslim Edildi",
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <OrderDetailsBackLink />
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              <span>Sipariş #</span>
-              <SkLine className="h-7 w-32 rounded-lg" />
-            </h1>
-            <Sk className="h-6 w-24 rounded-full" />
-          </div>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span>Oluşturulma:</span>
-            <SkLine className="h-3 w-36" />
-          </p>
-        </div>
-      </div>
-
-      <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
-        <div className="py-2">
-          <div className="relative flex items-start justify-between">
-            <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted" />
-            {stepLabels.map((label) => (
-              <div key={label} className="relative z-10 flex flex-col items-center">
-                <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 border-border bg-card">
-                  <Sk className="h-5 w-5 rounded-full" />
-                </div>
-                <span className="mt-2 text-center text-xs font-semibold text-muted-foreground">
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
+      {/* Sipariş Edilen Ürünler İskeleti */}
       <Card className="rounded-3xl border-border bg-card shadow-xs overflow-hidden">
         <CardHeader className="border-b border-border bg-muted/20 px-6 py-4">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
@@ -117,6 +79,43 @@ export function AccountOrderDetailsSkeleton() {
             <Sk className="h-4 w-16 shrink-0" />
           </div>
         </CardContent>
+      </Card>
+
+      {/* Birleştirilmiş Sipariş Bilgisi & Durum İlerlemesi İskeleti */}
+      <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  <span>Sipariş #</span>
+                  <SkLine className="h-7 w-32 rounded-lg" />
+                </div>
+                <Sk className="h-6 w-24 rounded-full" />
+              </div>
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>Oluşturulma:</span>
+                <SkLine className="h-3 w-36" />
+              </p>
+            </div>
+          </div>
+
+          <div className="py-2">
+            <div className="relative flex items-start justify-between">
+              <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted" />
+              {stepLabels.map((label) => (
+                <div key={label} className="relative z-10 flex flex-col items-center">
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 border-border bg-card">
+                    <Sk className="h-5 w-5 rounded-full" />
+                  </div>
+                  <span className="mt-2 text-center text-xs font-semibold text-muted-foreground">
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </Card>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -186,20 +185,7 @@ export default function AccountOrderDetailsClient({
   }
 
   if (authLoading || order === undefined) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <OrderDetailsBackLink />
-            <div className="space-y-2 animate-pulse">
-              <div className="h-7 w-64 rounded-lg bg-muted" />
-              <div className="h-3 w-44 rounded bg-muted" />
-            </div>
-          </div>
-        </div>
-        <AccountOrderDetailsSkeleton />
-      </div>
-    );
+    return <AccountOrderDetailsSkeleton />;
   }
 
   if (order === null) {
@@ -225,94 +211,24 @@ export default function AccountOrderDetailsClient({
 
   const steps = [
     { key: "pending", label: "Sipariş Alındı", icon: ClockIcon },
-    { key: "paid", label: orderStatusLabels.paid, icon: CheckBadgeIcon },
+    { key: "paid", label: "Hazırlanıyor", icon: ArchiveBoxIcon },
+    { key: "shipped", label: "Kargoya Verildi", icon: TruckIcon },
+    { key: "delivered", label: "Teslim Edildi", icon: CheckBadgeIcon },
   ];
 
+  const stepIndexMap: Record<string, number> = {
+    pending: 0,
+    paid: 1,
+    shipped: 2,
+    delivered: 3,
+  };
+
   const isCancelled = order.status === "cancelled";
-  const currentStep = Math.max(0, steps.findIndex((step) => step.key === order.status));
+  const currentStep = stepIndexMap[order.status] ?? 0;
 
   return (
     <div className="space-y-6">
-      {/* Üst Navigasyon & Başlık */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <OrderDetailsBackLink />
-
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Sipariş #{getOrderCode(order)}
-            </h1>
-            <OrderStatusBadge status={order.status} />
-          </div>
-
-          <p className="mt-1 text-xs text-muted-foreground">
-            Oluşturulma:{" "}
-            {formatDateTime(order._creationTime, {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-        </div>
-
-      </div>
-
-      {/* Durum İlerleme Çubuğu */}
-      <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
-        {isCancelled ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 dark:text-red-400">
-            <XCircleIcon className="h-6 w-6 shrink-0" />
-            <div>
-              <p className="font-bold text-sm">Bu sipariş iptal edilmiştir.</p>
-              <p className="text-xs opacity-90">
-                Detaylı bilgi için müşteri hizmetlerimizle iletişime geçebilirsiniz.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="py-2">
-            <div className="relative flex items-start justify-between">
-              {/* Çizgi */}
-              <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted">
-                <div
-                  className="h-full bg-primary transition-[width] duration-300 ease-out"
-                  style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
-                />
-              </div>
-
-              {/* Adımlar */}
-              {steps.map((step, idx) => {
-                const Icon = step.icon;
-                const isPassed = idx <= currentStep;
-                const isCurrent = idx === currentStep;
-
-                return (
-                  <div key={step.key} className="relative z-10 flex flex-col items-center">
-                    <div
-                      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,box-shadow] duration-150 ${isPassed
-                          ? "border-primary bg-primary text-primary-foreground shadow-md"
-                          : "border-border bg-card text-muted-foreground"
-                        } ${isCurrent ? "ring-4 ring-primary/20" : ""}`}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span
-                      className={`mt-2 text-center text-xs font-semibold ${isPassed ? "text-foreground" : "text-muted-foreground"
-                        }`}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Sipariş Edilen Ürünler */}
+      {/* 1. Sipariş Edilen Ürünler (En Üstte) */}
       <Card className="rounded-3xl border-border bg-card shadow-xs overflow-hidden">
         <CardHeader className="border-b border-border bg-muted/20 px-6 py-4">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
@@ -367,6 +283,123 @@ export default function AccountOrderDetailsClient({
         </CardContent>
       </Card>
 
+      {/* 2. Birleştirilmiş Sipariş Bilgisi & Durum İlerlemesi */}
+      <Card className="rounded-3xl border-border bg-card p-6 shadow-xs">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-xl font-bold tracking-tight text-foreground">
+                  Sipariş #{getOrderCode(order)}
+                </h1>
+                <OrderStatusBadge status={order.status} />
+              </div>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Oluşturulma:{" "}
+                {formatDateTime(order._creationTime, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+
+            {order.status === "delivered" && (
+              <OrderReviewModal
+                orderId={order._id}
+                items={order.items}
+                customerName={order.customerName}
+              />
+            )}
+          </div>
+
+          {/* Durum İlerlemesi */}
+          {isCancelled ? (
+            <div className="flex items-center gap-3 rounded-2xl bg-destructive/10 border border-destructive/20 p-4 text-destructive">
+              <XCircleIcon className="h-6 w-6 shrink-0" />
+              <div>
+                <p className="font-bold text-sm">Bu sipariş iptal edilmiştir.</p>
+                <p className="text-xs opacity-90">
+                  Detaylı bilgi için müşteri hizmetlerimizle iletişime geçebilirsiniz.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="py-2">
+              <div className="relative flex items-start justify-between">
+                {/* Çizgi */}
+                <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted">
+                  <div
+                    className="h-full bg-primary transition-[width] duration-300 ease-out"
+                    style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+                  />
+                </div>
+
+                {/* Adımlar */}
+                {steps.map((step, idx) => {
+                  const Icon = step.icon;
+                  const isPassed = idx <= currentStep;
+                  const isCurrent = idx === currentStep;
+
+                  return (
+                    <div key={step.key} className="relative z-10 flex flex-col items-center">
+                      <div
+                        className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,box-shadow] duration-150 ${
+                          isPassed
+                            ? "border-primary bg-primary text-primary-foreground shadow-md"
+                            : "border-border bg-card text-muted-foreground"
+                        } ${isCurrent ? "ring-4 ring-primary/20" : ""}`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <span
+                        className={`mt-2 text-center text-xs font-semibold ${
+                          isPassed ? "text-foreground" : "text-muted-foreground"
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Kargo Takip Bilgisi (Kargo girilmişse veya kargolandıysa doğrudan sürecin altında görünür) */}
+              {(order.carrier || order.trackingNumber) && (
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3.5 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TruckIcon className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-muted-foreground font-medium">Kargo:</span>
+                    <span className="font-semibold text-foreground">
+                      {order.carrier || "Kargo"}
+                    </span>
+                    {order.trackingNumber && (
+                      <span className="font-mono font-semibold text-foreground bg-background px-2 py-0.5 rounded-md border border-border text-[11px]">
+                        #{order.trackingNumber}
+                      </span>
+                    )}
+                  </div>
+                  {resolveCarrierTrackingUrl(order.carrier, order.trackingNumber) && (
+                    <a
+                      href={resolveCarrierTrackingUrl(order.carrier, order.trackingNumber)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-primary hover:underline inline-flex items-center gap-1 ml-auto"
+                    >
+                      <span>Kargom Nerede?</span>
+                      <span>→</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* İki Kolonlu Bilgi Alanı: Teslimat & Ödeme Özeti */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Teslimat ve Müşteri Bilgileri */}
@@ -418,40 +451,16 @@ export default function AccountOrderDetailsClient({
           </CardTitle>
           <Separator />
 
-          <div className="space-y-2.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Ödeme Yöntemi:</span>
-              <span className="font-semibold text-foreground">
-                {getOrderPaymentMethodTitle(order)}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Ara Toplam:</span>
-              <span className="font-medium text-foreground">{formatMoney(order.total)}</span>
-            </div>
-
-            {order.paymentFee !== undefined && order.paymentFee > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Kapıda Ödeme Hizmet Bedeli:</span>
-                <span className="font-medium text-foreground">+{formatMoney(order.paymentFee)}</span>
-              </div>
-            )}
-
-            <Separator className="my-2" />
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-bold text-foreground">Genel Toplam:</span>
-              <span className="text-lg font-bold text-foreground">
-                {formatMoney(order.total)}
-              </span>
-            </div>
+          <OrderPriceSummary order={order} variant="storefront" />
 
             <div className="mt-4 rounded-2xl bg-muted/40 p-3.5 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">Sipariş Durumu: {order.status.toUpperCase()}</p>
-              <p className="mt-0.5">Sipariş numaranız: <span className="font-mono font-semibold">{getOrderCode(order, true)}</span></p>
+              <p className="font-medium text-foreground">
+                Sipariş Durumu: {orderStatusLabels[order.status] ?? order.status.toUpperCase()}
+              </p>
+              <p className="mt-0.5">
+                Sipariş numaranız: <span className="font-mono font-semibold">{getOrderCode(order, true)}</span>
+              </p>
             </div>
-          </div>
         </Card>
       </div>
     </div>

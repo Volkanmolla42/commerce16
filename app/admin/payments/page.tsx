@@ -309,7 +309,7 @@ function AdminPaymentsContent() {
             <CardContent className="space-y-4 p-4 sm:p-5">
               <div className="space-y-1.5">
                 <Label htmlFor="cod-fee" className="text-xs font-medium">
-                  Ek Hizmet / Kargo Tahsilat Bedeli (TL)
+                  Kapıda Ödeme Hizmet Bedeli (TL)
                 </Label>
                 <div className="relative">
                   <Input
@@ -327,7 +327,7 @@ function AdminPaymentsContent() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Kargo firmasının tahsilat hizmet bedeli varsa tutar belirleyin. Ek ücret yoksa 0 bırakın.
+                  Kargo taşıma bedelinden bağımsızdır. Kargo firmasının kapıda para tahsilatı yaparken aldığı operasyonel hizmet bedelidir. Ek komisyon yansıtmak istemiyorsanız 0 bırakın.
                 </p>
               </div>
 

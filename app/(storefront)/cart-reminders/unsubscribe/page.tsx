@@ -34,7 +34,7 @@ function UnsubscribeContent() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-16 sm:py-24">
+    <div className="mx-auto container px-4 py-16 sm:py-24">
       <Card className="mx-auto max-w-lg rounded-3xl border-border bg-card p-8 text-center shadow-lg sm:p-12 space-y-4">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
           {isDone ? (

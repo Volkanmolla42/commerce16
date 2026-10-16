@@ -27,6 +27,8 @@ type TextSettingKey =
 type SettingsEdits = Partial<Pick<StoreSettings, TextSettingKey>> & {
   isOpen?: boolean;
   lowStockThreshold?: number;
+  freeShippingThreshold?: number;
+  shippingFee?: number;
 };
 
 function AdminSettingsContent() {
@@ -50,6 +52,8 @@ function AdminSettingsContent() {
   const text = (key: TextSettingKey) => edits[key] ?? data?.[key] ?? "";
   const isOpen = edits.isOpen ?? data?.isOpen ?? true;
   const lowStockThreshold = edits.lowStockThreshold ?? data?.lowStockThreshold ?? 5;
+  const freeShippingThreshold = edits.freeShippingThreshold ?? data?.freeShippingThreshold ?? 0;
+  const shippingFee = edits.shippingFee ?? data?.shippingFee ?? 0;
   const logoPreview = pendingLogo?.previewUrl || data?.logoUrl || "";
 
   const set = (key: keyof SettingsEdits) => (
@@ -113,6 +117,8 @@ function AdminSettingsContent() {
         announcement: text("announcement"),
         isOpen,
         lowStockThreshold,
+        freeShippingThreshold,
+        shippingFee,
       });
       setEdits({});
       setPendingLogo(null);
@@ -316,6 +322,58 @@ function AdminSettingsContent() {
                       }))
                     }
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-lg overflow-hidden">
+              <div className="border-b border-border p-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-foreground">Kargo ve Ücretsiz Kargo Baremi</h2>
+              </div>
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="store-free-shipping">Ücretsiz Kargo Alt Limiti (TL)</Label>
+                    <Input
+                      id="store-free-shipping"
+                      name="freeShippingThreshold"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="10"
+                      value={freeShippingThreshold}
+                      onChange={(event) =>
+                        setEdits((current) => ({
+                          ...current,
+                          freeShippingThreshold: Math.max(0, Number(event.target.value) || 0),
+                        }))
+                      }
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Sepet bu tutara ulaştığında kargo ücretsiz olur. 0 girilirse tüm siparişlerde kargo ücretsizdir.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="store-shipping-fee">Standart Kargo Ücreti (TL)</Label>
+                    <Input
+                      id="store-shipping-fee"
+                      name="shippingFee"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="1"
+                      value={shippingFee}
+                      onChange={(event) =>
+                        setEdits((current) => ({
+                          ...current,
+                          shippingFee: Math.max(0, Number(event.target.value) || 0),
+                        }))
+                      }
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Sepet alt limitin altında kaldığında uygulanacak kargo ücreti.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

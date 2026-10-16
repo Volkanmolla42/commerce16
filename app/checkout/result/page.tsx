@@ -30,7 +30,7 @@ function ResultContent() {
   }, [clearCart, isSuccess]);
 
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-16 sm:py-24">
+    <div className="mx-auto max-w-screen-2xl px-4 py-16 sm:py-24">
       <Card className="mx-auto max-w-lg rounded-3xl border-border bg-card p-8 text-center shadow-xl sm:p-12">
         <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${isSuccess ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
           {isSuccess ? <CheckBadgeIcon className="h-12 w-12" /> : <ClockIcon className="h-10 w-10" />}
@@ -60,7 +60,7 @@ function ResultContent() {
 
 export default function CheckoutResultPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground">Sipariş sonucu yükleniyor...</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-screen-2xl px-4 py-20 text-center text-sm text-muted-foreground">Sipariş sonucu yükleniyor...</div>}>
       <ResultContent />
     </Suspense>
   );

@@ -25,7 +25,7 @@ export function MobileSummaryBar({
         hideFrom === "lg" ? "lg:hidden" : "md:hidden"
       }`}
     >
-      <div className="mx-auto flex max-w-(--breakpoint-2xl) items-center gap-4 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto flex max-w-screen-2xl items-center gap-4 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 shrink-0">
           <span className="block text-xs font-medium text-muted-foreground">{label}</span>
           <span className="block truncate text-lg font-bold tabular-nums text-foreground">

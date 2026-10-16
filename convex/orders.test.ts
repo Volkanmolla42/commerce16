@@ -166,7 +166,7 @@ describe("orders convex functions", () => {
   });
 
 
-  it("rejects invalid status transitions", async () => {
+  it("allows arbitrary status updates by admin", async () => {
     const t = makeTest();
     const productId = await seedProduct(t, 5);
 
@@ -187,13 +187,24 @@ describe("orders convex functions", () => {
       total: "250.00",
     });
 
-    // pending'den doğrudan delivered durumuna geçiş yasaktır
-    await expect(
-      t.mutation(api.orders.updateStatus, {
-        adminSecret: secret,
-        id: orderId,
-        status: "delivered",
-      })
-    ).rejects.toThrow("Sipariş bu durumdan seçilen duruma geçirilemiyor");
+    // Admin pending'den doğrudan delivered durumuna geçirebilir
+    await t.mutation(api.orders.updateStatus, {
+      adminSecret: secret,
+      id: orderId,
+      status: "delivered",
+    });
+
+    let order = await t.query(api.orders.getOrderById, { id: orderId });
+    expect(order?.status).toBe("delivered");
+
+    // Delivered durumundaki bir siparişi tekrar pending durumuna alabilir
+    await t.mutation(api.orders.updateStatus, {
+      adminSecret: secret,
+      id: orderId,
+      status: "pending",
+    });
+
+    order = await t.query(api.orders.getOrderById, { id: orderId });
+    expect(order?.status).toBe("pending");
   });
 });

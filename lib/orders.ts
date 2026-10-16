@@ -148,3 +148,57 @@ export function resolveCarrierTrackingUrl(
   }
   return null;
 }
+
+export interface OrderPriceBreakdown {
+  itemsSubtotal: number;
+  couponDiscount: number;
+  paymentFee: number;
+  shippingFee: number;
+  isFreeShipping: boolean;
+  total: number;
+}
+
+/**
+ * Sipariş nesnesinden ara toplam, kupon indirimi, kargo ücreti, kapıda ödeme bedeli
+ * ve genel toplam tutarlarını hesaplar.
+ */
+export function getOrderPriceBreakdown(order?: {
+  total: string | number;
+  items: Array<{ price: string | number; quantity: number }>;
+  shippingFee?: number | null;
+  paymentFee?: number | null;
+  couponDiscountKurus?: number | null;
+} | null): OrderPriceBreakdown {
+  if (!order) {
+    return {
+      itemsSubtotal: 0,
+      couponDiscount: 0,
+      paymentFee: 0,
+      shippingFee: 0,
+      isFreeShipping: true,
+      total: 0,
+    };
+  }
+
+  const total = typeof order.total === "number" ? order.total : parseFloat(order.total) || 0;
+  const itemsSubtotal = (order.items || []).reduce(
+    (sum, item) =>
+      sum +
+      (typeof item.price === "number" ? item.price : parseFloat(item.price) || 0) *
+        (item.quantity || 1),
+    0
+  );
+  const couponDiscount = (order.couponDiscountKurus ?? 0) / 100;
+  const paymentFee = order.paymentFee ?? 0;
+  const shippingFee = order.shippingFee ?? 0;
+  const isFreeShipping = shippingFee <= 0;
+
+  return {
+    itemsSubtotal,
+    couponDiscount,
+    paymentFee,
+    shippingFee,
+    isFreeShipping,
+    total,
+  };
+}

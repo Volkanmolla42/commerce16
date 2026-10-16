@@ -8,6 +8,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Price from "@/components/price";
 import { getProductImages } from "@/lib/catalog/product-images";
 import { getProductPriceRange } from "@/lib/catalog/variants";
+import { ProductCardActions } from "./product-card-actions";
 import type { Product } from "@/lib/catalog/types";
 
 const defaultImageSizes =
@@ -103,7 +104,9 @@ function ProductCard({
       </ProductImageLink>
       {action ? (
         <div className="flex flex-col gap-2 px-3 pb-3 sm:px-3.5 sm:pb-3.5">{action}</div>
-      ) : null}
+      ) : (
+        <ProductCardActions product={product} />
+      )}
       <FavoriteButton
         product={product}
         className="absolute right-3 top-3 z-10 size-9 min-h-9 min-w-9 shadow-md"

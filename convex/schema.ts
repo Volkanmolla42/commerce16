@@ -153,6 +153,7 @@ export default defineSchema({
     )),
     paymentMethodTitle: v.optional(v.string()),
     paymentFee: v.optional(v.number()),
+    shippingFee: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
@@ -275,6 +276,8 @@ export default defineSchema({
     announcement: v.optional(v.string()),
     isOpen: v.optional(v.boolean()),
     lowStockThreshold: v.optional(v.number()),
+    freeShippingThreshold: v.optional(v.number()),
+    shippingFee: v.optional(v.number()),
     updatedAt: v.optional(v.string()),
   }).index("by_key", ["key"]),
 
@@ -384,4 +387,38 @@ export default defineSchema({
     }),
     updatedAt: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  reviews: defineTable({
+    productId: v.id("products"),
+    userId: v.optional(v.id("users")),
+    orderId: v.optional(v.id("orders")),
+    authorName: v.string(),
+    rating: v.number(),
+    title: v.optional(v.string()),
+    content: v.string(),
+    isVerifiedPurchase: v.boolean(),
+    status: v.union(v.literal("approved"), v.literal("pending"), v.literal("rejected")),
+    createdAt: v.number(),
+  })
+    .index("by_product", ["productId"])
+    .index("by_product_and_status", ["productId", "status"])
+    .index("by_user", ["userId"])
+    .index("by_user_and_product", ["userId", "productId"])
+    .index("by_order", ["orderId"])
+    .index("by_order_and_product", ["orderId", "productId"])
+    .index("by_status", ["status"]),
+
+  orderFeedback: defineTable({
+    orderId: v.id("orders"),
+    userId: v.id("users"),
+    customerName: v.string(),
+    customerEmail: v.string(),
+    storeRating: v.number(),
+    deliveryRating: v.optional(v.number()),
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_order", ["orderId"])
+    .index("by_user", ["userId"])
+    .index("by_created_at", ["createdAt"]),
 });

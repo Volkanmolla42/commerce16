@@ -167,14 +167,17 @@ function PriceSummaryRows({
   appliedCouponCode,
   payableAmount,
   paymentFee = 0,
+  shippingFee = 0,
+  isFreeShipping = true,
 }: {
   couponDiscountKurus: number;
   couponPreview: CouponPreview;
   appliedCouponCode: string;
   payableAmount: number;
   paymentFee?: number;
+  shippingFee?: number;
+  isFreeShipping?: boolean;
 }) {
-  const hasAdjustments = couponDiscountKurus > 0 || paymentFee > 0;
   return (
     <div className="space-y-2 pt-1 text-sm">
       {couponDiscountKurus > 0 && (
@@ -183,13 +186,21 @@ function PriceSummaryRows({
           <span className="tabular-nums">−{formatMoney(couponDiscountKurus / 100)}</span>
         </div>
       )}
+      <div className="flex justify-between text-muted-foreground">
+        <span>Kargo</span>
+        {isFreeShipping ? (
+          <span className="font-medium text-emerald-600 dark:text-emerald-400">Ücretsiz</span>
+        ) : (
+          <span className="font-medium tabular-nums text-foreground">+{formatMoney(shippingFee)}</span>
+        )}
+      </div>
       {paymentFee > 0 && (
         <div className="flex justify-between text-muted-foreground">
           <span>Kapıda Ödeme Hizmet Bedeli</span>
           <span className="font-medium tabular-nums text-foreground">+{formatMoney(paymentFee)}</span>
         </div>
       )}
-      {hasAdjustments && <Separator className="my-2" />}
+      <Separator className="my-2" />
       <div className="flex items-baseline justify-between pt-1">
         <span className="text-base font-semibold text-foreground">Toplam</span>
         <span className="text-lg font-bold tabular-nums text-foreground sm:text-xl">
@@ -251,6 +262,7 @@ function CheckoutContent() {
   const payableKurus = Math.max(0, subtotalKurus - couponDiscountKurus);
 
   const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
+  const storeSettings = useQuery(api.settings.getStoreSettings, {});
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"paytr" | "bank_transfer" | "cash_on_delivery" | null>(null);
 
   // Demo kart bilgileri (PayTR)
@@ -273,7 +285,14 @@ function CheckoutContent() {
     ? (paymentSettings.cashOnDelivery.fee || 0)
     : 0;
   const codFeeKurus = Math.round(codFee * 100);
-  const finalPayableKurus = payableKurus + codFeeKurus;
+
+  const freeShippingThreshold = storeSettings?.freeShippingThreshold ?? 0;
+  const standardShippingFee = storeSettings?.shippingFee ?? 0;
+  const isFreeShipping = freeShippingThreshold <= 0 || (subtotalKurus / 100) >= freeShippingThreshold;
+  const shippingFee = isFreeShipping ? 0 : standardShippingFee;
+  const shippingFeeKurus = Math.round(shippingFee * 100);
+
+  const finalPayableKurus = payableKurus + codFeeKurus + shippingFeeKurus;
   const finalPayableAmount = finalPayableKurus / 100;
 
   const fillDemoCard = () => {
@@ -532,7 +551,7 @@ function CheckoutContent() {
   }
 
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-4 sm:px-6 sm:py-8 pb-28 sm:pb-12">
+    <div className="mx-auto max-w-screen-2xl px-4 py-4 sm:px-6 sm:py-8 pb-28 sm:pb-12">
       {/* SİPARİŞ FORMU */}
       <form id="checkout-form" onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start lg:gap-8">
         {/* Sol Kolon: Form Alanları */}
@@ -583,6 +602,8 @@ function CheckoutContent() {
               appliedCouponCode={appliedCouponCode}
               payableAmount={finalPayableAmount}
               paymentFee={codFee}
+              shippingFee={shippingFee}
+              isFreeShipping={isFreeShipping}
             />
           </Card>
 
@@ -1225,6 +1246,8 @@ function CheckoutContent() {
               appliedCouponCode={appliedCouponCode}
               payableAmount={finalPayableAmount}
               paymentFee={codFee}
+              shippingFee={shippingFee}
+              isFreeShipping={isFreeShipping}
             />
 
             <Button
@@ -1269,7 +1292,7 @@ export default function CheckoutPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center" aria-busy="true">
+        <div className="mx-auto max-w-screen-2xl px-4 py-20 text-center" aria-busy="true">
           <div className="mx-auto size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="mt-3 text-sm text-muted-foreground">Sipariş sayfası açılıyor...</p>
         </div>
