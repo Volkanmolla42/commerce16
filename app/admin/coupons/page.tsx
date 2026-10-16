@@ -90,7 +90,7 @@ function CouponEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+  const save = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError(null);

@@ -1,0 +1,32 @@
+import { v, type Infer } from "convex/values";
+
+/**
+ * Sipariş e-postası olayları. Her olay tek bir anlama gelir ve
+ * `orderEmailEvents` tablosunda kendi `(orderId, event)` kaydıyla izlenir.
+ */
+export const orderEmailEventValidator = v.union(
+  v.literal("order_placed"),
+  v.literal("payment_confirmed"),
+  v.literal("order_shipped"),
+  v.literal("order_delivered"),
+  v.literal("order_cancelled"),
+  v.literal("admin_order_alert")
+);
+
+export type OrderEmailEvent = Infer<typeof orderEmailEventValidator>;
+
+/** Olayın gönderilebilir (veya admin tarafından yeniden denenebilir) olduğu sipariş durumları. */
+export function canSendOrderEvent(event: OrderEmailEvent, status: string): boolean {
+  switch (event) {
+    case "order_placed":
+    case "payment_confirmed":
+    case "admin_order_alert":
+      return status !== "cancelled";
+    case "order_shipped":
+      return status === "shipped" || status === "delivered";
+    case "order_delivered":
+      return status === "delivered";
+    case "order_cancelled":
+      return status === "cancelled";
+  }
+}

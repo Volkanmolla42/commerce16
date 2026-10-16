@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { SyntheticEvent, useState } from "react";
 import {
   CreditCardIcon,
   BanknotesIcon,
@@ -195,7 +195,7 @@ function AdminPaymentsContent() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleSave = async (e?: FormEvent) => {
+  const handleSave = async (e?: SyntheticEvent) => {
     if (e) e.preventDefault();
     setSaving(true);
     setMessage(null);
@@ -291,7 +291,7 @@ function AdminPaymentsContent() {
                   value={activePaytrDesc}
                   onChange={(e) => setPaytrDesc(e.target.value)}
                   className="w-full rounded-md border border-input bg-background p-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring resize-none leading-relaxed"
-                  placeholder="256-bit SSL korumalı altyapı ile güvenli online ödeme."
+                  placeholder="Kart bilgileriniz mağazamızda saklanmaz."
                 />
                 <p className="text-xs text-muted-foreground">
                   Müşteri kartla ödeme seçeneğini seçtiğinde gösterilen açıklama metnidir.

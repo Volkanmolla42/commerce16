@@ -30,22 +30,7 @@ export default async function AboutPage() {
             Hakkımızda
           </h1>
           <p className="text-base text-muted-foreground leading-relaxed">
-            {settings.slogan
-              ? `${settings.storeName} — ${settings.slogan}`
-              : `${settings.storeName} olarak müşterilerimize en kaliteli ürünleri güvenle ulaştırıyoruz.`}
-          </p>
-        </div>
-
-        {/* Story Section */}
-        <div className="space-y-4 text-foreground/90 leading-relaxed text-sm sm:text-base">
-          <p>
-            <strong>{settings.storeName}</strong>, modern e-ticaret standartlarında güvenli, hızlı ve
-            keyifli bir alışveriş deneyimi sunmak amacıyla kurulmuştur. Geniş ürün yelpazemiz ve müşteri
-            odaklı hizmet anlayışımızla her siparişi özenle hazırlıyor, en hızlı şekilde sizlere ulaştırıyoruz.
-          </p>
-          <p>
-            Müşteri memnuniyetini her zaman ön planda tutarak, satış öncesinde ve sonrasında kesintisiz
-            destek sunmayı ilke ediniyoruz.
+            {settings.slogan || `${settings.storeName} online mağazası`}
           </p>
         </div>
 

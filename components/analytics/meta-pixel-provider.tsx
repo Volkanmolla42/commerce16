@@ -17,35 +17,35 @@ function isExcludedPath(pathname: string) {
   );
 }
 
+function trackCurrentPath(path: string | null, lastTrackedRef: { current: string | null }) {
+  const pixelId = getMetaPixelId();
+  if (!pixelId || !path || isExcludedPath(path)) return;
+  if (!hasMarketingConsent()) {
+    lastTrackedRef.current = null;
+    return;
+  }
+  if (lastTrackedRef.current === path) return;
+
+  const initialized = initMetaPixel();
+  if (!initialized) return;
+
+  lastTrackedRef.current = path;
+  trackPixelPageView();
+}
+
 export function MetaPixelProvider() {
   const pathname = usePathname();
   const lastTrackedPath = useRef<string | null>(null);
-  const pixelId = getMetaPixelId();
-
-  const trackCurrentPath = (path: string | null) => {
-    if (!pixelId || !path || isExcludedPath(path)) return;
-    if (!hasMarketingConsent()) {
-      lastTrackedPath.current = null;
-      return;
-    }
-    if (lastTrackedPath.current === path) return;
-
-    const initialized = initMetaPixel();
-    if (!initialized) return;
-
-    lastTrackedPath.current = path;
-    trackPixelPageView();
-  };
 
   useEffect(() => {
-    trackCurrentPath(pathname);
+    trackCurrentPath(pathname, lastTrackedPath);
   }, [pathname]);
 
   useEffect(() => {
     const onConsentChange = () => {
       if (hasMarketingConsent()) {
         lastTrackedPath.current = null;
-        trackCurrentPath(pathname);
+        trackCurrentPath(pathname, lastTrackedPath);
       } else {
         lastTrackedPath.current = null;
       }

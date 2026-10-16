@@ -148,10 +148,6 @@ function createSearchScorer(query: string) {
   };
 }
 
-export function getSearchScore(query: string, fields: Array<string | undefined>) {
-  return createSearchScorer(query)(fields);
-}
-
 export function rankSearchItems<T>(items: T[], query: string, getFields: (item: T) => Array<string | undefined>) {
   const score = createSearchScorer(query);
   return items.map((item, index) => ({ item, index, score: score(getFields(item)) }))

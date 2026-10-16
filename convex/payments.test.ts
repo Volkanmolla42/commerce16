@@ -4,6 +4,7 @@ import { convexTest } from "convex-test";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
+import { renderOrderEmail } from "./emails/templates/order";
 
 const modules = import.meta.glob("./**/*.ts");
 const secret = "test-admin-secret-payments";
@@ -35,14 +36,45 @@ afterEach(() => {
 });
 
 describe("payment settings and order payment methods", () => {
-  it("returns default payment settings when empty", async () => {
+  it("ayar satırı yokken hiçbir ödeme yöntemini açık göstermez", async () => {
     const t = convexTest(schema, modules);
     const settings = await t.query(api.payments.getPaymentSettings, {});
-    expect(settings.cashOnDelivery.enabled).toBe(true);
-    expect(settings.bankTransfer.enabled).toBe(true);
-    expect(settings.paytr.enabled).toBe(true);
-    expect(settings.paytr.testMode).toBe(true);
-    expect(settings.bankTransfer.accounts.length).toBeGreaterThan(0);
+    expect(settings.cashOnDelivery.enabled).toBe(false);
+    expect(settings.bankTransfer.enabled).toBe(false);
+    expect(settings.bankTransfer.accounts).toEqual([]);
+    expect(settings.paytr.enabled).toBe(false);
+    expect(settings.paytr.testMode).toBe(false);
+  });
+
+  it("yapılandırılmadan ödeme yöntemini açmaya izin vermez", async () => {
+    const t = convexTest(schema, modules);
+
+    await expect(
+      t.mutation(api.payments.updatePaymentSettings, {
+        adminSecret: secret,
+        cashOnDelivery: { enabled: true, fee: 0, description: "" },
+        bankTransfer: { enabled: false, description: "", accounts: [] },
+        paytr: { enabled: false, testMode: true, description: "" },
+      })
+    ).rejects.toThrow("açıkken müşteriye gösterilecek açıklama zorunludur");
+
+    await expect(
+      t.mutation(api.payments.updatePaymentSettings, {
+        adminSecret: secret,
+        cashOnDelivery: { enabled: false, fee: 0, description: "" },
+        bankTransfer: { enabled: true, description: "Havale yapın", accounts: [] },
+        paytr: { enabled: false, testMode: true, description: "" },
+      })
+    ).rejects.toThrow("en az bir banka hesabı zorunludur");
+
+    await expect(
+      t.mutation(api.payments.updatePaymentSettings, {
+        adminSecret: secret,
+        cashOnDelivery: { enabled: false, fee: 0, description: "" },
+        bankTransfer: { enabled: false, description: "", accounts: [] },
+        paytr: { enabled: true, testMode: false, description: "Kredi kartı ile ödeme" },
+      })
+    ).rejects.toThrow("canlı modda");
   });
 
   it("updates payment settings with admin secret and enforces validation", async () => {
@@ -118,6 +150,7 @@ describe("payment settings and order payment methods", () => {
 
   it("creates a paytr order without marking it paid", async () => {
     const t = convexTest(schema, modules);
+    await t.mutation(api.payments.updatePaymentSettings, { adminSecret: secret, ...merchantSettings });
 
     const productId = await t.mutation(api.products.create, {
       adminSecret: secret,
@@ -166,6 +199,7 @@ describe("payment settings and order payment methods", () => {
 
   it("confirms a paytr order as awaiting payment", async () => {
     const t = convexTest(schema, modules);
+    await t.mutation(api.payments.updatePaymentSettings, { adminSecret: secret, ...merchantSettings });
 
     const productId = await t.mutation(api.products.create, {
       adminSecret: secret,
@@ -207,15 +241,18 @@ describe("payment settings and order payment methods", () => {
 
     const emailPayload = await t.query(internal.notifications.getOrderEmailPayload, {
       orderId,
-      event: "payment_confirmation",
+      event: "order_placed",
     });
     expect(emailPayload).not.toBeNull();
-    expect(emailPayload?.orderStatus).toBe("pending");
     expect(emailPayload?.paymentMethod).toBe("paytr");
+    const email = renderOrderEmail(emailPayload!);
+    expect(email.html).toContain("Ödeme Bekleniyor");
+    expect(email.html).not.toContain("Ödeme Onaylandı");
   });
 
   it("creates order with bank transfer and sets status to pending", async () => {
     const t = convexTest(schema, modules);
+    await t.mutation(api.payments.updatePaymentSettings, { adminSecret: secret, ...merchantSettings });
 
     const productId = await t.mutation(api.products.create, {
       adminSecret: secret,
@@ -264,13 +301,14 @@ describe("payment settings and order payment methods", () => {
     // Havale / EFT için giden sipariş e-posta içeriği kontrolü
     const emailPayload = await t.query(internal.notifications.getOrderEmailPayload, {
       orderId,
-      event: "payment_confirmation",
+      event: "order_placed",
     });
     expect(emailPayload).not.toBeNull();
     expect(emailPayload?.bankAccounts).toBeDefined();
     expect(emailPayload?.bankAccounts?.length).toBeGreaterThan(0);
     expect(emailPayload?.bankAccounts?.[0].iban).toBeDefined();
     expect(emailPayload?.paymentMethodTitle).toBe("Havale / EFT");
+    expect(renderOrderEmail(emailPayload!).html).toContain("Havale / EFT Yapılacak Banka Hesapları");
   });
 
   it("applies cash on delivery fee when configured and rejects disabled method", async () => {
@@ -339,6 +377,38 @@ describe("payment settings and order payment methods", () => {
         districtId: "1819",
         total: "150.00",
         paymentMethod: "paytr",
+        items: [
+          {
+            productId,
+            variantId: "v-1",
+            title: "Test Çanta",
+            quantity: 1,
+            price: "150.00",
+          },
+        ],
+      })
+    ).rejects.toThrow("aktif değildir");
+
+    // Hesabı olmayan eski bir havale satırıyla sipariş kurulamaz; müşteriye boş talimat gitmemeli.
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("paymentSettings")
+        .withIndex("by_key", (q) => q.eq("key", "payment"))
+        .unique();
+      if (!row) throw new Error("Ödeme ayar satırı oluşmadı");
+      await ctx.db.patch(row._id, {
+        bankTransfer: { enabled: true, description: "Havale", accounts: [] },
+      });
+    });
+
+    await expect(
+      t.mutation(api.orders.createOrder, {
+        customerName: "Mehmet Demir",
+        customerEmail: "mehmet@test.com",
+        provinceId: "35",
+        districtId: "1819",
+        total: "150.00",
+        paymentMethod: "bank_transfer",
         items: [
           {
             productId,

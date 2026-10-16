@@ -1,15 +1,68 @@
-export const distanceSalesAgreement = {
-  title: "Mesafeli Satış Sözleşmesi",
-  slug: "distance-sales-agreement",
-  body: `
+export interface SellerInfo {
+  storeName: string;
+  address: string;
+  email: string;
+  phone: string;
+}
+
+export interface LegalDocument {
+  title: string;
+  slug: string;
+  body: string;
+  version: string;
+  ready: boolean;
+}
+
+export interface LegalDocuments {
+  distanceSalesAgreement: LegalDocument;
+  preInformationForm: LegalDocument;
+}
+
+function esc(value: string) {
+  return value
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function sellerRows(seller: SellerInfo) {
+  return `Unvan: ${esc(seller.storeName)}<br />
+  Adres: ${esc(seller.address)}<br />
+  E-posta: ${esc(seller.email)}<br />
+  Telefon: ${esc(seller.phone)}`;
+}
+
+function versionOf(title: string, body: string) {
+  const source = `${title}\n${body}`;
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function documentOf(title: string, slug: string, body: string, ready: boolean): LegalDocument {
+  return { title, slug, body, version: versionOf(title, body), ready };
+}
+
+/**
+ * Satıcı kimliği mağaza ayarlarından gelir; eksikse sözleşme hazırlanmamış sayılır
+ * ve ödeme ekranı belge onayını açmaz.
+ */
+export function getLegalDocuments(seller: SellerInfo): LegalDocuments {
+  const ready = [seller.storeName, seller.address, seller.email, seller.phone]
+    .every((value) => value.trim().length > 0);
+
+  return {
+    distanceSalesAgreement: documentOf(
+      "Mesafeli Satış Sözleşmesi",
+      "distance-sales-agreement",
+      `
 <h2>Madde 1 - Taraflar</h2>
 <p>
   <strong>1.1. Satıcı:</strong><br />
-  Unvan: Mağaza İşletmesi (Web Sitesi Satıcısı)<br />
-  Adres: Müşteri iletişim sayfasında ve sipariş onayında belirtilen şirket tebligat adresi<br />
-  E-posta: Sipariş teyitlerinde belirtilen resmi destek e-posta adresi<br />
-  Telefon: Müşteri hizmetleri destek hattı<br />
-  <em>(Güncel satıcı kurumsal bilgileri Alıcı'ya sunulan sipariş onay belgelerinde ve faturada yer almaktadır.)</em>
+  ${sellerRows(seller)}
 </p>
 <p>
   <strong>1.2. Alıcı:</strong><br />
@@ -58,13 +111,13 @@ export const distanceSalesAgreement = {
   İşbu Sözleşme'den doğabilecek uyuşmazlıklarda, Ticaret Bakanlığı'nca ilan edilen parasal sınırlar dâhilinde
   Alıcı'nın yerleşim yerindeki veya tüketici işleminin yapıldığı yerdeki Tüketici Hakem Heyetleri ile Tüketici Mahkemeleri yetkilidir.
 </p>
-  `.trim(),
-};
-
-export const preInformationForm = {
-  title: "Ön Bilgilendirme Formu",
-  slug: "pre-information-form",
-  body: `
+      `.trim(),
+      ready,
+    ),
+    preInformationForm: documentOf(
+      "Ön Bilgilendirme Formu",
+      "pre-information-form",
+      `
 <h2>1. Konu ve Amaç</h2>
 <p>
   İşbu Ön Bilgilendirme Formu ("Form"), 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler
@@ -75,11 +128,7 @@ export const preInformationForm = {
 
 <h2>2. Satıcı Bilgileri</h2>
 <p>
-  <strong>Unvan:</strong> Mağaza İşletmesi (Web Sitesi Satıcısı)<br />
-  <strong>Adres:</strong> Müşteri iletişim sayfasında ve sipariş onayında belirtilen şirket tebligat adresi<br />
-  <strong>E-posta:</strong> Sipariş teyitlerinde belirtilen resmi destek e-posta adresi<br />
-  <strong>Telefon:</strong> Müşteri hizmetleri destek hattı<br />
-  <em>(Güncel satıcı iletişim bilgileri, sipariş özeti ve fatura üzerinde Alıcı'ya eksiksiz olarak sunulmaktadır.)</em>
+  ${sellerRows(seller)}
 </p>
 
 <h2>3. Siparişe Konu Mal veya Hizmetin Temel Nitelikleri ve Fiyatı</h2>
@@ -116,29 +165,8 @@ export const preInformationForm = {
   sınırlar dâhilinde Alıcı'nın mal veya hizmeti satın aldığı ya da ikametgâhının bulunduğu yerdeki Tüketici Hakem Heyetleri
   veya Tüketici Mahkemeleri yetkilidir.
 </p>
-  `.trim(),
-};
-
-function versionOf(title: string, body: string) {
-  const source = `${title}\n${body}`;
-  let hash = 2166136261;
-  for (let index = 0; index < source.length; index += 1) {
-    hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-function checkoutDocument(document: { title: string; slug: string; body: string }) {
-  return {
-    ...document,
-    version: versionOf(document.title, document.body),
-    ready: document.body.trim().length >= 100 && !/\[[^\]]+\]/.test(document.body),
-  };
-}
-
-export function getCheckoutLegalDocuments() {
-  return {
-    distanceSalesAgreement: checkoutDocument(distanceSalesAgreement),
-    preInformationForm: checkoutDocument(preInformationForm),
+      `.trim(),
+      ready,
+    ),
   };
 }

@@ -6,7 +6,6 @@ import {
   EnvelopeIcon,
   PhoneIcon,
   MapPinIcon,
-  ClockIcon,
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 
@@ -101,20 +100,6 @@ export default async function ContactPage() {
                     </div>
                   </li>
                 )}
-
-                <li className="flex items-start gap-3.5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <ClockIcon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <span className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Çalışma Saatleri
-                    </span>
-                    <span className="font-medium text-foreground">
-                      Hafta içi 09:00 - 18:00
-                    </span>
-                  </div>
-                </li>
               </ul>
             </div>
 

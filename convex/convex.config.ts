@@ -7,8 +7,9 @@ const app = defineApp({
     ADMIN_API_SECRET: v.optional(v.string()),
     RESEND_API_KEY: v.optional(v.string()),
     ORDER_FROM_EMAIL: v.optional(v.string()),
-    CART_RECOVERY_FROM_EMAIL: v.optional(v.string()),
-    CART_RECOVERY_SITE_URL: v.optional(v.string()),
+    ADMIN_ALERT_EMAIL: v.optional(v.string()),
+    SITE_URL: v.optional(v.string()),
+    ADMIN_PATH: v.optional(v.string()),
   },
 });
 

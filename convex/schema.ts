@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { orderEmailEventValidator } from "./emails/events";
 
 const attributeTemplateFields = {
   label: v.string(),
@@ -192,13 +193,7 @@ export default defineSchema({
 
   orderEmailEvents: defineTable({
     orderId: v.id("orders"),
-    event: v.union(
-      v.literal("payment_confirmation"),
-      v.literal("order_shipped"),
-      v.literal("order_cancelled"),
-      v.literal("order_delivered"),
-      v.literal("admin_new_order")
-    ),
+    event: orderEmailEventValidator,
     status: v.union(
       v.literal("processing"),
       v.literal("sent"),
@@ -206,7 +201,6 @@ export default defineSchema({
       v.literal("not_configured"),
       v.literal("review"),
     ),
-    idempotencyKey: v.string(),
     error: v.optional(v.string()),
     leaseUntil: v.optional(v.number()),
   })
@@ -341,8 +335,6 @@ export default defineSchema({
     subject: v.string(),
     message: v.string(),
     status: v.union(v.literal("new"), v.literal("read"), v.literal("replied")),
-    emailSent: v.boolean(),
-    emailError: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_created_at", ["createdAt"])

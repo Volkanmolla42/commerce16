@@ -5,6 +5,7 @@ import { getAdminProductPage, getAdminProductStats } from "@/lib/catalog/pages";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { OrderEmailEvent } from "@/convex/emails/events";
 import { hasAdminSession, isSameOriginRequest } from "@/lib/admin/session";
 import { isRecord, stringValue, parseProductInput, parseCategoryInput } from "@/lib/admin/input";
 import { readJsonLimited } from "@/lib/http/read-json-limited";
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(payments, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "email-templates") {
-      const templates = await client.query(api.emailTemplates.listTemplatesAdmin, { adminSecret });
+      const templates = await client.query(api.adminEmails.listTemplatesAdmin, { adminSecret });
       return NextResponse.json(templates, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "sent-emails") {
@@ -319,18 +320,18 @@ export async function POST(request: NextRequest) {
         const result = await client.mutation(api.payments.updatePaymentSettings, {
           adminSecret,
           cashOnDelivery: {
-            enabled: cashOnDelivery.enabled !== false,
+            enabled: cashOnDelivery.enabled === true,
             fee: typeof cashOnDelivery.fee === "number" ? Math.max(0, cashOnDelivery.fee) : 0,
             description: typeof cashOnDelivery.description === "string" ? cashOnDelivery.description : "",
           },
           bankTransfer: {
-            enabled: bankTransfer.enabled !== false,
+            enabled: bankTransfer.enabled === true,
             description: typeof bankTransfer.description === "string" ? bankTransfer.description : "",
             accounts,
           },
           paytr: {
-            enabled: paytr.enabled !== false,
-            testMode: paytr.testMode !== false,
+            enabled: paytr.enabled === true,
+            testMode: paytr.testMode === true,
             merchantId: typeof paytr.merchantId === "string" ? paytr.merchantId : "",
             merchantKey: typeof paytr.merchantKey === "string" ? paytr.merchantKey : "",
             merchantSalt: typeof paytr.merchantSalt === "string" ? paytr.merchantSalt : "",
@@ -460,13 +461,19 @@ export async function POST(request: NextRequest) {
       }
 
       case "email.retry": {
-        const event = stringValue(input.event, "E-posta türü");
-        const validEvents = ["payment_confirmation", "order_shipped", "order_cancelled", "order_delivered"];
-        if (!validEvents.includes(event)) throw new Error("E-posta türü geçersiz.");
+        const event = stringValue(input.event, "E-posta türü") as OrderEmailEvent;
+        const retryableEvents: OrderEmailEvent[] = [
+          "order_placed",
+          "payment_confirmed",
+          "order_shipped",
+          "order_delivered",
+          "order_cancelled",
+        ];
+        if (!retryableEvents.includes(event)) throw new Error("E-posta türü geçersiz.");
         const result = await client.mutation(api.notifications.retry, {
           adminSecret,
           orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,
-          event: event as "payment_confirmation" | "order_shipped" | "order_cancelled" | "order_delivered",
+          event,
         });
         return NextResponse.json({ success: true, result });
       }

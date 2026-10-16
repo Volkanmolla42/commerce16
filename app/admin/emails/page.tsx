@@ -29,8 +29,6 @@ interface EmailTemplate {
   subject: string;
   bodyHtml: string;
   bodyText: string;
-  variables: string[];
-  sampleData: Record<string, string>;
 }
 
 interface SentEmailLog {
@@ -53,15 +51,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   marketing: "Pazarlama",
   admin: "Yönetici",
 };
-
-function renderSample(text: string, sampleData: Record<string, string> = {}) {
-  let result = text;
-  for (const [key, val] of Object.entries(sampleData)) {
-    const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
-    result = result.replace(regex, val);
-  }
-  return result;
-}
 
 function AdminEmailsContent() {
   const [activeTab, setActiveTab] = useState<TabMode>("templates");
@@ -299,7 +288,7 @@ function AdminEmailsContent() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                       <strong className="text-foreground font-medium">Konu:</strong>{" "}
-                      {renderSample(activeTemplate.subject, activeTemplate.sampleData)}
+                      {activeTemplate.subject}
                     </p>
                   </div>
 
@@ -344,7 +333,7 @@ function AdminEmailsContent() {
                     >
                       <iframe
                         title={activeTemplate.name}
-                        srcDoc={renderSample(activeTemplate.bodyHtml, activeTemplate.sampleData)}
+                        srcDoc={activeTemplate.bodyHtml}
                         className="w-full border-0 min-h-[560px]"
                         sandbox="allow-same-origin"
                       />

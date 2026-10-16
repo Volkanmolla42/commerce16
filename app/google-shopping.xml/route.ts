@@ -29,7 +29,7 @@ export async function GET() {
     getGoogleShoppingProducts(),
   ]);
 
-  const storeName = settings.storeName || "Mağaza";
+  const storeName = settings.storeName;
   const storeUrl = baseUrl;
 
   const itemsXml = products.map((product) => {

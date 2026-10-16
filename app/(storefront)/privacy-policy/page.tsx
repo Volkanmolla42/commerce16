@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import ContentPageLayout from "@/components/layout/content-page-layout";
 import { getStoreSettings } from "@/lib/catalog";
 
@@ -54,8 +55,8 @@ export default async function PrivacyPolicyPage() {
             <h2 className="text-xl font-semibold text-foreground">3. Veri Güvenliği</h2>
             <p>
               Kişisel verileriniz güncel güvenlik standartlarına uygun olarak korunmaktadır. Ödeme işlemleri
-              esnasında kart bilgileriniz sistemlerimizde saklanmamakta olup, BDDK lisanslı güvenli ödeme
-              altyapısı ve 256-Bit SSL şifreleme üzerinden bankalara iletilmektedir.
+              esnasında kart bilgileriniz sistemlerimizde saklanmaz; ödeme tamamen ilgili ödeme kuruluşunun
+              altyapısı üzerinden yürütülür.
             </p>
           </section>
 
@@ -63,11 +64,24 @@ export default async function PrivacyPolicyPage() {
             <h2 className="text-xl font-semibold text-foreground">4. İlgili Kişi Hakları</h2>
             <p>
               KVKK&apos;nın 11. maddesi kapsamında kişisel verilerinizin işlenip işlenmediğini öğrenme, işlenmişse bilgi
-              talep etme, düzeltilmesini veya silinmesini isteme hakkına sahipsiniz. Taleplerinizi{" "}
-              <a href={`mailto:${settings.email || "destek@magaza.com"}`} className="text-primary underline">
-                {settings.email || "destek@magaza.com"}
-              </a>{" "}
-              e-posta adresimize iletebilirsiniz.
+              talep etme, düzeltilmesini veya silinmesini isteme hakkına sahipsiniz.{" "}
+              {settings.email ? (
+                <>
+                  Taleplerinizi{" "}
+                  <a href={`mailto:${settings.email}`} className="text-primary underline">
+                    {settings.email}
+                  </a>{" "}
+                  e-posta adresimize iletebilirsiniz.
+                </>
+              ) : (
+                <>
+                  Taleplerinizi{" "}
+                  <Link href="/contact" className="text-primary underline">
+                    müşteri iletişim sayfamız
+                  </Link>{" "}
+                  üzerinden iletebilirsiniz.
+                </>
+              )}
             </p>
           </section>
         </div>

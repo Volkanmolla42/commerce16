@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCheckoutLegalDocuments } from "../lib/legal-documents";
+import { getLegalDocuments, type LegalDocument } from "../lib/legal-documents";
+import { readStoreSettings } from "./settings";
 
 const documentValidator = v.object({
   title: v.string(),
@@ -9,27 +10,22 @@ const documentValidator = v.object({
   ready: v.boolean(),
 });
 
+function checkoutMeta({ title, slug, version, ready }: LegalDocument) {
+  return { title, slug, version, ready };
+}
+
 export const getCheckoutDocuments = query({
   args: {},
   returns: v.object({
     distanceSalesAgreement: documentValidator,
     preInformationForm: documentValidator,
   }),
-  handler: () => {
-    const { distanceSalesAgreement, preInformationForm } = getCheckoutLegalDocuments();
+  handler: async (ctx) => {
+    const { storeName, address, email, phone } = await readStoreSettings(ctx);
+    const documents = getLegalDocuments({ storeName, address, email, phone });
     return {
-      distanceSalesAgreement: {
-        title: distanceSalesAgreement.title,
-        slug: distanceSalesAgreement.slug,
-        version: distanceSalesAgreement.version,
-        ready: distanceSalesAgreement.ready,
-      },
-      preInformationForm: {
-        title: preInformationForm.title,
-        slug: preInformationForm.slug,
-        version: preInformationForm.version,
-        ready: preInformationForm.ready,
-      },
+      distanceSalesAgreement: checkoutMeta(documents.distanceSalesAgreement),
+      preInformationForm: checkoutMeta(documents.preInformationForm),
     };
   },
 });

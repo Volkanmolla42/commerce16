@@ -159,15 +159,7 @@ export default async function Footer() {
             &copy; {copyrightDate} {settings.storeName}. Tüm hakları saklıdır.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-              <span className="rounded border border-neutral-200 px-2 py-1 dark:border-neutral-700">Visa</span>
-              <span className="rounded border border-neutral-200 px-2 py-1 dark:border-neutral-700">Mastercard</span>
-              <span className="rounded border border-neutral-200 px-2 py-1 dark:border-neutral-700">Troy</span>
-              <span className="rounded border border-neutral-200 px-2 py-1 dark:border-neutral-700">3D Secure</span>
-            </div>
-            <CookiePreferencesButton />
-          </div>
+          <CookiePreferencesButton />
         </div>
       </div>
     </footer>

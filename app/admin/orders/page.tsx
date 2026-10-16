@@ -35,7 +35,6 @@ import {
   getOrderCode,
   getOrderPaymentMethodTitle,
   formatWhatsAppUrl,
-  resolveCarrierTrackingUrl,
   CARRIER_OPTIONS,
 } from "@/lib/orders";
 import { formatDateTime } from "@/lib/format-date";
@@ -65,11 +64,12 @@ function availableStatusOptions(order: Order) {
 }
 
 const emailEventLabels: Record<OrderEmailEvent, string> = {
-  payment_confirmation: "Ödeme ve sipariş özeti",
-  admin_new_order: "Yeni sipariş bildirimi",
+  order_placed: "Sipariş alındı bildirimi",
+  payment_confirmed: "Ödeme onayı bildirimi",
   order_shipped: "Kargoya verildi bildirimi",
-  order_cancelled: "İptal bilgilendirmesi",
   order_delivered: "Teslimat bildirimi",
+  order_cancelled: "İptal bilgilendirmesi",
+  admin_order_alert: "Yeni sipariş bildirimi (yönetici)",
 };
 
 const emailStatusLabels: Record<Doc<"orderEmailEvents">["status"], string> = {
@@ -100,11 +100,11 @@ function ShippingDialog({
   onClose: () => void;
   onSubmit: (carrier: string, trackingNumber: string) => Promise<void>;
 }) {
-  const [carrier, setCarrier] = useState(order.carrier || "Yurtiçi Kargo");
+  const [carrier, setCarrier] = useState(order.carrier ?? "");
   const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || "");
   const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
@@ -129,19 +129,21 @@ function ShippingDialog({
             <Label htmlFor="shipping-carrier" className="text-xs">
               Kargo Firması
             </Label>
-            <select
+            <Input
               id="shipping-carrier"
+              list="carrier-options"
               value={carrier}
               onChange={(e) => setCarrier(e.target.value)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring cursor-pointer"
-            >
+              placeholder="Örn: Aras Kargo"
+              required
+              autoComplete="off"
+              className="h-10 text-sm"
+            />
+            <datalist id="carrier-options">
               {CARRIER_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c} value={c} />
               ))}
-              <option value="Diğer">Diğer</option>
-            </select>
+            </datalist>
           </div>
 
           <div className="space-y-1.5">
@@ -514,7 +516,8 @@ function OrderDetails({
                     <span className="text-xs text-muted-foreground">{emailStatusLabels[emailEvent.status]}</span>
                   </div>
                   {emailEvent.error && <p className="text-xs text-destructive">{emailEvent.error}</p>}
-                  {(emailEvent.status === "failed" || emailEvent.status === "not_configured") && (
+                  {(emailEvent.event !== "admin_order_alert" &&
+                    (emailEvent.status === "failed" || emailEvent.status === "not_configured")) && (
                     <Button
                       type="button"
                       size="sm"

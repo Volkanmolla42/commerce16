@@ -1,7 +1,7 @@
 import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationResultValidator } from "convex/server";
-import { getCheckoutLegalDocuments } from "../lib/legal-documents";
+import { getLegalDocuments } from "../lib/legal-documents";
 import schema from "./schema";
 import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -11,9 +11,10 @@ import { components, internal } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import type { Id, Doc } from "./_generated/dataModel";
 import { getDistrictById, getProvinceById } from "../lib/turkey-provinces";
-import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation } from "./coupons";
+import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation, reserveCouponForOrder } from "./coupons";
 import { patchCatalogProduct } from "./catalogModel";
-import { defaultPaymentSettings } from "./payments";
+import { readPaymentSettings } from "./payments";
+import { readStoreSettings } from "./settings";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -194,9 +195,10 @@ export const createOrder = mutation({
     if (args.shippingAddress && args.shippingAddress.trim().length > 500) {
       throw new Error("Teslimat adresi en fazla 500 karakter olabilir.");
     }
-    const { distanceSalesAgreement: agreement, preInformationForm: preInformation } = getCheckoutLegalDocuments();
     let recordedLegalAcceptance = undefined;
     if (args.legalAcceptance) {
+      const { distanceSalesAgreement: agreement, preInformationForm: preInformation } =
+        getLegalDocuments(await readStoreSettings(ctx));
       if (args.legalAcceptance.accepted !== true ||
         (args.legalAcceptance.distanceSalesAgreementVersion && args.legalAcceptance.distanceSalesAgreementVersion !== agreement.version) ||
         (args.legalAcceptance.preInformationFormVersion && args.legalAcceptance.preInformationFormVersion !== preInformation.version)) {
@@ -275,11 +277,7 @@ export const createOrder = mutation({
     let additionalFeeCents = 0;
 
     if (args.paymentMethod) {
-      const paymentSettingsDoc = await ctx.db
-        .query("paymentSettings")
-        .withIndex("by_key", (q) => q.eq("key", "payment"))
-        .unique();
-      const paymentSettings = paymentSettingsDoc ?? defaultPaymentSettings;
+      const paymentSettings = await readPaymentSettings(ctx);
 
       if (args.paymentMethod === "cash_on_delivery") {
         if (!paymentSettings.cashOnDelivery.enabled) {
@@ -291,7 +289,8 @@ export const createOrder = mutation({
           additionalFeeCents = Math.round(paymentFee * 100);
         }
       } else if (args.paymentMethod === "bank_transfer") {
-        if (!paymentSettings.bankTransfer.enabled) {
+        const { enabled, accounts } = paymentSettings.bankTransfer;
+        if (!enabled || accounts.length === 0) {
           throw new Error("Havale / EFT ile ödeme yöntemi şu anda aktif değildir.");
         }
         paymentMethodTitle = "Havale / EFT";
@@ -370,14 +369,15 @@ export const createOrder = mutation({
     if (!createdOrder) throw new Error("Sipariş oluşturulamadı.");
     // Stok sipariş anında rezerve edilir; iptal changeOrderStatus üzerinden geri yükler.
     await adjustInventoryForOrder(ctx, createdOrder, -1);
-    if (coupon?.valid) await commitCouponReservation(ctx, createdOrder);
+    // Kupon kullanım hakkı da sipariş anında düşülür; iptalde geri iade edilir.
+    if (coupon?.valid) await reserveCouponForOrder(ctx, createdOrder);
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId });
     await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.markConvertedForOrder, { orderId });
 
-    // Müşteriye sipariş alındı e-postası (ödendi, havale bekleniyor veya kapıda ödeme)
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "payment_confirmation" });
+    // Müşteriye sipariş alındı e-postası (havale/EFT veya kapıda ödeme beklenen siparişler dahil)
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "order_placed" });
     // Yöneticiye yeni sipariş bildirimi
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "admin_new_order" });
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "admin_order_alert" });
 
     return orderId;
   },
@@ -475,7 +475,7 @@ async function changeOrderStatus(
   }
 
   if (order.status !== "paid" && status === "paid") {
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmation" });
+    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmed" });
   }
   if (order.status !== "shipped" && status === "shipped") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_shipped" });

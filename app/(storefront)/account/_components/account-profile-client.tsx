@@ -105,7 +105,7 @@ export default function AccountProfilePage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
 
-  const handleProfileSubmit = async (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setStatusMessage(null);
@@ -154,7 +154,7 @@ export default function AccountProfilePage() {
     }
   };
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setPasswordError(null);
     setPasswordNotice(null);

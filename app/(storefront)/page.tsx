@@ -9,8 +9,8 @@ export const prefetch = "partial";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { storeName, slogan } = await getStoreSettings();
-  const title = `${storeName} | Resmi Online Mağaza`;
-  const description = slogan?.trim() || `${storeName} ürünlerini ve koleksiyonlarını keşfedin.`;
+  const title = `${storeName} | Online Mağaza`;
+  const description = slogan?.trim() || `${storeName} online mağazası.`;
 
   return {
     title: { absolute: title },

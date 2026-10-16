@@ -173,13 +173,6 @@ export async function getCategory(slug: string): Promise<Category | undefined> {
   };
 }
 
-export async function getCategoryProducts({
-  category,
-  ...filters
-}: ProductFilters & { category: string }): Promise<Product[]> {
-  return getProducts({ ...filters, category });
-}
-
 export async function getMenu(): Promise<Menu[]> {
   "use cache";
   const categories = await getCategories();

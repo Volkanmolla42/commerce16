@@ -1,10 +1,10 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { env, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { assertAdminApiSecret } from "./adminAuth";
-import { resolveLowStockThreshold } from "./settings";
-import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
-import { buildLowStockAlertEmail } from "./emailTemplates";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
+import { readStoreSettings, resolveLowStockThreshold } from "./settings";
+import { adminAlertTo, adminLink } from "./emails/config";
+import { renderLowStockEmail } from "./emails/templates/alerts";
+import { sendEmail } from "./emails/send";
 
 const ALERT_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 saat spam koruması
 
@@ -61,50 +61,24 @@ export const sendLowStockAlertAction = internalAction({
     });
     if (!info) return null;
 
-    const toEmail = process.env.ADMIN_ALERT_EMAIL || info.storeEmail || "delivered@resend.dev";
-    const { product, variant, storeName, siteUrl } = info;
-    const variantTitle = variant?.title && variant.title !== "Default Title" ? variant.title : null;
-    const adminInventoryUrl = `${siteUrl}/admin/products`;
-
-    const subject = `⚠️ Kritik Stok Uyarısı: ${product.title} (${args.currentStock} adet kaldı) | ${storeName}`;
-
-    // Plain text
-    const text = [
-      `${storeName.toUpperCase()} — KRİTİK STOK UYARISI`,
-      `----------------------------------------`,
-      `Dikkat: Aşağıdaki ürünün stoğu belirlenen kritik eşiğin altına indi!`,
-      ``,
-      `Ürün: ${product.title}`,
-      ...(variantTitle ? [`Seçenek: ${variantTitle}`] : []),
-      `Kalan Stok: ${args.currentStock} adet`,
-      `Kritik Eşik Seviyesi: ${args.threshold} adet`,
-      ``,
-      `Stok durumunu güncellemek için admin panelini ziyaret edin:`,
-      adminInventoryUrl,
-      ``,
-      `Bu bildirim otomatik olarak oluşturulmuştur.`,
-    ].join("\n");
-
-    // HTML Şablonu
-    const html = buildLowStockAlertEmail({
+    const { productTitle, variantTitle, storeName } = info;
+    const outcome = await sendEmail(ctx, {
+      to: adminAlertTo(),
       storeName,
-      productTitle: product.title,
-      variantTitle,
-      currentStock: args.currentStock,
-      threshold: args.threshold,
-      adminInventoryUrl,
-    });
-
-    const result = await sendResendEmail({
-      to: toEmail,
-      from: formatSender(storeName),
-      subject,
-      text,
-      html,
+      templateKey: "low_stock_alert",
+      content: renderLowStockEmail({
+        storeName,
+        productTitle,
+        variantTitle,
+        currentStock: args.currentStock,
+        threshold: args.threshold,
+        adminInventoryUrl: adminLink("inventory"),
+      }),
       idempotencyKey: `low-stock/${args.productId}/${args.variantId ?? "default"}/${args.currentStock}`,
+      metadata: { productId: args.productId, variantId: args.variantId ?? null },
     });
 
-    if (result.ok) {
+    if (outcome === "sent") {
       await ctx.runMutation(internal.lowStock.recordAlertSent, {
         productId: args.productId,
         variantId: args.variantId,
@@ -112,18 +86,6 @@ export const sendLowStockAlertAction = internalAction({
         threshold: args.threshold,
       });
     }
-
-    await ctx.runMutation(internal.emailTemplates.recordEmailLog, {
-      templateKey: "low_stock_alert",
-      recipient: toEmail,
-      subject,
-      htmlBody: html,
-      textBody: text,
-      status: result.ok ? "sent" : "failed",
-      resendId: result.messageId,
-      error: result.error,
-      metadata: { productId: args.productId, variantId: args.variantId },
-    });
 
     return null;
   },
@@ -137,20 +99,9 @@ export const getAlertDetails = internalQuery({
   },
   returns: v.union(
     v.object({
-      product: v.object({
-        title: v.string(),
-        slug: v.string(),
-      }),
-      variant: v.union(
-        v.object({
-          id: v.string(),
-          title: v.string(),
-        }),
-        v.null()
-      ),
+      productTitle: v.string(),
+      variantTitle: v.nullable(v.string()),
       storeName: v.string(),
-      storeEmail: v.optional(v.string()),
-      siteUrl: v.string(),
     }),
     v.null()
   ),
@@ -159,28 +110,15 @@ export const getAlertDetails = internalQuery({
     if (!product) return null;
 
     const variant = args.variantId
-      ? product.variants?.find((v) => v.id === args.variantId) || null
+      ? product.variants?.find((candidate) => candidate.id === args.variantId) || null
       : null;
 
-    const storeSettings = await ctx.db.query("storeSettings").first();
-    const storeName = storeSettings?.storeName?.trim() || "Mağaza";
-    const storeEmail = storeSettings?.email?.trim();
-    const siteUrl = env.CART_RECOVERY_SITE_URL || "http://localhost:3000";
+    const { storeName } = await readStoreSettings(ctx);
 
     return {
-      product: {
-        title: product.title,
-        slug: product.slug,
-      },
-      variant: variant
-        ? {
-            id: variant.id,
-            title: variant.title,
-          }
-        : null,
+      productTitle: product.title,
+      variantTitle: variant?.title && variant.title !== "Default Title" ? variant.title : null,
       storeName,
-      storeEmail,
-      siteUrl,
     };
   },
 });
@@ -220,46 +158,5 @@ export const recordAlertSent = internalMutation({
     }
 
     return null;
-  },
-});
-
-// 5. Test/Manuel tetikleme mutasyonu (Admin paneli veya test için)
-export const triggerLowStockAlertAdmin = mutation({
-  args: {
-    adminSecret: v.string(),
-    productId: v.id("products"),
-    variantId: v.optional(v.string()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    const product = await ctx.db.get(args.productId);
-    if (!product) throw new Error("Ürün bulunamadı.");
-
-    const variant = args.variantId
-      ? product.variants?.find((v) => v.id === args.variantId)
-      : product.variants?.[0];
-
-    const currentStock = variant?.stockQuantity ?? 1;
-    const threshold = await resolveLowStockThreshold(ctx);
-
-    await ctx.scheduler.runAfter(0, internal.lowStock.sendLowStockAlertAction, {
-      productId: args.productId,
-      variantId: args.variantId,
-      currentStock,
-      threshold,
-    });
-    return null;
-  },
-});
-
-// 6. Admin için gönderilen kritik stok alarmlarını listeleme
-export const listAlertsAdmin = query({
-  args: {
-    adminSecret: v.string(),
-  },
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    return await ctx.db.query("lowStockAlerts").collect();
   },
 });

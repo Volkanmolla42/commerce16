@@ -142,13 +142,12 @@ function CouponSection({
         id={`${idPrefix}-coupon-status`}
         role="status"
         aria-live="polite"
-        className={`min-h-4 text-xs font-medium ${
-          couponPreview?.valid
-            ? "text-emerald-600 dark:text-emerald-400"
-            : appliedCouponCode
-              ? "text-destructive"
-              : "text-muted-foreground"
-        }`}
+        className={`min-h-4 text-xs font-medium ${couponPreview?.valid
+          ? "text-emerald-600 dark:text-emerald-400"
+          : appliedCouponCode
+            ? "text-destructive"
+            : "text-muted-foreground"
+          }`}
       >
         {couponPreview?.valid
           ? `✓ "${couponPreview.code}" kuponu uygulandı.`
@@ -309,8 +308,11 @@ function CheckoutContent() {
     errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [errorMessage]);
 
+  const hasTrackedCheckoutRef = useRef(false);
+
   useEffect(() => {
-    if (items.length > 0) {
+    if (items.length > 0 && !hasTrackedCheckoutRef.current) {
+      hasTrackedCheckoutRef.current = true;
       void trackAnalyticsEvent("begin_checkout");
       trackPixelInitiateCheckout({
         value: finalPayableAmount,
@@ -373,14 +375,14 @@ function CheckoutContent() {
     setAppliedCouponCode(couponInput.trim().toLocaleUpperCase("en-US"));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
     setErrorMessage(null);
 
     if (!legalDocuments?.distanceSalesAgreement?.ready || !legalDocuments.preInformationForm?.ready) {
-      setErrorMessage("Ödeme açılamıyor: yasal sözleşmeler henüz hazır değil.");
+      setErrorMessage("Sözleşmeler onaya hazır değil: mağaza ayarlarındaki satıcı bilgilerini tamamlayın.");
       setIsSubmitting(false);
       return;
     }
@@ -545,7 +547,7 @@ function CheckoutContent() {
   }
 
   return (
-    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-4 sm:px-6 sm:py-8 pb-28 sm:pb-12 overflow-x-clip">
+    <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-4 sm:px-6 sm:py-8 pb-28 sm:pb-12">
       {/* SİPARİŞ FORMU */}
       <form id="checkout-form" onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start lg:gap-8">
         {/* Sol Kolon: Form Alanları */}
@@ -686,8 +688,8 @@ function CheckoutContent() {
                       <label
                         key={addr._id}
                         className={`relative flex flex-col p-3.5 rounded-xl border cursor-pointer transition select-none ${isSelected
-                            ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
-                            : "border-border hover:border-muted-foreground/40 bg-card"
+                          ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                          : "border-border hover:border-muted-foreground/40 bg-card"
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -714,8 +716,8 @@ function CheckoutContent() {
 
                   <label
                     className={`relative flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition select-none ${selectedAddressId === "custom"
-                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
-                        : "border-border hover:border-muted-foreground/40 bg-card"
+                      ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground/40 bg-card"
                       }`}
                   >
                     <span className="font-semibold text-sm text-foreground">
@@ -904,11 +906,10 @@ function CheckoutContent() {
                 {/* PayTR Seçeneği */}
                 {paymentSettings.paytr.enabled && (
                   <div
-                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${
-                      effectivePaymentMethod === "paytr"
-                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
-                        : "border-border hover:border-muted-foreground/40 bg-card"
-                    }`}
+                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${effectivePaymentMethod === "paytr"
+                      ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground/40 bg-card"
+                      }`}
                     onClick={() => setSelectedPaymentMethod("paytr")}
                   >
                     <div className="flex items-center justify-between">
@@ -1021,11 +1022,10 @@ function CheckoutContent() {
                 {/* Havale / EFT Seçeneği */}
                 {paymentSettings.bankTransfer.enabled && (
                   <div
-                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${
-                      effectivePaymentMethod === "bank_transfer"
-                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
-                        : "border-border hover:border-muted-foreground/40 bg-card"
-                    }`}
+                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${effectivePaymentMethod === "bank_transfer"
+                      ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground/40 bg-card"
+                      }`}
                     onClick={() => setSelectedPaymentMethod("bank_transfer")}
                   >
                     <div className="flex items-center justify-between">
@@ -1084,11 +1084,10 @@ function CheckoutContent() {
                 {/* Kapıda Ödeme Seçeneği */}
                 {paymentSettings.cashOnDelivery.enabled && (
                   <div
-                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${
-                      effectivePaymentMethod === "cash_on_delivery"
-                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
-                        : "border-border hover:border-muted-foreground/40 bg-card"
-                    }`}
+                    className={`rounded-xl border p-4 transition cursor-pointer select-none ${effectivePaymentMethod === "cash_on_delivery"
+                      ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground/40 bg-card"
+                      }`}
                     onClick={() => setSelectedPaymentMethod("cash_on_delivery")}
                   >
                     <div className="flex items-center justify-between">
@@ -1141,7 +1140,7 @@ function CheckoutContent() {
               <legend className="sr-only">Sipariş sözleşmeleri</legend>
               {!legalDocuments?.distanceSalesAgreement?.ready || !legalDocuments.preInformationForm?.ready ? (
                 <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                  Ödeme için Mesafeli Satış Sözleşmesi ve Ön Bilgilendirme Formu içerikleri kodda tamamlanmalı.
+                  Satıcı bilgileri (ünvan, adres, e-posta, telefon) mağaza ayarlarında eksik olduğu için sözleşmeler henüz onaya hazır değil.
                 </div>
               ) : (
                 <>
@@ -1211,8 +1210,8 @@ function CheckoutContent() {
         </div>
 
         {/* Sağ Kolon: Masaüstü Sipariş Özeti */}
-        <div className="hidden lg:block lg:col-span-5">
-          <Card className="sticky top-20 rounded-2xl border-border bg-card p-6 shadow-sm space-y-4">
+        <div className="hidden lg:block lg:col-span-5 lg:sticky lg:top-20">
+          <Card className="rounded-2xl border-border bg-card p-6 shadow-sm space-y-4">
             <CardHeader className="p-0">
               <CardTitle className="text-base font-semibold text-foreground">
                 Sipariş Özeti ({totalCount} Ürün)

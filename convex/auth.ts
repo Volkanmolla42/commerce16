@@ -1,52 +1,39 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { Email } from "@convex-dev/auth/providers/Email";
-import { internal } from "./_generated/api";
-import { formatSender, sendResendEmail } from "./mailUtils";
-import { buildPasswordResetEmail } from "./emailTemplates";
+import type { GenericActionCtx } from "convex/server";
+import { api, internal } from "./_generated/api";
+import type { DataModel } from "./_generated/dataModel";
+import { renderOtpEmail } from "./emails/templates/account";
+import { sendEmail } from "./emails/send";
+
+// convex-auth, e-posta sağlayıcısında ctx'i ikinci argüman olarak çalıştırmada veriyor
+// ama tip tanımlarında onu açıklamıyor; mağaza adı için runQuery gerekiyor.
+async function sendPasswordResetCode(
+  { identifier: email, token }: { identifier: string; token: string },
+  ctx?: GenericActionCtx<DataModel>
+) {
+  if (!ctx) throw new Error("Şifre sıfırlama e-postası için bağlantı bağlamı yok.");
+
+  const settings = await ctx.runQuery(api.settings.getStoreSettings, {});
+  const outcome = await sendEmail(ctx, {
+    to: email,
+    storeName: settings.storeName,
+    templateKey: "password_reset_otp",
+    content: renderOtpEmail({ storeName: settings.storeName, token, purpose: "reset" }),
+    replyTo: settings.email || undefined,
+  });
+  if (outcome !== "sent") {
+    throw new Error(`Şifre sıfırlama kodu gönderilemedi: ${outcome}`);
+  }
+}
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({
       reset: Email({
         id: "email",
-        async sendVerificationRequest({ identifier: email, token }) {
-          const storeName = "Mağaza";
-          const subject = `Şifre Sıfırlama Kodunuz: ${token} | ${storeName}`;
-
-          const text = [
-            `${storeName.toUpperCase()} — ŞİFRE SIFIRLAMA`,
-            `----------------------------------------`,
-            `Hesabınız için bir şifre sıfırlama talebinde bulunuldu.`,
-            ``,
-            `Tek Kullanımlık Doğrulama Kodunuz:`,
-            `>>> ${token} <<<`,
-            ``,
-            `Bu kod güvenlik nedeniyle sınırlı bir süre için geçerlidir.`,
-            `Kodu kimseyle paylaşmayınız.`,
-            ``,
-            `Bu talebi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız. Hesabınız güvendedir.`,
-          ].join("\n");
-
-          const html = buildPasswordResetEmail({
-            storeName,
-            token,
-          });
-
-          const result = await sendResendEmail({
-            to: email,
-            from: formatSender(storeName),
-            subject,
-            text,
-            html,
-          });
-
-          if (!result.ok) {
-            console.error("Şifre sıfırlama OTP gönderim hatası:", result.error);
-          } else {
-            console.log("Şifre sıfırlama OTP kodu başarıyla gönderildi:", result.messageId);
-          }
-        },
+        sendVerificationRequest: sendPasswordResetCode,
       }),
     }),
   ],

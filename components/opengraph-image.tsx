@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { join } from "path";
 import { readFile } from "fs/promises";
 import { getStoreSettings } from "@/lib/catalog";
+import { storeInitial } from "@/components/store-initial";
 
 export const alt = "Mağaza paylaşım görseli";
 export const size = { width: 1200, height: 630 };
@@ -16,7 +17,7 @@ export default async function OpengraphImage(
 ): Promise<ImageResponse> {
   const { storeName } = await getStoreSettings();
   const title = props?.title ?? storeName;
-  const initial = storeName.trim().slice(0, 1).toLocaleUpperCase("tr-TR") || "M";
+  const initial = storeInitial(storeName);
 
   const file = await readFile(join(process.cwd(), "./fonts/Inter-Bold.ttf"));
   const font = Uint8Array.from(file).buffer;

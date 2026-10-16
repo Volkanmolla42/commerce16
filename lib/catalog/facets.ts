@@ -21,11 +21,6 @@ export function getProductAttributeValues(product: Product, definition: Category
   return [String(value)];
 }
 
-export function getCategoryAttributeOptions(products: Product[], definition: CategoryAttributeDefinition) {
-  const available = new Set(products.flatMap((product) => getProductAttributeValues(product, definition)));
-  return [...available].sort((a, b) => a.localeCompare(b, "tr", { sensitivity: "base" }));
-}
-
 export function matchesCategoryAttributeFilters(
   product: Product,
   definitions: CategoryAttributeDefinition[],

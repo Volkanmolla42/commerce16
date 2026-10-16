@@ -1,11 +1,14 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
-import { env, internalAction, internalMutation, mutation, query } from "./_generated/server";
+import { internalAction, internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { assertAdminApiSecret } from "./adminAuth";
 import { getImagesForVariant } from "../lib/catalog/product-images";
-import { formatMoney } from "../lib/format-money";
+import { isEmailConfigured, siteLink } from "./emails/config";
+import { renderCartRecoveryEmail } from "./emails/templates/marketing";
+import { sendEmail } from "./emails/send";
+import { readStoreSettings } from "./settings";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   cartRecoveryConsent: { kind: "fixed window", rate: 5, period: 60 * 60 * 1000 },
@@ -38,35 +41,10 @@ function cleanEmail(value: string) {
   return email;
 }
 
-function siteUrl() {
-  const value = env.CART_RECOVERY_SITE_URL || "http://localhost:3000";
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.hostname === "localhost" ? parsed : new URL("http://localhost:3000");
-  } catch {
-    return new URL("http://localhost:3000");
-  }
-}
-
-function formatTRY(value: string | number) {
-  return formatMoney(value);
-}
-
-function emailFrom() {
-  return env.CART_RECOVERY_FROM_EMAIL;
-}
-
-function emailEnabled() {
-  return Boolean(siteUrl() && env.RESEND_API_KEY && emailFrom());
-}
-
-import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
-import { buildAbandonedCartRecoveryEmail } from "./emailTemplates";
-
 export const getAvailability = query({
   args: {},
   returns: v.object({ email: v.boolean() }),
-  handler: async () => ({ email: emailEnabled() }),
+  handler: async () => ({ email: isEmailConfigured() }),
 });
 
 export const capture = mutation({
@@ -80,7 +58,7 @@ export const capture = mutation({
   handler: async (ctx, args) => {
     if (!/^[a-f0-9-]{32,64}$/i.test(args.sessionKey)) throw new Error("Sepet oturumu geçersiz.");
     if (args.items.length > 100) throw new Error("Sepet en fazla 100 ürün içerebilir.");
-    if (args.emailConsent && !emailEnabled()) throw new Error("E-posta hatırlatması şu anda etkin değil.");
+    if (args.emailConsent && !isEmailConfigured()) throw new Error("E-posta hatırlatması şu anda etkin değil.");
 
     const email = args.emailConsent ? cleanEmail(args.email ?? "") : undefined;
     const existing = await ctx.db
@@ -337,17 +315,13 @@ export const claimReminder = internalMutation({
       return null;
     }
 
-    const email = cart.emailConsent && cart.email && emailEnabled() ? cart.email : null;
+    const email = cart.emailConsent && cart.email && isEmailConfigured() ? cart.email : null;
     if (!email) {
       await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
       return null;
     }
 
-    const settings = await ctx.db
-      .query("storeSettings")
-      .withIndex("by_key", (q) => q.eq("key", "store"))
-      .first();
-    const storeName = settings?.storeName?.trim() || "Mağazamız";
+    const { storeName } = await readStoreSettings(ctx);
 
     await ctx.db.patch(cartId, { status: "sending" });
     return {
@@ -388,147 +362,35 @@ export const processReminder = internalAction({
   handler: async (ctx, args) => {
     const reminder = await ctx.runMutation(internal.abandonedCartRecovery.claimReminder, args);
     if (!reminder) return null;
-    const base = siteUrl();
-    if (!base) {
-      await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
+
+    const outcome = await sendEmail(ctx, {
+      to: reminder.email,
+      storeName: reminder.storeName,
+      templateKey: "abandoned_cart_recovery",
+      content: renderCartRecoveryEmail({
+        storeName: reminder.storeName,
+        items: reminder.items.map((item) => ({
+          title: item.title,
+          quantity: item.quantity,
+          price: item.price,
+          image: item.imageUrl,
+          meta: item.variantTitle,
+        })),
+        cartUrl: siteLink("/cart", { recover: reminder.restoreToken }),
+        unsubscribeUrl: siteLink("/cart-reminders/unsubscribe", { token: reminder.unsubscribeToken }),
+      }),
+      idempotencyKey: `cart-recovery/${reminder.notificationId}`,
+      metadata: {
         cartId: args.cartId,
         notificationId: args.notificationId,
-        emailSent: false,
-      });
-      return null;
-    }
-
-    const cartUrl = new URL("/cart", base);
-    cartUrl.searchParams.set("recover", reminder.restoreToken);
-    const unsubscribeUrl = new URL("/cart-reminders/unsubscribe", base);
-    unsubscribeUrl.searchParams.set("token", reminder.unsubscribeToken);
-    let emailSent = false;
-
-    if (reminder.email && env.RESEND_API_KEY && emailFrom()) {
-      try {
-        const storeName = reminder.storeName;
-        const subject = `Sepetinizde ürünler kaldı! Alışverişinizi tamamlayın | ${storeName}`;
-
-        const totalKurus = reminder.items.reduce((sum, item) => sum + Math.round(Number(item.price) * 100) * item.quantity, 0);
-        const totalText = formatTRY(totalKurus / 100);
-
-        // Plain text
-        const textLines = reminder.items.map(
-          (i) => `• ${i.title}${i.variantTitle ? ` (${i.variantTitle})` : ""} - ${i.quantity} adet × ${formatTRY(i.price)}`
-        );
-        const text = [
-          `${storeName.toUpperCase()} — SEPETİNİZ SİZİ BEKLİYOR`,
-          `----------------------------------------`,
-          `Merhaba,`,
-          ``,
-          `Sepetinizde bıraktığınız ürünler tükenmeden alışverişinizi kolayca tamamlayabilirsiniz.`,
-          ``,
-          `Sepetinizdeki Ürünler:`,
-          ...textLines,
-          ``,
-          `Tahmini Toplam: ${totalText}`,
-          ``,
-          `Sepetinizi geri yüklemek ve alışverişinizi tamamlamak için tıklayın:`,
-          cartUrl.toString(),
-          ``,
-          `----------------------------------------`,
-          `Sepet hatırlatma e-postalarını almak istemiyorsanız:`,
-          unsubscribeUrl.toString(),
-          `----------------------------------------`,
-          `© ${storeName}`,
-        ].join("\n");
-
-        // HTML Ürün Satırları
-        const itemRowsHtml = reminder.items.map((item) => {
-          const itemTotal = Number(item.price) * item.quantity;
-          const imageHtml = item.imageUrl
-            ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" width="56" height="56" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;margin-right:12px;" />`
-            : `<div style="width:56px;height:56px;border-radius:8px;background-color:#f3f4f6;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;margin-right:12px;text-align:center;line-height:56px;">Görsel Yok</div>`;
-
-          return `
-            <tr>
-              <td style="padding:12px 0;border-bottom:1px solid #f3f4f6;vertical-align:middle;">
-                <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
-                  <tr>
-                    <td style="width:68px;vertical-align:middle;">
-                      ${imageHtml}
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <div style="font-size:14px;font-weight:600;color:#111827;line-height:1.4;">${escapeHtml(item.title)}</div>
-                      ${item.variantTitle ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(item.variantTitle)}</div>` : ""}
-                      <div style="font-size:13px;color:#4b5563;margin-top:2px;">${item.quantity} adet × ${escapeHtml(formatTRY(item.price))}</div>
-                    </td>
-                    <td style="vertical-align:middle;text-align:right;font-size:14px;font-weight:600;color:#111827;">
-                      ${escapeHtml(formatTRY(itemTotal))}
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          `;
-        }).join("");
-
-        const html = buildAbandonedCartRecoveryEmail({
-          storeName,
-          itemsHtml: itemRowsHtml,
-          totalText,
-          cartUrl: cartUrl.toString(),
-          unsubscribeUrl: unsubscribeUrl.toString(),
-        });
-
-        const from = formatSender(storeName, emailFrom());
-        const result = await sendResendEmail({
-          to: reminder.email,
-          subject,
-          text,
-          html,
-          from,
-          idempotencyKey: `cart-recovery/${reminder.notificationId}/email`,
-        });
-
-        await ctx.runMutation(internal.emailTemplates.recordEmailLog, {
-          templateKey: "abandoned_cart_recovery",
-          recipient: reminder.email,
-          subject,
-          status: result.ok ? "sent" : "failed",
-          error: result.error,
-          metadata: {
-            cartId: args.cartId,
-            notificationId: args.notificationId,
-            itemCount: reminder.items.length,
-          },
-        });
-
-        emailSent = result.ok;
-      } catch (err) {
-        console.error("Abandoned cart email send failed:", err);
-        emailSent = false;
-      }
-    }
+        itemCount: reminder.items.length,
+      },
+    });
 
     await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
       cartId: args.cartId,
       notificationId: args.notificationId,
-      emailSent,
-    });
-    return null;
-  },
-});
-
-export const triggerReminderAdmin = mutation({
-  args: {
-    adminSecret: v.string(),
-    cartId: v.id("abandonedCarts"),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    const cart = await ctx.db.get(args.cartId);
-    if (!cart) throw new Error("Sepet bulunamadı.");
-    await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.processReminder, {
-      cartId: args.cartId,
-      notificationId: cart.notificationId,
-      force: true,
+      emailSent: outcome === "sent",
     });
     return null;
   },

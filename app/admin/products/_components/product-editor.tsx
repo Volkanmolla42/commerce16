@@ -718,7 +718,7 @@ function ProductEditor({
     onCancel();
   };
 
-  const save = async (event?: React.FormEvent<HTMLFormElement>, publishStatusOverride?: boolean) => {
+  const save = async (event?: React.SyntheticEvent<HTMLFormElement>, publishStatusOverride?: boolean) => {
     if (event) event.preventDefault();
     const targetAvailableForSale = publishStatusOverride !== undefined ? publishStatusOverride : availableForSale;
     const activeVariantRows = variantRows;

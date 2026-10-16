@@ -72,34 +72,28 @@ export default function AdminOverviewPage() {
       ) : (
         <div className="space-y-6">
           {/* Hızlı Eylem Kısayolları */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Hızlı İşlemler:
-              </span>
-              <Button asChild size="sm" variant="outline" className="h-8 text-xs gap-1 cursor-pointer">
-                <Link href={adminPath("orders")}>
-                  <ShoppingBagIcon className="size-3.5" />
-                  <span>Siparişler</span>
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="h-8 text-xs gap-1 cursor-pointer">
-                <Link href={adminPath("inventory")}>
-                  <ArchiveBoxIcon className="size-3.5" />
-                  <span>Stok Yönetimi</span>
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="h-8 text-xs gap-1 cursor-pointer">
-                <Link href={adminPath("coupons")}>
-                  <TagIcon className="size-3.5" />
-                  <span>Kuponlar</span>
-                </Link>
-              </Button>
-            </div>
-
-            <Button asChild size="sm" className="h-8 text-xs gap-1 cursor-pointer">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Button asChild size="sm" variant="outline" className="h-9 w-full justify-center gap-2 text-xs font-medium cursor-pointer">
+              <Link href={adminPath("orders")}>
+                <ShoppingBagIcon className="size-4 shrink-0" />
+                <span>Siparişler</span>
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="h-9 w-full justify-center gap-2 text-xs font-medium cursor-pointer">
+              <Link href={adminPath("inventory")}>
+                <ArchiveBoxIcon className="size-4 shrink-0" />
+                <span>Stok Yönetimi</span>
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="h-9 w-full justify-center gap-2 text-xs font-medium cursor-pointer">
+              <Link href={adminPath("coupons")}>
+                <TagIcon className="size-4 shrink-0" />
+                <span>Kuponlar</span>
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="h-9 w-full justify-center gap-2 text-xs font-medium cursor-pointer">
               <Link href={adminPath("products")}>
-                <PlusIcon className="size-3.5" />
+                <PlusIcon className="size-4 shrink-0" />
                 <span>Ürün Yönetimi</span>
               </Link>
             </Button>

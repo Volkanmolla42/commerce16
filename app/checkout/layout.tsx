@@ -75,7 +75,6 @@ export default async function CheckoutLayout({ children }: { children: ReactNode
 
             <div className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
               <ShieldCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-              <span className="hidden sm:inline">256-Bit SSL ile</span>
               <span>Güvenli Ödeme</span>
               <LockClosedIcon className="size-3.5 text-neutral-400" aria-hidden="true" />
             </div>

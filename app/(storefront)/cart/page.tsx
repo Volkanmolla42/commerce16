@@ -31,99 +31,6 @@ import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/lay
 import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
 import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
 
-function CartContent() {
-  const router = useRouter();
-  const restoreToken = useSearchParams().get("recover");
-  const { items, addItem, updateQuantity, removeItem, totalAmount, getItemMaxStock, removedItem, restoreLastRemoved } =
-    useCart();
-  const restoreHandled = useRef(false);
-  const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
-  const [restoreState, setRestoreState] = useState<{
-    token: string;
-    cart: Awaited<ReturnType<typeof restoreCart>>;
-  } | null>(null);
-
-  const restoredCart = restoreToken
-    ? restoreState?.token === restoreToken ? restoreState.cart : undefined
-    : null;
-
-  useEffect(() => {
-    let cancelled = false;
-    restoreHandled.current = false;
-    if (!restoreToken) return () => { cancelled = true; };
-    void restoreCart({ token: restoreToken })
-      .then((cart) => { if (!cancelled) setRestoreState({ token: restoreToken, cart }); })
-      .catch(() => { if (!cancelled) setRestoreState({ token: restoreToken, cart: null }); });
-    return () => { cancelled = true; };
-  }, [restoreCart, restoreToken]);
-
-  const restoredProducts = useQuery(
-    api.products.getByIds,
-    restoredCart === undefined
-      ? "skip"
-      : { ids: (restoredCart?.items ?? []).map((item) => item.productId as Id<"products">) },
-  );
-
-  useEffect(() => {
-    if (!restoreToken || restoredCart === undefined || restoredProducts === undefined || restoreHandled.current) return;
-    restoreHandled.current = true;
-
-    if (restoredCart) {
-      try {
-        setCartRecoverySessionKey(restoredCart.sessionKey);
-      } catch {
-        // The cart can still be restored when browser storage is unavailable.
-      }
-    }
-
-    const restoredProductsById = new Map<string, Product>();
-    for (const product of restoredProducts ?? []) {
-      restoredProductsById.set(product._id, {
-        id: product._id,
-        slug: product.slug,
-        title: product.title,
-        price: getProductPriceRange(product).min,
-        availableForSale: product.availableForSale ?? true,
-        categorySlug: product.categorySlug,
-        images: product.images,
-        options: product.options,
-        variants: product.variants.map(({ price, ...variant }) => ({
-          ...variant,
-          price: { amount: price, currencyCode: "TRY" },
-        })),
-        updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
-      });
-    }
-
-    for (const restored of restoredCart?.items ?? []) {
-      const product = restoredProductsById.get(restored.productId);
-      if (!product?.availableForSale) continue;
-      const resolvedVariantId = restored.variantId ?? (product.variants?.length === 1 ? product.variants[0].id : undefined);
-      if (product.variants?.length && !resolvedVariantId) continue;
-      const variant = resolvedVariantId
-        ? product.variants?.find((candidate) => candidate.id === resolvedVariantId)
-        : undefined;
-      if (resolvedVariantId && (!variant || !variant.availableForSale)) continue;
-      const currentQuantity = items.find((item) =>
-        item.product.id === product.id && item.variantId === resolvedVariantId
-      )?.quantity ?? 0;
-      const quantity = Math.max(currentQuantity, Math.min(999, restored.quantity));
-      if (currentQuantity > 0) updateQuantity(product.id, quantity, resolvedVariantId);
-      else addItem(product, quantity, resolvedVariantId);
-    }
-
-    router.replace("/cart");
-  }, [addItem, items, restoredCart, restoredProducts, restoreToken, router, updateQuantity]);
-
-  if (restoreToken) {
-    return (
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">
-        <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent mb-3" />
-        <p>Sepetiniz geri yükleniyor...</p>
-      </div>
-    );
-  }
-
 type CartItem = ReturnType<typeof useCart>["items"][number];
 
 function CartEmptyState() {
@@ -295,6 +202,99 @@ function CartMobileCheckoutBar({ totalAmount }: { totalAmount: number }) {
     </MobileSummaryBar>
   );
 }
+
+function CartContent() {
+  const router = useRouter();
+  const restoreToken = useSearchParams().get("recover");
+  const { items, addItem, updateQuantity, removeItem, totalAmount, getItemMaxStock, removedItem, restoreLastRemoved } =
+    useCart();
+  const restoreHandled = useRef(false);
+  const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
+  const [restoreState, setRestoreState] = useState<{
+    token: string;
+    cart: Awaited<ReturnType<typeof restoreCart>>;
+  } | null>(null);
+
+  const restoredCart = restoreToken
+    ? restoreState?.token === restoreToken ? restoreState.cart : undefined
+    : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    restoreHandled.current = false;
+    if (!restoreToken) return () => { cancelled = true; };
+    void restoreCart({ token: restoreToken })
+      .then((cart) => { if (!cancelled) setRestoreState({ token: restoreToken, cart }); })
+      .catch(() => { if (!cancelled) setRestoreState({ token: restoreToken, cart: null }); });
+    return () => { cancelled = true; };
+  }, [restoreCart, restoreToken]);
+
+  const restoredProducts = useQuery(
+    api.products.getByIds,
+    restoredCart === undefined
+      ? "skip"
+      : { ids: (restoredCart?.items ?? []).map((item) => item.productId as Id<"products">) },
+  );
+
+  useEffect(() => {
+    if (!restoreToken || restoredCart === undefined || restoredProducts === undefined || restoreHandled.current) return;
+    restoreHandled.current = true;
+
+    if (restoredCart) {
+      try {
+        setCartRecoverySessionKey(restoredCart.sessionKey);
+      } catch {
+        // The cart can still be restored when browser storage is unavailable.
+      }
+    }
+
+    const restoredProductsById = new Map<string, Product>();
+    for (const product of restoredProducts ?? []) {
+      restoredProductsById.set(product._id, {
+        id: product._id,
+        slug: product.slug,
+        title: product.title,
+        price: getProductPriceRange(product).min,
+        availableForSale: product.availableForSale ?? true,
+        categorySlug: product.categorySlug,
+        images: product.images,
+        options: product.options,
+        variants: product.variants.map(({ price, ...variant }) => ({
+          ...variant,
+          price: { amount: price, currencyCode: "TRY" },
+        })),
+        updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
+      });
+    }
+
+    for (const restored of restoredCart?.items ?? []) {
+      const product = restoredProductsById.get(restored.productId);
+      if (!product?.availableForSale) continue;
+      const resolvedVariantId = restored.variantId ?? (product.variants?.length === 1 ? product.variants[0].id : undefined);
+      if (product.variants?.length && !resolvedVariantId) continue;
+      const variant = resolvedVariantId
+        ? product.variants?.find((candidate) => candidate.id === resolvedVariantId)
+        : undefined;
+      if (resolvedVariantId && (!variant || !variant.availableForSale)) continue;
+      const currentQuantity = items.find((item) =>
+        item.product.id === product.id && item.variantId === resolvedVariantId
+      )?.quantity ?? 0;
+      const quantity = Math.max(currentQuantity, Math.min(999, restored.quantity));
+      if (currentQuantity > 0) updateQuantity(product.id, quantity, resolvedVariantId);
+      else addItem(product, quantity, resolvedVariantId);
+    }
+
+    router.replace("/cart");
+  }, [addItem, items, restoredCart, restoredProducts, restoreToken, router, updateQuantity]);
+
+  if (restoreToken) {
+    return (
+      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center text-sm text-muted-foreground" aria-busy="true">
+        <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent mb-3" />
+        <p>Sepetiniz geri yükleniyor...</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (

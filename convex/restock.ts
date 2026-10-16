@@ -1,7 +1,11 @@
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
-import { env, internalAction, internalMutation, mutation, query } from "./_generated/server";
+import { internalAction, internalMutation, mutation, query } from "./_generated/server";
+import { siteLink } from "./emails/config";
+import { renderRestockEmail } from "./emails/templates/marketing";
+import { sendEmail } from "./emails/send";
+import { readStoreSettings } from "./settings";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   restockSubscribe: { kind: "fixed window", rate: 10, period: 60 * 60 * 1000 },
@@ -24,14 +28,6 @@ function cleanEmail(value: string) {
     throw new Error("Lütfen geçerli bir e-posta adresi girin.");
   }
   return email;
-}
-
-import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
-import { buildRestockNotificationEmail } from "./emailTemplates";
-import { formatMoney } from "../lib/format-money";
-
-function formatTRY(value: string | number) {
-  return formatMoney(value);
 }
 
 // 1. Müşterinin stok bildirimi kaydı oluşturması
@@ -218,72 +214,24 @@ export const sendRestockEmailAction = internalAction({
     });
     if (!data) return null;
 
-    const { sub, product, variant, storeName, siteUrl } = data;
-    const from = formatSender(storeName, process.env.RESTOCK_FROM_EMAIL);
-    const productUrl = `${siteUrl}/product/${product.slug}`;
-    const unsubscribeUrl = `${siteUrl}/restock/unsubscribe?token=${sub.unsubscribeToken}`;
-    const variantTitle = variant?.title && variant.title !== "Default Title" ? variant.title : null;
-    const priceText = formatTRY(variant?.price ?? product.price);
-    const imageUrl = product.imageUrl ?? null;
-
-    const subject = `Müjde! ${product.title} Tekrar Stokta! | ${storeName}`;
-
-    // Plain text
-    const text = [
-      `${storeName.toUpperCase()} — TEKRAR STOKTA!`,
-      `----------------------------------------`,
-      `Merhaba,`,
-      ``,
-      `Beklediğiniz ürün tekrar stoklarımıza girdi!`,
-      ``,
-      `Ürün: ${product.title}`,
-      ...(variantTitle ? [`Seçenek: ${variantTitle}`] : []),
-      `Fiyat: ${priceText}`,
-      ``,
-      `Hemen incelemek ve tükenmeden satın almak için tıklayın:`,
-      productUrl,
-      ``,
-      `----------------------------------------`,
-      `Bu ürün için artık bildirim almak istemiyorsanız:`,
-      unsubscribeUrl,
-      `----------------------------------------`,
-      `© ${storeName}`,
-    ].join("\n");
-
-    // Modern HTML Şablonu
-    const html = buildRestockNotificationEmail({
-      storeName,
-      productTitle: `${product.title}${variantTitle ? ` (${variantTitle})` : ""}`,
-      productUrl,
-      unsubscribeUrl,
-    });
-
-    const result = await sendResendEmail({
-      to: sub.email,
-      subject,
-      text,
-      html,
-      from,
-      idempotencyKey: `restock/${sub._id}`,
-    });
-
-    await ctx.runMutation(internal.emailTemplates.recordEmailLog, {
+    const outcome = await sendEmail(ctx, {
+      to: data.sub.email,
+      storeName: data.storeName,
       templateKey: "restock_notification",
-      recipient: sub.email,
-      subject,
-      status: result.ok ? "sent" : "failed",
-      error: result.error,
-      metadata: {
-        subscriptionId: sub._id,
-        productId: product._id,
-        productTitle: product.title,
-      },
+      content: renderRestockEmail({
+        storeName: data.storeName,
+        productTitle: data.productTitle,
+        variantTitle: data.variantTitle,
+        price: data.price,
+        productUrl: siteLink(`/product/${data.productSlug}`),
+        unsubscribeUrl: siteLink("/restock/unsubscribe", { token: data.sub.unsubscribeToken }),
+      }),
+      idempotencyKey: `restock/${data.sub._id}`,
+      metadata: { subscriptionId: data.sub._id, productId: data.productId },
     });
 
-    if (result.ok) {
-      await ctx.runMutation(internal.restock.markNotified, {
-        subscriptionId: sub._id,
-      });
+    if (outcome === "sent") {
+      await ctx.runMutation(internal.restock.markNotified, { subscriptionId: data.sub._id });
     }
 
     return null;
@@ -300,23 +248,12 @@ export const claimForNotification = internalMutation({
         email: v.string(),
         unsubscribeToken: v.string(),
       }),
-      product: v.object({
-        _id: v.id("products"),
-        title: v.string(),
-        slug: v.string(),
-        price: v.string(),
-        imageUrl: v.optional(v.string()),
-      }),
-      variant: v.union(
-        v.object({
-          id: v.string(),
-          title: v.string(),
-          price: v.string(),
-        }),
-        v.null()
-      ),
+      productId: v.id("products"),
+      productTitle: v.string(),
+      productSlug: v.string(),
+      variantTitle: v.nullable(v.string()),
+      price: v.string(),
       storeName: v.string(),
-      siteUrl: v.string(),
     }),
     v.null()
   ),
@@ -328,20 +265,10 @@ export const claimForNotification = internalMutation({
     if (!product) return null;
 
     const variant = sub.variantId
-      ? product.variants?.find((v) => v.id === sub.variantId) ?? null
+      ? product.variants?.find((candidate) => candidate.id === sub.variantId) ?? null
       : null;
 
-    const settings = await ctx.db
-      .query("storeSettings")
-      .withIndex("by_key", (q) => q.eq("key", "store"))
-      .first();
-
-    const storeName = settings?.storeName?.trim() || "Mağazamız";
-    const siteUrl = env.CART_RECOVERY_SITE_URL || "http://localhost:3000";
-
-    const firstImage = product.images?.[0];
-    const imageUrl = firstImage ? await ctx.storage.getUrl(firstImage.storageId) : null;
-    const basePrice = product.variants?.[0]?.price ?? "0";
+    const { storeName } = await readStoreSettings(ctx);
 
     return {
       sub: {
@@ -349,16 +276,12 @@ export const claimForNotification = internalMutation({
         email: sub.email,
         unsubscribeToken: sub.unsubscribeToken,
       },
-      product: {
-        _id: product._id,
-        title: product.title,
-        slug: product.slug,
-        price: basePrice,
-        imageUrl: imageUrl ?? undefined,
-      },
-      variant: variant ? { id: variant.id, title: variant.title, price: variant.price } : null,
+      productId: product._id,
+      productTitle: product.title,
+      productSlug: product.slug,
+      variantTitle: variant?.title && variant.title !== "Default Title" ? variant.title : null,
+      price: variant?.price ?? product.variants?.[0]?.price ?? String(product.priceValue),
       storeName,
-      siteUrl,
     };
   },
 });

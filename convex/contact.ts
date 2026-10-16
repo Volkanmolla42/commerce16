@@ -1,11 +1,10 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { env, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { assertAdminApiSecret } from "./adminAuth";
-import { escapeHtml, formatSender, sendResendEmail } from "./mailUtils";
-import { buildContactFormEmail } from "./emailTemplates";
-import { formatDateTime } from "../lib/format-date";
-import { formatPhone } from "../lib/orders";
+import { internalAction, internalQuery, mutation } from "./_generated/server";
+import { adminAlertTo } from "./emails/config";
+import { renderContactEmail } from "./emails/templates/alerts";
+import { sendEmail } from "./emails/send";
+import { readStoreSettings } from "./settings";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -67,7 +66,6 @@ export const submitContactMessage = mutation({
       subject: cleanSubject,
       message: cleanMessage,
       status: "new",
-      emailSent: false,
       createdAt: now,
     });
 
@@ -83,55 +81,46 @@ export const submitContactMessage = mutation({
   },
 });
 
-// 2. Mesaj detaylarını ve mağaza ayarlarını getiren internal query
+// 2. Mesaj detaylarını ve mağaza adını getiren internal query
 export const getContactMessageDetails = internalQuery({
   args: {
     messageId: v.id("contactMessages"),
   },
+  returns: v.union(
+    v.object({
+      message: v.object({
+        name: v.string(),
+        email: v.string(),
+        phone: v.nullable(v.string()),
+        subject: v.string(),
+        message: v.string(),
+        createdAt: v.number(),
+      }),
+      storeName: v.string(),
+    }),
+    v.null()
+  ),
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     if (!message) return null;
 
-    const storeSettings = await ctx.db.query("storeSettings").first();
-    const storeName = storeSettings?.storeName?.trim() || "Mağaza";
-    const storeEmail = storeSettings?.email?.trim();
-    const siteUrl = env.CART_RECOVERY_SITE_URL || "http://localhost:3000";
+    const { storeName } = await readStoreSettings(ctx);
 
     return {
       message: {
-        _id: message._id,
         name: message.name,
         email: message.email,
-        phone: message.phone,
+        phone: message.phone ?? null,
         subject: message.subject,
         message: message.message,
         createdAt: message.createdAt,
       },
       storeName,
-      storeEmail,
-      siteUrl,
     };
   },
 });
 
-// 3. E-posta gönderim sonucunu contactMessages tablosuna işleyen internal mutation
-export const recordContactEmailResult = internalMutation({
-  args: {
-    messageId: v.id("contactMessages"),
-    emailSent: v.boolean(),
-    error: v.optional(v.string()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.messageId, {
-      emailSent: args.emailSent,
-      emailError: args.error,
-    });
-    return null;
-  },
-});
-
-// 4. Resend üzerinden yöneticiye e-posta gönderen internal action
+// 3. Yöneticiye iletişim mesajı bildirimini gönderen internal action
 export const sendContactAlertAction = internalAction({
   args: {
     messageId: v.id("contactMessages"),
@@ -143,104 +132,25 @@ export const sendContactAlertAction = internalAction({
     });
     if (!data) return null;
 
-    const { message, storeName, storeEmail } = data;
-    const toEmail = process.env.ADMIN_ALERT_EMAIL || storeEmail || "delivered@resend.dev";
-
-    const formattedDate = formatDateTime(message.createdAt, {
-      dateStyle: "full",
-      timeStyle: "short",
-    });
-
-    const subject = `📩 Yeni İletişim Mesajı: ${message.subject} (${message.name}) | ${storeName}`;
-
-    // Plain text
-    const text = [
-      `${storeName.toUpperCase()} — YENİ İLETİŞİM MESAJI`,
-      `----------------------------------------`,
-      `Tarih: ${formattedDate}`,
-      `Gönderen: ${message.name}`,
-      `E-posta: ${message.email}`,
-      ...(message.phone ? [`Telefon: ${formatPhone(message.phone)}`] : []),
-      `Konu: ${message.subject}`,
-      ``,
-      `Mesaj:`,
-      message.message,
-      ``,
-      `Bu e-postayı doğrudan yanıtlayarak müşteriye geri dönebilirsiniz (Reply-To aktiftir).`,
-    ].join("\n");
-
-    // HTML Şablonu
-    const html = buildContactFormEmail({
+    const { message, storeName } = data;
+    await sendEmail(ctx, {
+      to: adminAlertTo(),
       storeName,
-      senderName: message.name,
-      senderEmail: message.email,
-      senderPhone: message.phone,
-      subject: message.subject,
-      message: message.message,
-      formattedDate,
-    });
-
-    const result = await sendResendEmail({
-      to: toEmail,
-      from: formatSender(storeName),
-      replyTo: message.email,
-      subject,
-      text,
-      html,
-      idempotencyKey: `contact-msg/${args.messageId}`,
-    });
-
-    await ctx.runMutation(internal.contact.recordContactEmailResult, {
-      messageId: args.messageId,
-      emailSent: result.ok,
-      error: result.error,
-    });
-
-    await ctx.runMutation(internal.emailTemplates.recordEmailLog, {
       templateKey: "contact_form_alert",
-      recipient: toEmail,
-      subject,
-      htmlBody: html,
-      textBody: text,
-      status: result.ok ? "sent" : "failed",
-      resendId: result.messageId,
-      error: result.error,
+      content: renderContactEmail({
+        storeName,
+        senderName: message.name,
+        senderEmail: message.email,
+        senderPhone: message.phone,
+        messageSubject: message.subject,
+        message: message.message,
+        createdAt: message.createdAt,
+      }),
+      replyTo: message.email,
+      idempotencyKey: `contact/${args.messageId}`,
       metadata: { messageId: args.messageId },
     });
 
-    return null;
-  },
-});
-
-// 5. Admin için mesajları listeleme query'si
-export const listMessagesAdmin = query({
-  args: {
-    adminSecret: v.string(),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    const limit = args.limit ?? 50;
-
-    return await ctx.db
-      .query("contactMessages")
-      .withIndex("by_created_at")
-      .order("desc")
-      .take(limit);
-  },
-});
-
-// 6. Admin mesaj durumunu güncelleme (okundu / yanıtlandı)
-export const updateMessageStatusAdmin = mutation({
-  args: {
-    adminSecret: v.string(),
-    messageId: v.id("contactMessages"),
-    status: v.union(v.literal("new"), v.literal("read"), v.literal("replied")),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    await ctx.db.patch(args.messageId, { status: args.status });
     return null;
   },
 });

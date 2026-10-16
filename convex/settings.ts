@@ -32,7 +32,7 @@ function withDefaults(settings?: {
   lowStockThreshold?: number;
 } | null) {
   return {
-    storeName: settings?.storeName ?? defaultStoreName,
+    storeName: settings?.storeName?.trim() || defaultStoreName,
     slogan: settings?.slogan ?? "",
     logoUrl: "",
     logoStorageId: settings?.logoStorageId ?? null,
@@ -54,18 +54,21 @@ export async function resolveLowStockThreshold(ctx: QueryCtx | MutationCtx) {
   return settings?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD;
 }
 
+export async function readStoreSettings(ctx: QueryCtx | MutationCtx) {
+  const settings = await ctx.db
+    .query("storeSettings")
+    .withIndex("by_key", (q) => q.eq("key", "store"))
+    .unique();
+  return withDefaults(settings);
+}
+
 export const getStoreSettings = query({
   args: {},
   returns: settingsShape,
   handler: async (ctx) => {
-    const settings = await ctx.db
-      .query("storeSettings")
-      .withIndex("by_key", (q) => q.eq("key", "store"))
-      .unique();
-
-    const base = withDefaults(settings);
-    if (settings?.logoStorageId) {
-      base.logoUrl = (await ctx.storage.getUrl(settings.logoStorageId)) ?? "";
+    const base = await readStoreSettings(ctx);
+    if (base.logoStorageId) {
+      base.logoUrl = (await ctx.storage.getUrl(base.logoStorageId)) ?? "";
     }
     return base;
   },

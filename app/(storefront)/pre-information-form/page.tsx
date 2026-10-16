@@ -1,20 +1,26 @@
 import type { Metadata } from "next";
 import LegalDocumentLayout from "@/components/layout/legal-document-layout";
-import { preInformationForm } from "@/lib/legal-documents";
+import { getStoreSettings } from "@/lib/catalog";
+import { getLegalDocuments } from "@/lib/legal-documents";
 
-export const metadata: Metadata = {
-  title: preInformationForm.title,
-  description: "Ön bilgilendirme formu.",
-  robots: { index: false, follow: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const form = getLegalDocuments(await getStoreSettings()).preInformationForm;
+  return {
+    title: form.title,
+    description: "Ön bilgilendirme formu.",
+    robots: { index: false, follow: true },
+  };
+}
 
-export default function PreInformationFormPage() {
+export default async function PreInformationFormPage() {
+  const form = getLegalDocuments(await getStoreSettings()).preInformationForm;
+
   return (
     <LegalDocumentLayout
       badge="Yasal Bilgilendirme"
-      title={preInformationForm.title}
+      title={form.title}
       description="Sipariş öncesi tüketici hakları ve ön bilgilendirme koşulları"
-      bodyHtml={preInformationForm.body}
+      bodyHtml={form.body}
     />
   );
 }

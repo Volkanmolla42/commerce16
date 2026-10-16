@@ -9,8 +9,9 @@ import {
   modifyAccountCredentials,
   retrieveAccount,
 } from "@convex-dev/auth/server";
-import { formatSender, sendResendEmail } from "./mailUtils";
-import { buildPasswordChangeEmail } from "./emailTemplates";
+import { renderOtpEmail } from "./emails/templates/account";
+import { sendEmail } from "./emails/send";
+import { readStoreSettings } from "./settings";
 
 const PROVIDER = "password";
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -33,10 +34,10 @@ export const getChangeContext = internalQuery({
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
     if (!user?.email) return null;
-    const storeSettings = await ctx.db.query("storeSettings").first();
+    const { storeName } = await readStoreSettings(ctx);
     return {
       email: user.email,
-      storeName: storeSettings?.storeName?.trim() || "Mağaza",
+      storeName,
     };
   },
 });
@@ -126,44 +127,16 @@ export const requestPasswordChangeCode = action({
       expiresAt: Date.now() + CODE_TTL_MS,
     });
 
-    const { email, storeName } = context;
-    const subject = `Şifre Değiştirme Kodunuz: ${code} | ${storeName}`;
-    const text = [
-      `${storeName.toUpperCase()} — ŞİFRE DEĞİŞTİRME`,
-      `----------------------------------------`,
-      `Hesabınızın şifresini değiştirmek için talepte bulundunuz.`,
-      ``,
-      `Tek Kullanımlık Doğrulama Kodunuz:`,
-      `>>> ${code} <<<`,
-      ``,
-      `Bu kod güvenlik nedeniyle sınırlı bir süre için geçerlidir.`,
-      `Kodu kimseyle paylaşmayınız.`,
-      ``,
-      `Bu talebi siz yapmadıysanız şifreniz değişmemiştir; bu e-postayı dikkate almanıza gerek yoktur.`,
-    ].join("\n");
-    const html = buildPasswordChangeEmail({ storeName, token: code });
-
-    const result = await sendResendEmail({
-      to: email,
-      from: formatSender(storeName),
-      subject,
-      text,
-      html,
-    });
-
-    await ctx.runMutation(internal.emailTemplates.recordEmailLog, {
+    const outcome = await sendEmail(ctx, {
+      to: context.email,
+      storeName: context.storeName,
       templateKey: "password_change_otp",
-      recipient: email,
-      subject,
-      htmlBody: html,
-      textBody: text,
-      status: result.ok ? "sent" : "failed",
-      resendId: result.messageId,
-      error: result.error,
+      content: renderOtpEmail({ storeName: context.storeName, token: code, purpose: "change" }),
+      idempotencyKey: `password-change/${userId}/${code}`,
       metadata: { userId },
     });
 
-    if (!result.ok) {
+    if (outcome !== "sent") {
       throw new ConvexError("Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin.");
     }
     return null;

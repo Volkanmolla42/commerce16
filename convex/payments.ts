@@ -1,4 +1,4 @@
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
 
@@ -50,69 +50,36 @@ export const paymentSettingsValidator = v.object({
 
 type PaymentSettings = typeof paymentSettingsValidator["type"];
 
-export const defaultPaymentSettings = {
-  cashOnDelivery: {
-    enabled: true,
-    fee: 0,
-    description: "Siparişinizi kapıda nakit veya banka/kredi kartı ile teslim alırken ödeyebilirsiniz.",
-  },
-  bankTransfer: {
-    enabled: true,
-    description: "Siparişinizi oluşturduktan sonra belirtilen banka hesabımıza sipariş numaranızı açıklama kısmına yazarak havale/EFT yapınız.",
-    accounts: [
-      {
-        id: "bank-1",
-        bankName: "Ziraat Bankası",
-        accountHolder: "Mağaza Ticaret A.Ş.",
-        iban: "TR12 0001 0000 0000 0000 0000 01",
-      },
-      {
-        id: "bank-2",
-        bankName: "Garanti BBVA",
-        accountHolder: "Mağaza Ticaret A.Ş.",
-        iban: "TR62 0006 2000 0000 0000 0000 02",
-      },
-    ],
-  },
+/** Ayar satırı olmayan mağazada vitrine hiçbir ödeme yöntemi çıkmaz. */
+const unsetPaymentSettings: PaymentSettings = {
+  cashOnDelivery: { enabled: false, fee: 0, description: "" },
+  bankTransfer: { enabled: false, description: "", accounts: [] },
   paytr: {
-    enabled: true,
-    testMode: true,
+    enabled: false,
+    testMode: false,
     merchantId: "",
     merchantKey: "",
     merchantSalt: "",
-    description: "PayTR 256-bit SSL korumalı altyapısı ile kredi kartı veya banka kartınızla güvenle ödeyin (Demo Modu).",
+    description: "",
   },
 };
 
-async function readPaymentSettings(ctx: QueryCtx): Promise<PaymentSettings> {
+export async function readPaymentSettings(
+  ctx: QueryCtx | MutationCtx,
+): Promise<PaymentSettings> {
   const record = await ctx.db
     .query("paymentSettings")
     .withIndex("by_key", (q) => q.eq("key", "payment"))
     .unique();
 
   if (!record) {
-    return defaultPaymentSettings;
+    return unsetPaymentSettings;
   }
 
   return {
-    cashOnDelivery: {
-      enabled: record.cashOnDelivery?.enabled ?? defaultPaymentSettings.cashOnDelivery.enabled,
-      fee: record.cashOnDelivery?.fee ?? defaultPaymentSettings.cashOnDelivery.fee,
-      description: record.cashOnDelivery?.description ?? defaultPaymentSettings.cashOnDelivery.description,
-    },
-    bankTransfer: {
-      enabled: record.bankTransfer?.enabled ?? defaultPaymentSettings.bankTransfer.enabled,
-      description: record.bankTransfer?.description ?? defaultPaymentSettings.bankTransfer.description,
-      accounts: record.bankTransfer?.accounts ?? defaultPaymentSettings.bankTransfer.accounts,
-    },
-    paytr: {
-      enabled: record.paytr?.enabled ?? defaultPaymentSettings.paytr.enabled,
-      testMode: record.paytr?.testMode ?? defaultPaymentSettings.paytr.testMode,
-      merchantId: record.paytr?.merchantId ?? defaultPaymentSettings.paytr.merchantId,
-      merchantKey: record.paytr?.merchantKey ?? defaultPaymentSettings.paytr.merchantKey,
-      merchantSalt: record.paytr?.merchantSalt ?? defaultPaymentSettings.paytr.merchantSalt,
-      description: record.paytr?.description ?? defaultPaymentSettings.paytr.description,
-    },
+    cashOnDelivery: record.cashOnDelivery,
+    bankTransfer: record.bankTransfer,
+    paytr: record.paytr,
     updatedAt: record.updatedAt,
   };
 }
@@ -185,6 +152,21 @@ export const updatePaymentSettings = mutation({
       if (!acc.bankName.trim() || !acc.accountHolder.trim() || !acc.iban.trim()) {
         throw new Error("Tüm banka hesapları için Banka Adı, Hesap Sahibi ve IBAN zorunludur.");
       }
+    }
+
+    // Vitrinde görünen açıklamalar yalnız admin panelinden yazılır; kodda örnek metin durmaz.
+    if (args.cashOnDelivery.enabled && !args.cashOnDelivery.description.trim()) {
+      throw new Error("Kapıda ödeme açıkken müşteriye gösterilecek açıklama zorunludur.");
+    }
+    if (args.bankTransfer.enabled && (!args.bankTransfer.description.trim() || args.bankTransfer.accounts.length === 0)) {
+      throw new Error("Havale / EFT açıkken açıklama ve en az bir banka hesabı zorunludur.");
+    }
+    if (args.paytr.enabled && !args.paytr.description.trim()) {
+      throw new Error("PayTR açıkken müşteriye gösterilecek açıklama zorunludur.");
+    }
+    if (args.paytr.enabled && !args.paytr.testMode &&
+      (!args.paytr.merchantId?.trim() || !args.paytr.merchantKey?.trim() || !args.paytr.merchantSalt?.trim())) {
+      throw new Error("PayTR canlı modda Merchant Id, Merchant Key ve Merchant Salt alanlarının tümü zorunludur.");
     }
 
     const existing = await ctx.db

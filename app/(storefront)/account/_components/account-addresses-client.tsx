@@ -190,7 +190,7 @@ function AddressEditDialog({
   isSaving: boolean;
   form: AddressFormData;
   setForm: React.Dispatch<React.SetStateAction<AddressFormData>>;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.SyntheticEvent) => void;
 }) {
   const districtOptions = getProvinceById(form.provinceId)?.districts ?? [];
 
@@ -313,7 +313,6 @@ function AddressEditDialog({
                 required
                 value={form.addressLine1}
                 onChange={(e) => setForm({ ...form, addressLine1: e.target.value })}
-                placeholder="Caferağa Mah. Moda Cad. No: 10 Daire: 4"
                 className="flex w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-[border-color,background-color,box-shadow] duration-150"
               />
             </div>
@@ -415,7 +414,7 @@ export default function AccountAddressesPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 

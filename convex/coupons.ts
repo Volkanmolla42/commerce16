@@ -104,10 +104,11 @@ export async function reserveCouponForOrder(ctx: MutationCtx, order: Doc<"orders
     const price = Math.round(Number(item.price) * 100);
     return sum + price * item.quantity;
   }, 0);
+  const paymentFeeKurus = Math.round((order.paymentFee ?? 0) * 100);
   const orderTotalKurus = Math.round(Number(order.total) * 100);
   const quote = quoteCouponRecord(coupon, subtotalKurus, Date.now());
   if (!Number.isSafeInteger(orderTotalKurus) || orderTotalKurus < 0 || !quote.valid ||
-    quote.discountKurus !== order.couponDiscountKurus || quote.totalKurus !== orderTotalKurus) {
+    quote.discountKurus !== order.couponDiscountKurus || quote.totalKurus + paymentFeeKurus !== orderTotalKurus) {
     throw new Error(quote.valid ? "Kupon koşulları değişti. Siparişinizi yeniden oluşturun." : quote.message);
   }
   if (coupon.usageLimit !== undefined && coupon.usedCount >= coupon.usageLimit) {

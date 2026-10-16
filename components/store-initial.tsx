@@ -3,8 +3,12 @@ type StoreInitialProps = {
   size?: "sm" | "xs";
 };
 
+export function storeInitial(storeName: string) {
+  return storeName.trim().slice(0, 1).toLocaleUpperCase("tr-TR");
+}
+
 export default function StoreInitial({ storeName, size }: StoreInitialProps) {
-  const initial = storeName.trim().slice(0, 1).toLocaleUpperCase("tr-TR") || "M";
+  const initial = storeInitial(storeName);
   const sizeClasses = size === "sm"
     ? "size-[30px] rounded-lg text-xs"
     : size === "xs"

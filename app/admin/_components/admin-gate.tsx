@@ -14,7 +14,7 @@ export function AdminGate() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const verifyPin = async (event: React.FormEvent<HTMLFormElement>) => {
+  const verifyPin = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!/^\d{6}$/.test(pin)) {
       setError("6 haneli PIN'i gir.");

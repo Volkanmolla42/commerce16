@@ -158,7 +158,7 @@ export function CategoryEditor({
     setAttributes((current) => current.filter((item) => item.key !== attribute.key));
   };
 
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+  const save = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving || savingPresetKey !== null || libraryBusy) return;
     setError(null);

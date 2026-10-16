@@ -120,7 +120,7 @@ export default function Search() {
     }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: React.SyntheticEvent) => {
     event.preventDefault();
     setIsOpen(false);
     const params = new URLSearchParams();

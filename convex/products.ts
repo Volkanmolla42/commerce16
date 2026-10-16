@@ -709,23 +709,6 @@ export const update = mutation({
   },
 });
 
-export const triggerRestockAdmin = mutation({
-  args: {
-    adminSecret: v.string(),
-    productId: v.id("products"),
-    variantId: v.optional(v.string()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    await ctx.scheduler.runAfter(0, internal.restock.triggerRestockCheck, {
-      productId: args.productId,
-      variantId: args.variantId,
-    });
-    return null;
-  },
-});
-
 export const remove = mutation({
   args: {
     adminSecret: v.string(),

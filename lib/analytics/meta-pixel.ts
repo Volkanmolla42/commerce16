@@ -81,26 +81,6 @@ export function trackPixelEvent(eventName: string, data?: Record<string, unknown
   }
 }
 
-export function trackPixelCustomEvent(eventName: string, data?: Record<string, unknown>): void {
-  if (typeof window === "undefined") return;
-  const pixelId = getMetaPixelId();
-  if (!pixelId) return;
-  if (!hasMarketingConsent()) return;
-
-  if (!isInitialized) {
-    const initialized = initMetaPixel();
-    if (!initialized) return;
-  }
-
-  if (window.fbq) {
-    if (data) {
-      window.fbq("trackCustom", eventName, data);
-    } else {
-      window.fbq("trackCustom", eventName);
-    }
-  }
-}
-
 export function trackPixelPageView(): void {
   trackPixelEvent("PageView");
 }

@@ -38,7 +38,7 @@ export function RestockNotificationDialog({
 
   const subscribe = useMutation(api.restock.subscribe);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!email || !email.includes("@")) {
       setStatus("error");

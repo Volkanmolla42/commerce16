@@ -2,7 +2,6 @@ import {
   ArrowPathIcon,
   ArrowUpRightIcon,
   LockClosedIcon,
-  ShieldCheckIcon,
   TagIcon,
   TruckIcon,
 } from "@heroicons/react/24/outline";
@@ -14,15 +13,14 @@ import { getProductImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 
 const valueProps = [
-  { icon: TruckIcon, title: "Hızlı Teslimat", description: "Özenli paketleme, hızlı kargo" },
-  { icon: ShieldCheckIcon, title: "Orijinal Ürün", description: "Doğrulanmış kalite güvencesi" },
-  { icon: ArrowPathIcon, title: "Kolay İade", description: "14 gün içinde koşulsuz iade" },
-  { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "3D Secure ödeme altyapısı" },
+  { icon: TruckIcon, title: "Ücretsiz Kargo", description: "Tüm siparişlerde" },
+  { icon: ArrowPathIcon, title: "14 Gün Cayma Hakkı", description: "Teslimattan itibaren" },
+  { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "Kart bilgileriniz saklanmaz" },
 ];
 
 export function HomeValueProps() {
   return (
-    <section aria-label="Mağaza güvenceleri" className="grid grid-cols-2 gap-x-6 gap-y-5 py-8 lg:grid-cols-4">
+    <section aria-label="Mağaza güvenceleri" className="grid grid-cols-2 gap-x-6 gap-y-5 py-8 sm:grid-cols-3">
       {valueProps.map((item) => {
         const Icon = item.icon;
         return (
@@ -88,7 +86,7 @@ export function HomeHero({
   hasCategories: boolean;
 }) {
   const heroImage = featuredProduct ? getProductImages(featuredProduct)[0] : undefined;
-  const heading = slogan?.trim() || "Yeni favorinizi bulun.";
+  const heading = slogan?.trim() || storeName;
 
   return (
     <section
@@ -96,9 +94,11 @@ export function HomeHero({
       className={`my-4 overflow-hidden rounded-3xl border border-border/60 bg-card text-foreground sm:my-6 ${heroImage ? "lg:grid lg:grid-cols-[1fr_1.05fr]" : ""}`}
     >
       <div className={`flex flex-col items-start justify-center px-6 py-8 sm:px-10 sm:py-12 lg:px-14 lg:py-16 ${heroImage ? "" : "mx-auto max-w-3xl"}`}>
-        <p className="mb-5 max-w-full truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground sm:mb-8 sm:text-xs">
-          {storeName}
-        </p>
+        {slogan?.trim() ? (
+          <p className="mb-5 max-w-full truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground sm:mb-8 sm:text-xs">
+            {storeName}
+          </p>
+        ) : null}
         <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.08] tracking-tight text-balance sm:text-5xl xl:text-6xl">
           {heading}
         </h1>

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { SyntheticEvent, useEffect, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -71,7 +71,7 @@ function AdminSettingsContent() {
     setPendingLogo({ blob: file, previewUrl: url });
   };
 
-  const save = async (event: FormEvent<HTMLFormElement>) => {
+  const save = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setMessage(null);
@@ -176,7 +176,7 @@ function AdminSettingsContent() {
                     id="store-slogan"
                     name="slogan"
                     maxLength={140}
-                    placeholder="Örn: En taze lezzetler kapınızda"
+                    placeholder="Mağazanızın kısa tanıtım cümlesi"
                     value={text("slogan")}
                     onChange={set("slogan")}
                   />
@@ -237,7 +237,7 @@ function AdminSettingsContent() {
                     id="store-announcement"
                     name="announcement"
                     maxLength={160}
-                    placeholder="Örn: 500 TL üzeri kargo bedava!"
+                    placeholder="Örn: Tüm siparişlerde kargo ücretsiz"
                     value={text("announcement")}
                     onChange={set("announcement")}
                   />

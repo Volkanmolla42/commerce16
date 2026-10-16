@@ -28,18 +28,22 @@ export function ProductViewTracker({
   slug: string;
   product?: { id: string; title: string; price?: string };
 }) {
+  const productId = product?.id;
+  const productTitle = product?.title;
+  const productPrice = product?.price;
+
   useEffect(() => {
     recordRecentProduct(slug);
-    if (product) {
-      const priceVal = product.price ? Number(product.price) : undefined;
+    if (productId && productTitle) {
+      const priceVal = productPrice ? Number(productPrice) : undefined;
       trackPixelViewContent({
-        content_id: product.id,
-        content_name: product.title,
+        content_id: productId,
+        content_name: productTitle,
         value: Number.isFinite(priceVal) ? priceVal : undefined,
         currency: "TRY",
       });
     }
-  }, [slug, product?.id, product?.title, product?.price]);
+  }, [slug, productId, productTitle, productPrice]);
   return null;
 }
 
