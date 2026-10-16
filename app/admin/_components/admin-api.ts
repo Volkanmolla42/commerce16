@@ -9,6 +9,15 @@ type ResourceState<T> = {
   refresh: () => Promise<void>;
 };
 
+function cleanErrorMessage(raw: string): string {
+  return raw
+    .replace(/^\[Request ID:[^\]]+\]\s*/i, "")
+    .replace(/^Server Error\s*/i, "")
+    .replace(/^Uncaught (?:Convex)?Error:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+}
+
 async function adminRequest<T>(url: string, options: RequestInit, fallback: string): Promise<T> {
   const response = await fetch(url, options);
   const payload: unknown = await response.json().catch(() => null);
@@ -16,13 +25,14 @@ async function adminRequest<T>(url: string, options: RequestInit, fallback: stri
     const message =
       payload && typeof payload === "object" && "error" in payload &&
       typeof payload.error === "string"
-        ? payload.error
+        ? cleanErrorMessage(payload.error)
         : fallback;
-    throw new Error(message);
+    throw new Error(message || fallback);
   }
   if (payload === null) throw new Error(fallback);
   return payload as T;
 }
+
 
 export function useAdminResource<T>(resource: string, params: Record<string, string> = {}): ResourceState<T> {
   const [data, setData] = useState<T | null>(null);

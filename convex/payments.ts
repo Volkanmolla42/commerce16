@@ -50,19 +50,22 @@ export const paymentSettingsValidator = v.object({
 
 type PaymentSettings = typeof paymentSettingsValidator["type"];
 
+import { DEFAULT_PAYMENT_DESCRIPTIONS } from "../lib/payments";
+
 /** Ayar satırı olmayan mağazada vitrine hiçbir ödeme yöntemi çıkmaz. */
 const unsetPaymentSettings: PaymentSettings = {
-  cashOnDelivery: { enabled: false, fee: 0, description: "" },
-  bankTransfer: { enabled: false, description: "", accounts: [] },
+  cashOnDelivery: { enabled: false, fee: 0, description: DEFAULT_PAYMENT_DESCRIPTIONS.cashOnDelivery },
+  bankTransfer: { enabled: false, description: DEFAULT_PAYMENT_DESCRIPTIONS.bankTransfer, accounts: [] },
   paytr: {
     enabled: false,
     testMode: false,
     merchantId: "",
     merchantKey: "",
     merchantSalt: "",
-    description: "",
+    description: DEFAULT_PAYMENT_DESCRIPTIONS.paytr,
   },
 };
+
 
 export async function readPaymentSettings(
   ctx: QueryCtx | MutationCtx,
@@ -77,12 +80,23 @@ export async function readPaymentSettings(
   }
 
   return {
-    cashOnDelivery: record.cashOnDelivery,
-    bankTransfer: record.bankTransfer,
-    paytr: record.paytr,
+    cashOnDelivery: {
+      ...record.cashOnDelivery,
+      description: record.cashOnDelivery.description || DEFAULT_PAYMENT_DESCRIPTIONS.cashOnDelivery,
+    },
+    bankTransfer: {
+      ...record.bankTransfer,
+      description: record.bankTransfer.description || DEFAULT_PAYMENT_DESCRIPTIONS.bankTransfer,
+    },
+    paytr: {
+      ...record.paytr,
+      description: record.paytr.description || DEFAULT_PAYMENT_DESCRIPTIONS.paytr,
+    },
     updatedAt: record.updatedAt,
   };
+
 }
+
 
 export const getPaymentSettings = query({
   args: {},

@@ -1,16 +1,13 @@
-/**
- * IBAN'ı boşluklardan arındırıp standart 4'lü bloklar halinde formatlar (örn: TR12 3456 7890 ...).
- */
+
 export function formatIban(iban?: string | null): string {
   if (!iban) return "";
-  const clean = iban.replace(/\s+/g, "").toUpperCase();
-  return clean.replace(/(.{4})/g, "$1 ").trim();
-}
+  const cleaned = iban.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (!cleaned) return "";
 
-/**
- * Kullanıcı girdisindeki fazla boşlukları temizleyip tek boşluklu büyük harf IBAN formatına getirir.
- */
-export function cleanIban(iban?: string | null): string {
-  if (!iban) return "";
-  return iban.trim().replace(/\s+/g, " ").toUpperCase();
+  const digits = cleaned.startsWith("TR")
+    ? cleaned.slice(2).replace(/[^0-9]/g, "")
+    : cleaned.replace(/[^0-9]/g, "");
+
+  const full = ("TR" + digits).slice(0, 26);
+  return full.replace(/(.{4})/g, "$1 ").trim();
 }

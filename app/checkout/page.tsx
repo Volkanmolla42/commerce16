@@ -33,7 +33,7 @@ import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/lay
 import { formatMoney } from "@/lib/format-money";
 import { formatPhoneInput } from "@/lib/format-phone-input";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
-import { useQuickBuyDraft, clearQuickBuyItem } from "@/components/cart/quick-buy-store";
+import { useQuickBuyItem } from "@/components/cart/quick-buy-store";
 import { getCartRecoverySessionKey } from "@/components/cart/recovery-store";
 import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackPixelInitiateCheckout } from "@/lib/analytics/meta-pixel";
@@ -219,10 +219,10 @@ function SubmitButtonContent({ isSubmitting }: { isSubmitting: boolean }) {
 
 function CheckoutContent() {
   const router = useRouter();
-  const { items: cartItems, clearCart } = useCart();
+  const { items: cartItems } = useCart();
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
-  const quickBuy = useQuickBuyDraft();
-  const items = isQuickBuy ? (quickBuy.item ? [quickBuy.item] : []) : cartItems;
+  const quickBuyItem = useQuickBuyItem();
+  const items = isQuickBuy ? (quickBuyItem ? [quickBuyItem] : []) : cartItems;
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotalKurus = items.reduce(
     (sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity,
@@ -349,7 +349,7 @@ function CheckoutContent() {
       }).catch(() => undefined);
     }, 700);
     return () => window.clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [captureRecovery, customerEmail, emailReminderConsent, itemsKey]);
 
   const handleAddressSelect = (addressId: string) => {
@@ -495,33 +495,18 @@ function CheckoutContent() {
         },
       });
 
-      if (!isQuickBuy) {
-        clearCart();
-      }
-      clearQuickBuyItem();
-
       if (recoverySessionKey && emailReminderConsent) {
         await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
       }
 
       router.replace(`/checkout/success/${orderId}`);
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
-    } finally {
       setIsSubmitting(false);
+      setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
     }
   };
 
-  if (isQuickBuy && !quickBuy.ready) {
-    return (
-      <div className="mx-auto max-w-(--breakpoint-2xl) px-4 py-20 text-center" aria-busy="true">
-        <div className="mx-auto size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <p className="mt-3 text-sm text-muted-foreground">Hızlı satın alma bilgisi yükleniyor...</p>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
+  if (items.length === 0 && !isSubmitting) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center sm:py-24">
         <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
@@ -1274,6 +1259,12 @@ function CheckoutContent() {
   );
 }
 
+function CheckoutContentWrapper() {
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode") ?? "cart";
+  return <CheckoutContent key={mode} />;
+}
+
 export default function CheckoutPage() {
   return (
     <Suspense
@@ -1284,7 +1275,7 @@ export default function CheckoutPage() {
         </div>
       }
     >
-      <CheckoutContent />
+      <CheckoutContentWrapper />
     </Suspense>
   );
 }

@@ -16,13 +16,19 @@ export function getAdminErrorMessage(error: unknown) {
 
   const rawMessage = error.message.trim();
   const stackStart = rawMessage.search(/\s+at\s+[^()\r\n]+\([^\r\n)]*:\d+:\d+\)?/);
-  const message = (stackStart >= 0 ? rawMessage.slice(0, stackStart) : rawMessage.split(/\r?\n\s*at\s+/)[0])
-    .replace(/^\s*Server Error\s*/i, "")
-    .replace(/^\s*Uncaught Error:\s*/i, "")
+  let message = (stackStart >= 0 ? rawMessage.slice(0, stackStart) : rawMessage.split(/\r?\n\s*at\s+/)[0]).trim();
+
+  // Convex Request ID, Server Error ve Uncaught Error öneklerini temizle
+  message = message
+    .replace(/^\[Request ID:[^\]]+\]\s*/i, "")
+    .replace(/^Server Error\s*/i, "")
+    .replace(/^Uncaught (?:Convex)?Error:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
     .trim();
 
   return message || "İşlem tamamlanamadı.";
 }
+
 
 export function adminErrorResponse(error: unknown) {
   const rawMessage = error instanceof Error ? error.message : "";

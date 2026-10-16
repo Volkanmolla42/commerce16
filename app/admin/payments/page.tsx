@@ -32,7 +32,8 @@ import {
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
-import { cleanIban, formatIban } from "@/lib/iban";
+import { formatIban } from "@/lib/iban";
+import { DEFAULT_PAYMENT_DESCRIPTIONS } from "@/lib/payments";
 
 type BankAccount = {
   id: string;
@@ -62,17 +63,16 @@ type PaymentSettingsData = {
   };
 };
 
+
 function MethodCardHeader({
   icon: Icon,
   title,
-  subtitle,
   badgeText,
   enabled,
   onToggle,
 }: {
   icon: React.ElementType;
   title: string;
-  subtitle: string;
   badgeText?: string;
   enabled: boolean;
   onToggle: (checked: boolean) => void;
@@ -83,16 +83,13 @@ function MethodCardHeader({
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-foreground">
           <Icon className="size-4.5" />
         </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-foreground truncate">{title}</h2>
-            {badgeText && (
-              <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 shrink-0">
-                {badgeText}
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-sm font-semibold text-foreground truncate">{title}</h2>
+          {badgeText && (
+            <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 shrink-0">
+              {badgeText}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -155,18 +152,23 @@ function AdminPaymentsContent() {
   // Aktif değerler (state değişmediyse veritabanındaki veriler kullanılır)
   const activeCodEnabled = codEnabled !== null ? codEnabled : data.cashOnDelivery.enabled;
   const activeCodFee = codFee !== null ? codFee : String(data.cashOnDelivery.fee);
-  const activeCodDesc = codDesc !== null ? codDesc : data.cashOnDelivery.description;
+  const activeCodDesc = codDesc !== null ? codDesc : (data.cashOnDelivery.description || DEFAULT_PAYMENT_DESCRIPTIONS.cashOnDelivery);
 
   const activeBankEnabled = bankEnabled !== null ? bankEnabled : data.bankTransfer.enabled;
-  const activeBankDesc = bankDesc !== null ? bankDesc : data.bankTransfer.description;
+  const activeBankDesc = bankDesc !== null ? bankDesc : (data.bankTransfer.description || DEFAULT_PAYMENT_DESCRIPTIONS.bankTransfer);
   const activeAccounts = accounts !== null ? accounts : data.bankTransfer.accounts;
 
   const activePaytrEnabled = paytrEnabled !== null ? paytrEnabled : data.paytr.enabled;
-  const activePaytrDesc = paytrDesc !== null ? paytrDesc : data.paytr.description;
+  const activePaytrDesc = paytrDesc !== null ? paytrDesc : (data.paytr.description || DEFAULT_PAYMENT_DESCRIPTIONS.paytr);
 
   const handleAddAccount = () => {
-    if (!newBankName.trim() || !newAccountHolder.trim() || !newIban.trim()) {
+    const digits = newIban.replace(/[^0-9]/g, "");
+    if (!newBankName.trim() || !newAccountHolder.trim() || !digits) {
       setModalError("Lütfen banka adı, hesap sahibi ve IBAN alanlarını doldurun.");
+      return;
+    }
+    if (digits.length !== 24) {
+      setModalError("IBAN numarası 24 haneli olmalıdır (TR hariç).");
       return;
     }
 
@@ -174,7 +176,7 @@ function AdminPaymentsContent() {
       id: `bank-${Date.now()}`,
       bankName: newBankName.trim(),
       accountHolder: newAccountHolder.trim(),
-      iban: cleanIban(newIban),
+      iban: formatIban(newIban),
     };
 
     setAccounts([...activeAccounts, newAccount]);
@@ -270,7 +272,6 @@ function AdminPaymentsContent() {
             <MethodCardHeader
               icon={CreditCardIcon}
               title="PayTR Kredi & Banka Kartı"
-              subtitle="Online sanal POS ile kartlı ödeme"
               badgeText="Demo Modu"
               enabled={activePaytrEnabled}
               onToggle={(checked) => setPaytrEnabled(checked)}
@@ -291,11 +292,7 @@ function AdminPaymentsContent() {
                   value={activePaytrDesc}
                   onChange={(e) => setPaytrDesc(e.target.value)}
                   className="w-full rounded-md border border-input bg-background p-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring resize-none leading-relaxed"
-                  placeholder="Kart bilgileriniz mağazamızda saklanmaz."
                 />
-                <p className="text-xs text-muted-foreground">
-                  Müşteri kartla ödeme seçeneğini seçtiğinde gösterilen açıklama metnidir.
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -305,7 +302,6 @@ function AdminPaymentsContent() {
             <MethodCardHeader
               icon={TruckIcon}
               title="Kapıda Ödeme"
-              subtitle="Teslimat anında nakit veya kartla tahsilat"
               enabled={activeCodEnabled}
               onToggle={(checked) => setCodEnabled(checked)}
             />
@@ -345,7 +341,6 @@ function AdminPaymentsContent() {
                   value={activeCodDesc}
                   onChange={(e) => setCodDesc(e.target.value)}
                   className="w-full rounded-md border border-input bg-background p-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring resize-none leading-relaxed"
-                  placeholder="Siparişinizi kapıda teslim alırken nakit veya banka kartı ile ödeyebilirsiniz."
                 />
               </div>
             </CardContent>
@@ -357,7 +352,6 @@ function AdminPaymentsContent() {
           <MethodCardHeader
             icon={BanknotesIcon}
             title="Havale / EFT ile Ödeme"
-            subtitle="Banka hesaplarına doğrudan transfer ile sipariş alma"
             enabled={activeBankEnabled}
             onToggle={(checked) => setBankEnabled(checked)}
           />
@@ -373,7 +367,6 @@ function AdminPaymentsContent() {
                 value={activeBankDesc}
                 onChange={(e) => setBankDesc(e.target.value)}
                 className="w-full rounded-md border border-input bg-background p-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring resize-none leading-relaxed"
-                placeholder="Siparişi oluşturduktan sonra belirtilen banka hesabına sipariş numaranızı açıklama kısmına yazarak ödeme yapınız."
               />
               <p className="text-xs text-muted-foreground">
                 Bu talimat sipariş tamamlama ekranında ve müşteriye gönderilen sipariş alındı e-postasında gösterilir.
@@ -387,9 +380,6 @@ function AdminPaymentsContent() {
                   <h3 className="text-sm font-semibold text-foreground">
                     Banka Hesapları ({activeAccounts.length})
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Müşterilerinize ödeme sayfasında ve sipariş e-postasında sunulan aktif IBAN listesi
-                  </p>
                 </div>
                 <Button
                   type="button"
@@ -550,9 +540,10 @@ function AdminPaymentsContent() {
               <Input
                 id="modal-iban"
                 value={newIban}
-                onChange={(e) => setNewIban(e.target.value)}
-                placeholder="TR00 0000 0000 0000 0000 0000 00"
-                className="h-10 text-sm font-mono uppercase"
+                onChange={(e) => setNewIban(formatIban(e.target.value))}
+                placeholder="TR11 8187 8888 8888 8888 8888 77"
+                maxLength={32}
+                className="h-10 text-sm font-mono tracking-wide"
               />
             </div>
           </div>

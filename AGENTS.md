@@ -7,6 +7,7 @@ Kod yazmadan önce düşünme protokolü (Senior Mühendislik Standardı):
 - Mevcut mimariyi, sözleşmeleri ve tip tanımlarını bozma; varsayım yapmak yerine ilgili dosyaları oku ve doğrula.
 - Açıklamayı sade tut, doğrudan amaca hizmet eden temiz koda odaklan.
 
+asla git checkout gibi tüm dosyayı etkileyen kırıcı git komutları kullanma.
 ## Projenin amacı
 
 Bu repo, müşteriler için e-ticaret sitelerini hızlıca uyarlayıp teslim etmeye yarayan bir boilerplate'tir. Mevcut mağaza verisini boilerplate'in evrensel kuralı kabul etme.
