@@ -5,7 +5,7 @@ import { getAdminProductPage, getAdminProductStats } from "@/lib/catalog/pages";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import type { OrderEmailEvent } from "@/convex/emails/events";
+import { isRetryableOrderEvent, type OrderEmailEvent } from "@/convex/emails/events";
 import { hasAdminSession, isSameOriginRequest } from "@/lib/admin/session";
 import { isRecord, stringValue, parseProductInput, parseCategoryInput } from "@/lib/admin/input";
 import { readJsonLimited } from "@/lib/http/read-json-limited";
@@ -462,14 +462,7 @@ export async function POST(request: NextRequest) {
 
       case "email.retry": {
         const event = stringValue(input.event, "E-posta türü") as OrderEmailEvent;
-        const retryableEvents: OrderEmailEvent[] = [
-          "order_placed",
-          "payment_confirmed",
-          "order_shipped",
-          "order_delivered",
-          "order_cancelled",
-        ];
-        if (!retryableEvents.includes(event)) throw new Error("E-posta türü geçersiz.");
+        if (!isRetryableOrderEvent(event)) throw new Error("E-posta türü geçersiz.");
         const result = await client.mutation(api.notifications.retry, {
           adminSecret,
           orderId: stringValue(input.orderId, "Sipariş") as Id<"orders">,

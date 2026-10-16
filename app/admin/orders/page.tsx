@@ -17,6 +17,7 @@ import {
   TruckIcon,
 } from "@heroicons/react/24/outline";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { isRetryableOrderEvent } from "@/convex/emails/events";
 import {
   Button,
   Input,
@@ -516,7 +517,7 @@ function OrderDetails({
                     <span className="text-xs text-muted-foreground">{emailStatusLabels[emailEvent.status]}</span>
                   </div>
                   {emailEvent.error && <p className="text-xs text-destructive">{emailEvent.error}</p>}
-                  {(emailEvent.event !== "admin_order_alert" &&
+                  {(isRetryableOrderEvent(emailEvent.event) &&
                     (emailEvent.status === "failed" || emailEvent.status === "not_configured")) && (
                     <Button
                       type="button"

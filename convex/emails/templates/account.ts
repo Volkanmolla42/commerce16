@@ -1,6 +1,6 @@
+import { escapeHtml } from "../../../lib/html";
 import {
   cta,
-  escapeHtml,
   ICONS,
   note,
   panel,

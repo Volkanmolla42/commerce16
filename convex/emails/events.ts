@@ -15,7 +15,7 @@ export const orderEmailEventValidator = v.union(
 
 export type OrderEmailEvent = Infer<typeof orderEmailEventValidator>;
 
-/** Olayın gönderilebilir (veya admin tarafından yeniden denenebilir) olduğu sipariş durumları. */
+/** Olayın gönderilebileceği sipariş durumları. */
 export function canSendOrderEvent(event: OrderEmailEvent, status: string): boolean {
   switch (event) {
     case "order_placed":
@@ -29,4 +29,9 @@ export function canSendOrderEvent(event: OrderEmailEvent, status: string): boole
     case "order_cancelled":
       return status === "cancelled";
   }
+}
+
+/** Yönetici bildirimi yeniden gönderilemez. */
+export function isRetryableOrderEvent(event: OrderEmailEvent): boolean {
+  return event !== "admin_order_alert";
 }

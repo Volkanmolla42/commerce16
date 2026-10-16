@@ -15,6 +15,7 @@ import { formatOrderCode, resolveCarrierTrackingUrl } from "../lib/orders";
 import { adminAlertTo } from "./emails/config";
 import {
   canSendOrderEvent,
+  isRetryableOrderEvent,
   orderEmailEventValidator,
   type OrderEmailEvent,
 } from "./emails/events";
@@ -233,6 +234,9 @@ export const retry = mutation({
     assertAdminApiSecret(adminSecret);
     const order = await ctx.db.get(orderId);
     if (!order) throw new Error("Sipariş bulunamadı.");
+    if (!isRetryableOrderEvent(event)) {
+      throw new Error("Bu e-posta türü yeniden gönderilemez.");
+    }
     if (!canSendOrderEvent(event, order.status)) {
       throw new Error("Bu e-posta türü için sipariş durumu uygun değil.");
     }

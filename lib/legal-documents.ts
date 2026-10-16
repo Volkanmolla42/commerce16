@@ -1,3 +1,5 @@
+import { escapeHtml } from "./html";
+
 export interface SellerInfo {
   storeName: string;
   address: string;
@@ -18,19 +20,11 @@ export interface LegalDocuments {
   preInformationForm: LegalDocument;
 }
 
-function esc(value: string) {
-  return value
-    .trim()
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 function sellerRows(seller: SellerInfo) {
-  return `Unvan: ${esc(seller.storeName)}<br />
-  Adres: ${esc(seller.address)}<br />
-  E-posta: ${esc(seller.email)}<br />
-  Telefon: ${esc(seller.phone)}`;
+  return `Unvan: ${escapeHtml(seller.storeName.trim())}<br />
+  Adres: ${escapeHtml(seller.address.trim())}<br />
+  E-posta: ${escapeHtml(seller.email.trim())}<br />
+  Telefon: ${escapeHtml(seller.phone.trim())}`;
 }
 
 function versionOf(title: string, body: string) {

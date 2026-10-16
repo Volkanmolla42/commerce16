@@ -1,8 +1,8 @@
 import { formatDateTime } from "../../../lib/format-date";
 import { formatPhone } from "../../../lib/orders";
+import { escapeHtml } from "../../../lib/html";
 import {
   cta,
-  escapeHtml,
   field,
   fieldTable,
   ICONS,

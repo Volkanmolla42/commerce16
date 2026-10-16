@@ -1,7 +1,7 @@
 import { formatMoney } from "../../../lib/format-money";
+import { escapeHtml } from "../../../lib/html";
 import {
   cta,
-  escapeHtml,
   field,
   fieldTable,
   ICONS,

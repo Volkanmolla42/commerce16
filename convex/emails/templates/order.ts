@@ -2,8 +2,8 @@ import { v, type Infer } from "convex/values";
 import { formatMoney } from "../../../lib/format-money";
 import { formatDateTime } from "../../../lib/format-date";
 import { formatIban } from "../../../lib/iban";
+import { escapeHtml } from "../../../lib/html";
 import {
-  escapeHtml,
   field,
   fieldTable,
   ICONS,

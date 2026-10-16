@@ -1,14 +1,5 @@
 import { formatMoney } from "../../lib/format-money";
-
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character]!);
-}
+import { escapeHtml } from "../../lib/html";
 
 export interface EmailContent {
   subject: string;
