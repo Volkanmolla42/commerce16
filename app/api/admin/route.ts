@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(coupons, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "payments") {
-      const payments = await client.query(api.payments.getPaymentSettings, {});
+      const payments = await client.query(api.payments.getPaymentSettingsAdmin, { adminSecret });
       return NextResponse.json(payments, { headers: { "Cache-Control": "no-store" } });
     }
     if (resource === "email-templates") {

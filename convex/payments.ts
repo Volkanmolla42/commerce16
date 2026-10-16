@@ -1,36 +1,54 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
 
+const cashOnDeliverySettingsValidator = v.object({
+  enabled: v.boolean(),
+  fee: v.number(),
+  description: v.string(),
+});
+
+const bankTransferSettingsValidator = v.object({
+  enabled: v.boolean(),
+  description: v.string(),
+  accounts: v.array(
+    v.object({
+      id: v.string(),
+      bankName: v.string(),
+      accountHolder: v.string(),
+      iban: v.string(),
+    })
+  ),
+});
+
+// Vitrine dönen PayTR biçimi; merchant kimlikleri yalnız admin biçiminde taşınır.
+const publicPaytrSettingsValidator = v.object({
+  enabled: v.boolean(),
+  testMode: v.boolean(),
+  description: v.string(),
+});
+
+const paytrSettingsValidator = publicPaytrSettingsValidator.extend({
+  merchantId: v.optional(v.string()),
+  merchantKey: v.optional(v.string()),
+  merchantSalt: v.optional(v.string()),
+});
+
+export const storefrontPaymentSettingsValidator = v.object({
+  cashOnDelivery: cashOnDeliverySettingsValidator,
+  bankTransfer: bankTransferSettingsValidator,
+  paytr: publicPaytrSettingsValidator,
+});
+
 export const paymentSettingsValidator = v.object({
   key: v.optional(v.literal("payment")),
-  cashOnDelivery: v.object({
-    enabled: v.boolean(),
-    fee: v.number(),
-    description: v.string(),
-  }),
-  bankTransfer: v.object({
-    enabled: v.boolean(),
-    description: v.string(),
-    accounts: v.array(
-      v.object({
-        id: v.string(),
-        bankName: v.string(),
-        accountHolder: v.string(),
-        iban: v.string(),
-      })
-    ),
-  }),
-  paytr: v.object({
-    enabled: v.boolean(),
-    testMode: v.boolean(),
-    merchantId: v.optional(v.string()),
-    merchantKey: v.optional(v.string()),
-    merchantSalt: v.optional(v.string()),
-    description: v.string(),
-  }),
+  cashOnDelivery: cashOnDeliverySettingsValidator,
+  bankTransfer: bankTransferSettingsValidator,
+  paytr: paytrSettingsValidator,
   updatedAt: v.optional(v.string()),
 });
+
+type PaymentSettings = typeof paymentSettingsValidator["type"];
 
 export const defaultPaymentSettings = {
   cashOnDelivery: {
@@ -66,40 +84,62 @@ export const defaultPaymentSettings = {
   },
 };
 
+async function readPaymentSettings(ctx: QueryCtx): Promise<PaymentSettings> {
+  const record = await ctx.db
+    .query("paymentSettings")
+    .withIndex("by_key", (q) => q.eq("key", "payment"))
+    .unique();
+
+  if (!record) {
+    return defaultPaymentSettings;
+  }
+
+  return {
+    cashOnDelivery: {
+      enabled: record.cashOnDelivery?.enabled ?? defaultPaymentSettings.cashOnDelivery.enabled,
+      fee: record.cashOnDelivery?.fee ?? defaultPaymentSettings.cashOnDelivery.fee,
+      description: record.cashOnDelivery?.description ?? defaultPaymentSettings.cashOnDelivery.description,
+    },
+    bankTransfer: {
+      enabled: record.bankTransfer?.enabled ?? defaultPaymentSettings.bankTransfer.enabled,
+      description: record.bankTransfer?.description ?? defaultPaymentSettings.bankTransfer.description,
+      accounts: record.bankTransfer?.accounts ?? defaultPaymentSettings.bankTransfer.accounts,
+    },
+    paytr: {
+      enabled: record.paytr?.enabled ?? defaultPaymentSettings.paytr.enabled,
+      testMode: record.paytr?.testMode ?? defaultPaymentSettings.paytr.testMode,
+      merchantId: record.paytr?.merchantId ?? defaultPaymentSettings.paytr.merchantId,
+      merchantKey: record.paytr?.merchantKey ?? defaultPaymentSettings.paytr.merchantKey,
+      merchantSalt: record.paytr?.merchantSalt ?? defaultPaymentSettings.paytr.merchantSalt,
+      description: record.paytr?.description ?? defaultPaymentSettings.paytr.description,
+    },
+    updatedAt: record.updatedAt,
+  };
+}
+
 export const getPaymentSettings = query({
   args: {},
-  returns: paymentSettingsValidator,
+  returns: storefrontPaymentSettingsValidator,
   handler: async (ctx) => {
-    const record = await ctx.db
-      .query("paymentSettings")
-      .withIndex("by_key", (q) => q.eq("key", "payment"))
-      .unique();
-
-    if (!record) {
-      return defaultPaymentSettings;
-    }
-
+    const settings = await readPaymentSettings(ctx);
     return {
-      cashOnDelivery: {
-        enabled: record.cashOnDelivery?.enabled ?? defaultPaymentSettings.cashOnDelivery.enabled,
-        fee: record.cashOnDelivery?.fee ?? defaultPaymentSettings.cashOnDelivery.fee,
-        description: record.cashOnDelivery?.description ?? defaultPaymentSettings.cashOnDelivery.description,
-      },
-      bankTransfer: {
-        enabled: record.bankTransfer?.enabled ?? defaultPaymentSettings.bankTransfer.enabled,
-        description: record.bankTransfer?.description ?? defaultPaymentSettings.bankTransfer.description,
-        accounts: record.bankTransfer?.accounts ?? defaultPaymentSettings.bankTransfer.accounts,
-      },
+      cashOnDelivery: settings.cashOnDelivery,
+      bankTransfer: settings.bankTransfer,
       paytr: {
-        enabled: record.paytr?.enabled ?? defaultPaymentSettings.paytr.enabled,
-        testMode: record.paytr?.testMode ?? defaultPaymentSettings.paytr.testMode,
-        merchantId: record.paytr?.merchantId ?? defaultPaymentSettings.paytr.merchantId,
-        merchantKey: record.paytr?.merchantKey ?? defaultPaymentSettings.paytr.merchantKey,
-        merchantSalt: record.paytr?.merchantSalt ?? defaultPaymentSettings.paytr.merchantSalt,
-        description: record.paytr?.description ?? defaultPaymentSettings.paytr.description,
+        enabled: settings.paytr.enabled,
+        testMode: settings.paytr.testMode,
+        description: settings.paytr.description,
       },
-      updatedAt: record.updatedAt,
     };
+  },
+});
+
+export const getPaymentSettingsAdmin = query({
+  args: { adminSecret: v.string() },
+  returns: paymentSettingsValidator,
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    return await readPaymentSettings(ctx);
   },
 });
 

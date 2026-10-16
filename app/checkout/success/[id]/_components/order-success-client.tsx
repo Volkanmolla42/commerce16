@@ -19,6 +19,7 @@ import {
   XCircleIcon,
   TruckIcon,
   BanknotesIcon,
+  CreditCardIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, CardHeader, CardTitle, CardContent, Separator } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
@@ -333,6 +334,23 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                     </div>
                   ))}
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {order.paymentMethod === "paytr" && order.status === "pending" && (
+            <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-3">
+              <CardTitle className="text-base font-bold text-foreground flex items-center gap-2 pb-3 border-b border-border">
+                <CreditCardIcon className="size-5 text-primary" />
+                <span>Ödeme Doğrulaması</span>
+              </CardTitle>
+
+              <div className="rounded-xl border border-border bg-muted/20 p-3.5 text-xs text-muted-foreground leading-relaxed space-y-1">
+                <p className="font-semibold text-foreground text-sm">Ödemeniz Doğrulanıyor</p>
+                <p>
+                  Siparişiniz kaydedildi ve ürünleriniz sizin için rezerve edildi. Kartlı işleminiz
+                  onaylandığında siparişiniz işleme alınır ve size e-posta ile bildirilir.
+                </p>
               </div>
             </Card>
           )}

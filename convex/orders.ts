@@ -272,8 +272,6 @@ export const createOrder = mutation({
 
     let paymentMethodTitle: string | undefined = undefined;
     let paymentFee: number | undefined = undefined;
-    let orderStatus: "pending" | "paid" = "pending";
-    let paidAtTimestamp: number | undefined = undefined;
     let additionalFeeCents = 0;
 
     if (args.paymentMethod) {
@@ -302,9 +300,6 @@ export const createOrder = mutation({
           throw new Error("PayTR ile ödeme yöntemi şu anda aktif değildir.");
         }
         paymentMethodTitle = paymentSettings.paytr.testMode ? "PayTR (Demo)" : "PayTR (Kredi Kartı)";
-        // PayTR demo payment is simulated and paid at checkout
-        orderStatus = "paid";
-        paidAtTimestamp = Date.now();
       }
     }
 
@@ -360,8 +355,8 @@ export const createOrder = mutation({
         couponDiscountKurus: coupon.discountKurus,
         couponReserved: false,
       } : {}),
-      status: orderStatus,
-      ...(paidAtTimestamp ? { paidAt: paidAtTimestamp } : {}),
+      // Oluşturma hiçbir ödeme yönteminde ödeme alınmış saymaz; "paid" yalnız yönetici durum geçişiyle yazılır.
+      status: "pending",
       ...(args.paymentMethod ? {
         paymentMethod: args.paymentMethod,
         paymentMethodTitle,
@@ -481,7 +476,6 @@ async function changeOrderStatus(
 
   if (order.status !== "paid" && status === "paid") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmation" });
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "admin_new_order" });
   }
   if (order.status !== "shipped" && status === "shipped") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_shipped" });

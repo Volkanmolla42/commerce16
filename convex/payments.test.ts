@@ -8,6 +8,23 @@ import { api, internal } from "./_generated/api";
 const modules = import.meta.glob("./**/*.ts");
 const secret = "test-admin-secret-payments";
 
+const merchantSettings = {
+  cashOnDelivery: { enabled: true, fee: 0, description: "Kapıda ödeme" },
+  bankTransfer: {
+    enabled: true,
+    description: "Havale",
+    accounts: [{ id: "bank-1", bankName: "Ziraat", accountHolder: "Mağaza A.Ş.", iban: "TR00" }],
+  },
+  paytr: {
+    enabled: true,
+    testMode: true,
+    merchantId: "123456",
+    merchantKey: "gizli-merchant-key",
+    merchantSalt: "gizli-merchant-salt",
+    description: "Kredi kartı ile ödeme",
+  },
+};
+
 beforeEach(() => {
   vi.stubEnv("ADMIN_API_SECRET", secret);
   vi.spyOn(RateLimiter.prototype, "limit").mockResolvedValue({ ok: true } as unknown as Awaited<ReturnType<RateLimiter["limit"]>>);
@@ -73,10 +90,35 @@ describe("payment settings and order payment methods", () => {
     expect(updated.paytr.enabled).toBe(false);
   });
 
-  it("creates order with paytr (demo) and sets status to paid", async () => {
+  it("keeps PayTR merchant credentials out of the storefront payment settings", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(api.payments.updatePaymentSettings, { adminSecret: secret, ...merchantSettings });
+
+    const storefront = await t.query(api.payments.getPaymentSettings, {});
+
+    expect(JSON.stringify(storefront)).not.toContain("gizli-merchant-key");
+    expect(JSON.stringify(storefront)).not.toContain("gizli-merchant-salt");
+    expect(storefront.paytr.enabled).toBe(true);
+    expect(storefront.paytr.description).toBe("Kredi kartı ile ödeme");
+  });
+
+  it("exposes PayTR merchant credentials only through the admin payment settings query", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(api.payments.updatePaymentSettings, { adminSecret: secret, ...merchantSettings });
+
+    const admin = await t.query(api.payments.getPaymentSettingsAdmin, { adminSecret: secret });
+    expect(admin.paytr.merchantId).toBe("123456");
+    expect(admin.paytr.merchantKey).toBe("gizli-merchant-key");
+    expect(admin.paytr.merchantSalt).toBe("gizli-merchant-salt");
+
+    await expect(t.query(api.payments.getPaymentSettingsAdmin, { adminSecret: "wrong-secret" })).rejects.toThrow(
+      "doğrulanamadı",
+    );
+  });
+
+  it("creates a paytr order without marking it paid", async () => {
     const t = convexTest(schema, modules);
 
-    // Ürün ekle
     const productId = await t.mutation(api.products.create, {
       adminSecret: secret,
       title: "Test Tişört",
@@ -97,7 +139,6 @@ describe("payment settings and order payment methods", () => {
       images: [],
     });
 
-    // PayTR demo siparişi
     const orderId = await t.mutation(api.orders.createOrder, {
       customerName: "Ali Veli",
       customerEmail: "ali@test.com",
@@ -118,9 +159,59 @@ describe("payment settings and order payment methods", () => {
 
     const order = await t.query(api.orders.getOrderById, { id: orderId });
     expect(order).not.toBeNull();
-    expect(order?.status).toBe("paid");
+    expect(order?.status).toBe("pending");
     expect(order?.paymentMethod).toBe("paytr");
-    expect(order?.paidAt).toBeDefined();
+    expect(order?.paidAt).toBeUndefined();
+  });
+
+  it("confirms a paytr order as awaiting payment", async () => {
+    const t = convexTest(schema, modules);
+
+    const productId = await t.mutation(api.products.create, {
+      adminSecret: secret,
+      title: "Test Tişört",
+      slug: "test-tisort",
+      availableForSale: true,
+      variants: [
+        {
+          id: "v-1",
+          title: "Standart",
+          sku: "SKU-TISORT-1",
+          price: "100.00",
+          stockQuantity: 10,
+          availableForSale: true,
+          selectedOptions: [],
+        },
+      ],
+      options: [],
+      images: [],
+    });
+
+    const orderId = await t.mutation(api.orders.createOrder, {
+      customerName: "Ali Veli",
+      customerEmail: "ali@test.com",
+      provinceId: "34",
+      districtId: "1421",
+      total: "100.00",
+      paymentMethod: "paytr",
+      items: [
+        {
+          productId,
+          variantId: "v-1",
+          title: "Test Tişört",
+          quantity: 1,
+          price: "100.00",
+        },
+      ],
+    });
+
+    const emailPayload = await t.query(internal.notifications.getOrderEmailPayload, {
+      orderId,
+      event: "payment_confirmation",
+    });
+    expect(emailPayload).not.toBeNull();
+    expect(emailPayload?.orderStatus).toBe("pending");
+    expect(emailPayload?.paymentMethod).toBe("paytr");
   });
 
   it("creates order with bank transfer and sets status to pending", async () => {

@@ -71,7 +71,7 @@ type EmailItem = {
   image: string | null;
   sku: string | null;
 };
-type EmailPayload = {
+export type EmailPayload = {
   orderId: Id<"orders">;
   event: EmailEvent;
   customerEmail: string;
@@ -186,32 +186,48 @@ export const beginSend = internalMutation({
   returns: v.union(v.id("orderEmailEvents"), v.null()),
   handler: async (ctx, { orderId, event }) => {
     const now = Date.now();
+    const order = await ctx.db.get(orderId);
+    if (!order) return null;
+
+    // payment_confirmation hem sipariş oluşturulduğunda ("created") hem de ödendiğinde ("paid") gönderilir.
+    // İki aşama birbirinden idempotencyKey üzerinden ayrılır.
+    const targetIdempotencyKey = event === "payment_confirmation"
+      ? `${event}/${orderId}/${order.status === "paid" ? "paid" : "created"}`
+      : `${event}/${orderId}`;
+
     const existing = await ctx.db.query("orderEmailEvents")
       .withIndex("by_order_and_event", (q) => q.eq("orderId", orderId).eq("event", event))
       .unique();
-    if (existing?.status === "sent" || existing?.status === "review") return null;
-    if (existing?.status === "processing") {
-      if ((existing.leaseUntil ?? 0) > now) return null;
-      await ctx.db.patch(existing._id, {
-        status: "review",
-        error: "E-posta gönderiminin sonucu doğrulanamadı. Gönderici kutusunu kontrol etmeden tekrar göndermeyin.",
-        leaseUntil: undefined,
-      });
-      return null;
-    }
+
     if (existing) {
+      const isSamePhase = existing.idempotencyKey === targetIdempotencyKey;
+      if (isSamePhase) {
+        if (existing.status === "sent" || existing.status === "review") return null;
+        if (existing.status === "processing") {
+          if ((existing.leaseUntil ?? 0) > now) return null;
+          await ctx.db.patch(existing._id, {
+            status: "review",
+            error: "E-posta gönderiminin sonucu doğrulanamadı. Gönderici kutusunu kontrol etmeden tekrar göndermeyin.",
+            leaseUntil: undefined,
+          });
+          return null;
+        }
+      }
+
       await ctx.db.patch(existing._id, {
         status: "processing",
+        idempotencyKey: targetIdempotencyKey,
         error: undefined,
         leaseUntil: now + 60_000,
       });
       return existing._id;
     }
+
     return await ctx.db.insert("orderEmailEvents", {
       orderId,
       event,
       status: "processing",
-      idempotencyKey: `${event}/${orderId}`,
+      idempotencyKey: targetIdempotencyKey,
       leaseUntil: now + 60_000,
     });
   },
@@ -289,7 +305,7 @@ function formatDate(timestamp: number) {
   });
 }
 
-function buildEmail(payload: EmailPayload) {
+export function buildEmail(payload: EmailPayload) {
   const shortOrderId = formatOrderCode(payload.orderId);
   const discountAmount = payload.couponDiscountKurus ? payload.couponDiscountKurus / 100 : 0;
   const itemsSubtotal = payload.items.reduce((acc, item) => acc + Number(item.price) * item.quantity, 0);
@@ -298,7 +314,7 @@ function buildEmail(payload: EmailPayload) {
   let subject = `Siparişiniz Alındı — #${shortOrderId} | ${payload.storeName}`;
   let iconSvg = EMAIL_ICONS.checkCircle;
   let mainTitle = "Siparişiniz Alındı";
-  let heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişiniz başarıyla alındı ve ödemeniz onaylandı.`;
+  let heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişiniz başarıyla alındı.`;
   let nextStepTitle = "Sırada Ne Var?";
   let nextStepMessage = "Siparişiniz hazırlandığında ve kargoya verildiğinde takip numarası ile birlikte yeni bir bilgilendirme e-postası alacaksınız.";
 
@@ -328,8 +344,19 @@ function buildEmail(payload: EmailPayload) {
       badgeBg = "#f0fdf4";
       badgeColor = "#16a34a";
       badgeBorder = "#bbf7d0";
-    } else {
+    } else if (payload.orderStatus === "paid") {
+      heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, siparişiniz başarıyla alındı ve ödemeniz onaylandı.`;
       badgeText = "Ödeme Onaylandı";
+    } else {
+      subject = `Siparişiniz Alındı (Ödeme Bekleniyor) — #${shortOrderId} | ${payload.storeName}`;
+      mainTitle = "Siparişiniz Alındı — Ödeme Bekleniyor";
+      heroMessage = `Merhaba <strong>${escapeHtml(payload.customerName)}</strong>, #${shortOrderId} numaralı siparişiniz oluşturuldu. Ödemeniz doğrulandığında siparişiniz işleme alınacaktır.`;
+      nextStepTitle = "Ödeme Doğrulaması";
+      nextStepMessage = "Ödemeniz onaylandığında sizinle ayrıca paylaşacağız.";
+      badgeText = "Ödeme Bekleniyor";
+      badgeBg = "#fffbeb";
+      badgeColor = "#b45309";
+      badgeBorder = "#fde68a";
     }
   } else if (payload.event === "order_shipped") {
     subject = `Siparişiniz Kargoya Verildi — #${shortOrderId} | ${payload.storeName}`;
@@ -749,8 +776,8 @@ export const retry = mutation({
     if (!order) throw new Error("Sipariş bulunamadı.");
 
     const canRetry =
-      (event === "payment_confirmation" && order.status !== "pending") ||
-      (event === "admin_new_order" && order.status !== "pending") ||
+      (event === "payment_confirmation" && order.status !== "cancelled") ||
+      (event === "admin_new_order" && order.status !== "cancelled") ||
       (event === "order_shipped" && (order.status === "shipped" || order.status === "delivered")) ||
       (event === "order_cancelled" && order.status === "cancelled") ||
       (event === "order_delivered" && order.status === "delivered");
