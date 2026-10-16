@@ -35,12 +35,11 @@ const mockVariant2: ProductVariant = {
     { name: "Beden", value: "M" },
   ],
 };
-
 const mockProduct: Product = {
   id: "prod-1",
   slug: "ornek-tisort",
   title: "Örnek Tişört",
-  description: "Açıklama",
+  updatedAt: "2026-01-01T00:00:00.000Z",
   price: "100.00",
   availableForSale: true,
   images: [],
