@@ -14,8 +14,8 @@ function loadConfetti() {
 // Sepete ekleme sonrası, tıklanan elemanın merkezinden konfeti patlatır.
 export async function burstCartConfetti(origin?: HTMLElement | null) {
   if (typeof window === "undefined") return;
-  const confetti = await loadConfetti();
   const rect = origin?.getBoundingClientRect();
+  const confetti = await loadConfetti();
   const point = rect
     ? {
         x: (rect.left + rect.width / 2) / window.innerWidth,

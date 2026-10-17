@@ -36,17 +36,29 @@ const publicVariantValidator = v.object({
   availableForSale: v.boolean(),
   selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
   price: v.string(),
+  compareAtPrice: v.optional(v.string()),
   sku: v.optional(v.string()),
   barcode: v.optional(v.string()),
   stockQuantity: v.optional(v.number()),
 });
 const productValidator = productDocumentValidator.omit(
   "images", "variants", "priceValue",
-).extend({ price: v.string(), images: v.array(publicImageValidator), variants: v.array(publicVariantValidator) });
+).extend({
+  price: v.string(),
+  images: v.array(publicImageValidator),
+  variants: v.array(publicVariantValidator),
+  descriptionImages: v.optional(v.array(v.object({ url: v.string() }))),
+});
 const sitemapProductValidator = v.object({ slug: v.string(), updatedAt: v.string() });
 
 const adminProductValidator = productDocumentValidator.omit("priceValue")
-  .extend({ images: v.array(adminStoredImageValidator) });
+  .extend({
+    images: v.array(adminStoredImageValidator),
+    descriptionImages: v.array(v.object({
+      storageId: v.id("_storage"),
+      url: v.union(v.string(), v.null()),
+    })),
+  });
 
 function normalizeKey(value: string) {
   return value.trim().toLocaleLowerCase("tr-TR");
@@ -113,6 +125,12 @@ function validateProductVariants(
     if (!/^\d+(?:\.\d{1,2})?$/.test(variant.price) || !Number.isSafeInteger(priceInCents) || priceInCents < 0) {
       throw new Error("Her varyant için geçerli bir satış fiyatı girin.");
     }
+    if (variant.compareAtPrice !== undefined) {
+      const compareAtCents = Math.round(Number(variant.compareAtPrice) * 100);
+      if (!/^\d+(?:\.\d{1,2})?$/.test(variant.compareAtPrice) || !Number.isSafeInteger(compareAtCents) || compareAtCents <= priceInCents) {
+        throw new Error("Liste fiyatı satış fiyatından büyük ve geçerli bir tutar olmalı.");
+      }
+    }
     const sku = normalizeSku(variant.sku);
     if (!sku) throw new Error("Her varyant için ayrı bir SKU girin.");
     if (skus.has(sku)) throw new Error("Her varyantın SKU kodu benzersiz olmalı.");
@@ -153,6 +171,10 @@ async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
     const url = await ctx.storage.getUrl(storageId);
     return url ? { url, ...(selectedOptions ? { selectedOptions } : {}) } : null;
   }));
+  const descriptionImages = await Promise.all((product.descriptionImageStorageIds ?? []).map(async (storageId) => {
+    const url = await ctx.storage.getUrl(storageId);
+    return url ? { url } : null;
+  }));
   const variants = product.variants.map((variant) => ({
     ...variant,
     stockQuantity: Math.max(0, variant.stockQuantity),
@@ -165,13 +187,59 @@ async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
     slug: product.slug,
     title: product.title,
     price: getProductPriceRange(product).min,
+    soldCount: product.soldCount ?? 0,
+    publishedAt: product.publishedAt,
     availableForSale: product.availableForSale && hasInStockVariant,
     attributes: product.attributes,
     categorySlug: product.categorySlug,
+    description: product.description,
+    descriptionImages: descriptionImages.filter((image): image is NonNullable<typeof image> => Boolean(image)),
     images: images.filter((image): image is NonNullable<typeof image> => Boolean(image)),
     options: product.options,
     variants,
     updatedAt: product.updatedAt,
+  };
+}
+
+function normalizeProductMediaLinks(product: Pick<Doc<"products">, "descriptionImageStorageIds">) {
+  const descriptionImageStorageIds = product.descriptionImageStorageIds
+    ? [...new Set(product.descriptionImageStorageIds)]
+    : undefined;
+  return { descriptionImageStorageIds };
+}
+
+async function deleteUnreferencedStorage(ctx: MutationCtx, storageIds: Id<"_storage">[]) {
+  if (storageIds.length === 0) return;
+  const referenced = new Set<string>();
+  for (const product of await ctx.db.query("products").take(200)) {
+    for (const image of product.images) referenced.add(image.storageId);
+    for (const storageId of product.descriptionImageStorageIds ?? []) referenced.add(storageId);
+  }
+  for (const category of await ctx.db.query("categories").take(200)) {
+    if (category.imageStorageId) referenced.add(category.imageStorageId);
+  }
+  for (const settings of await ctx.db.query("storeSettings").take(10)) {
+    if (settings.logoStorageId) referenced.add(settings.logoStorageId);
+  }
+  for (const storageId of storageIds) {
+    if (referenced.has(storageId)) continue;
+    if (await ctx.db.system.get("_storage", storageId)) {
+      await ctx.storage.delete(storageId);
+    }
+  }
+}
+
+async function withAdminMediaUrls(ctx: QueryCtx, product: Doc<"products">) {
+  return {
+    ...withoutCatalogMetadata(product),
+    images: await Promise.all(product.images.map(async (image) => ({
+      ...image,
+      url: await ctx.storage.getUrl(image.storageId),
+    }))),
+    descriptionImages: await Promise.all((product.descriptionImageStorageIds ?? []).map(async (storageId) => ({
+      storageId,
+      url: await ctx.storage.getUrl(storageId),
+    }))),
   };
 }
 
@@ -279,9 +347,7 @@ export const getByIdAdmin = query({
     assertAdminApiSecret(args.adminSecret);
     const product = await ctx.db.get("products", args.id);
     if (!product) return null;
-    return { ...withoutCatalogMetadata(product), images: await Promise.all(product.images.map(async (image) => ({
-      ...image, url: await ctx.storage.getUrl(image.storageId),
-    }))) };
+    return await withAdminMediaUrls(ctx, product);
   },
 });
 
@@ -342,13 +408,7 @@ export const listAllAdmin = query({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
     const items = await ctx.db.query("products").order("desc").take(100);
-    return await Promise.all(items.map(async (item) => ({
-        ...withoutCatalogMetadata(item),
-        images: await Promise.all(item.images.map(async (image) => ({
-          ...image,
-          url: await ctx.storage.getUrl(image.storageId),
-        }))),
-      })));
+    return await Promise.all(items.map((item) => withAdminMediaUrls(ctx, item)));
   },
 });
 
@@ -639,6 +699,7 @@ export const create = mutation({
     validateProductVariantsAndOptions(normalizedProduct);
     await validateProductAttributes(ctx, normalizedProduct);
     await validateProductImages(ctx, normalizedProduct.images, normalizedProduct.options, normalizedProduct.variants);
+    const media = normalizeProductMediaLinks(normalizedProduct);
     const existing = await ctx.db
       .query("products")
       .withIndex("by_slug", (q) => q.eq("slug", normalizedProduct.slug))
@@ -646,7 +707,12 @@ export const create = mutation({
     if (existing) throw new Error("Bu ürün adresi zaten kullanılıyor.");
 
     const updatedAt = new Date().toISOString();
-    const productId = await insertCatalogProduct(ctx, { ...normalizedProduct, updatedAt });
+    const productId = await insertCatalogProduct(ctx, {
+      ...normalizedProduct,
+      ...(normalizedProduct.availableForSale ? { publishedAt: Date.now() } : {}),
+      ...(media.descriptionImageStorageIds !== undefined ? { descriptionImageStorageIds: media.descriptionImageStorageIds } : {}),
+      updatedAt,
+    });
     await syncProductSkus(ctx, productId, normalizedProduct);
     return productId;
   },
@@ -670,6 +736,13 @@ export const update = mutation({
 
     const nextImages = rest.images ?? current.images;
     await validateProductImages(ctx, nextImages, next.options, next.variants);
+    const media = normalizeProductMediaLinks(next);
+    const nextDescriptionImageStorageIds = rest.descriptionImageStorageIds ?? current.descriptionImageStorageIds ?? [];
+    const removedDescriptionImageStorageIds = (current.descriptionImageStorageIds ?? [])
+      .filter((storageId) => !nextDescriptionImageStorageIds.includes(storageId));
+    const publishedAt = !current.availableForSale && rest.availableForSale === true && current.publishedAt === undefined
+      ? Date.now()
+      : current.publishedAt;
 
     if (rest.slug && rest.slug !== current.slug) {
       const duplicate = await ctx.db
@@ -684,8 +757,11 @@ export const update = mutation({
       ...rest,
       variants: next.variants,
       images: nextImages,
+      ...(media.descriptionImageStorageIds !== undefined ? { descriptionImageStorageIds: media.descriptionImageStorageIds } : {}),
+      ...(publishedAt !== undefined ? { publishedAt } : {}),
       updatedAt: new Date().toISOString(),
     });
+    await deleteUnreferencedStorage(ctx, removedDescriptionImageStorageIds);
 
     // Stok artışı olan veya yeniden satışa açılan varyantlar için Gelince Haber Ver bildirimini tetikle
     if (next.availableForSale) {
@@ -718,6 +794,11 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
     const product = await ctx.db.get(args.id);
+    const descriptionImageStorageIds = product
+      ? (product.descriptionImageStorageIds ?? []).filter(
+          (storageId) => !product.images.some((image) => image.storageId === storageId),
+        )
+      : [];
     if (product) {
       for (const image of product.images) {
         if (await ctx.db.system.get("_storage", image.storageId)) {
@@ -730,6 +811,7 @@ export const remove = mutation({
       for (const entry of registry) await ctx.db.delete(entry._id);
     }
     if (product) await deleteCatalogProduct(ctx, product);
+    await deleteUnreferencedStorage(ctx, descriptionImageStorageIds);
     return null;
   },
 });
@@ -773,7 +855,8 @@ export const discardImageUpload = mutation({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
     for await (const product of ctx.db.query("products")) {
-      if (product.images.some((image) => image.storageId === args.storageId)) {
+      if (product.images.some((image) => image.storageId === args.storageId) ||
+        (product.descriptionImageStorageIds ?? []).some((storageId) => storageId === args.storageId)) {
         return null;
       }
     }

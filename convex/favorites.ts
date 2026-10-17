@@ -14,8 +14,7 @@ async function requireUserId(ctx: MutationCtx) {
   return userId;
 }
 
-export const getMyFavoriteSlugs = query({
-  args: {},
+export const getMyFavoriteSlugs = query({  args: {},
   returns: v.array(v.string()),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -28,6 +27,18 @@ export const getMyFavoriteSlugs = query({
       .take(MAX_FAVORITES);
 
     return favorites.map(({ productSlug }) => productSlug);
+  },
+});
+
+export const getProductFavoriteCount = query({
+  args: { productSlug: v.string() },
+  returns: v.object({ count: v.number(), limited: v.boolean() }),
+  handler: async (ctx, { productSlug }) => {
+    const rows = await ctx.db
+      .query("favorites")
+      .withIndex("by_product_slug", (q) => q.eq("productSlug", productSlug))
+      .take(501);
+    return { count: Math.min(rows.length, 500), limited: rows.length > 500 };
   },
 });
 

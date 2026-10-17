@@ -31,6 +31,7 @@ import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/lay
 import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
 import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
 import { FreeShippingBar } from "@/components/cart/free-shipping-bar";
+import { quotePromotions } from "@/lib/promotions";
 
 type CartItem = ReturnType<typeof useCart>["items"][number];
 
@@ -158,14 +159,20 @@ function CartSummaryCard({
   totalAmount,
   threshold,
   shippingFee,
+  promotionDiscountKurus = 0,
+  promotionTitle = null,
+  freeShippingTitle = null,
 }: {
   totalAmount: number;
   threshold?: number;
   shippingFee?: number;
+  promotionDiscountKurus?: number;
+  promotionTitle?: string | null;
+  freeShippingTitle?: string | null;
 }) {
-  const isFreeShipping = (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
+  const isFreeShipping = Boolean(freeShippingTitle) || (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
   const calculatedShippingFee = isFreeShipping ? 0 : (shippingFee ?? 0);
-  const finalTotal = totalAmount + calculatedShippingFee;
+  const finalTotal = totalAmount - promotionDiscountKurus / 100 + calculatedShippingFee;
 
   return (
     <Card className="sticky top-24 rounded-3xl border-border/80 bg-card p-6 shadow-sm space-y-5">
@@ -179,10 +186,18 @@ function CartSummaryCard({
           <span>Ara Toplam</span>
           <span className="font-semibold text-foreground">{formatMoney(totalAmount)}</span>
         </div>
+        {promotionDiscountKurus > 0 && (
+          <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
+            <span>Kampanya{promotionTitle ? ` (${promotionTitle})` : ""}</span>
+            <span className="tabular-nums">−{formatMoney(promotionDiscountKurus / 100)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-muted-foreground">
           <span>Kargo</span>
           {isFreeShipping ? (
-            <span className="font-medium text-emerald-500">Ücretsiz</span>
+            <span className="text-right font-medium text-emerald-500">
+              Ücretsiz{freeShippingTitle ? ` (${freeShippingTitle})` : ""}
+            </span>
           ) : (
             <span className="font-medium text-foreground">{formatMoney(calculatedShippingFee)}</span>
           )}
@@ -211,14 +226,18 @@ function CartMobileCheckoutBar({
   totalAmount,
   threshold,
   shippingFee,
+  promotionDiscountKurus = 0,
+  freeShippingTitle = null,
 }: {
   totalAmount: number;
   threshold?: number;
   shippingFee?: number;
+  promotionDiscountKurus?: number;
+  freeShippingTitle?: string | null;
 }) {
-  const isFreeShipping = (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
+  const isFreeShipping = Boolean(freeShippingTitle) || (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
   const calculatedShippingFee = isFreeShipping ? 0 : (shippingFee ?? 0);
-  const finalTotal = totalAmount + calculatedShippingFee;
+  const finalTotal = totalAmount - promotionDiscountKurus / 100 + calculatedShippingFee;
 
   return (
     <MobileSummaryBar label="Toplam Tutar" amount={formatMoney(finalTotal)}>
@@ -239,6 +258,17 @@ function CartContent() {
     useCart();
   const restoreHandled = useRef(false);
   const settings = useQuery(api.settings.getStoreSettings, {});
+  const activePromotions = useQuery(api.promotions.listActive, {});
+  const promotion = quotePromotions(
+    items.map((item) => ({
+      productId: item.product.id,
+      unitPriceKurus: Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100),
+      quantity: item.quantity,
+      categorySlug: item.product.categorySlug,
+    })),
+    activePromotions ?? [],
+    Math.round(totalAmount * 100),
+  );
   const restoreCart = useMutation(api.abandonedCartRecovery.restoreCart);
   const [restoreState, setRestoreState] = useState<{
     token: string;
@@ -353,7 +383,11 @@ function CartContent() {
       </div>
 
       {/* Ücretsiz Kargo İlerleme Baremi */}
-      <FreeShippingBar totalAmount={totalAmount} className="mt-6 mb-2" />
+      <FreeShippingBar
+        totalAmount={totalAmount}
+        freeShipping={promotion.freeShipping}
+        className="mt-6 mb-2"
+      />
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
         {/* Ürün Listesi */}
@@ -390,6 +424,9 @@ function CartContent() {
             totalAmount={totalAmount}
             threshold={settings?.freeShippingThreshold}
             shippingFee={settings?.shippingFee}
+            promotionDiscountKurus={promotion.discountKurus}
+            promotionTitle={promotion.title}
+            freeShippingTitle={promotion.freeShippingTitle}
           />
         </div>
       </div>
@@ -399,6 +436,8 @@ function CartContent() {
         totalAmount={totalAmount}
         threshold={settings?.freeShippingThreshold}
         shippingFee={settings?.shippingFee}
+        promotionDiscountKurus={promotion.discountKurus}
+        freeShippingTitle={promotion.freeShippingTitle}
       />
     </div>
   );

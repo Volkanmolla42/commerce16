@@ -91,6 +91,19 @@ export const sync = mutation({
   },
 });
 
+export const getProductCartCount = query({
+  args: { productId: v.id("products"), now: v.number() },
+  returns: v.object({ count: v.number(), limited: v.boolean() }),
+  handler: async (ctx, { productId, now }) => {
+    const carts = await ctx.db
+      .query("activeCarts")
+      .withIndex("by_expires_at", (q) => q.gt("expiresAt", now))
+      .take(501);
+    const matching = carts.filter((cart) => cart.items.some((item) => item.productId === productId));
+    return { count: Math.min(matching.length, 500), limited: carts.length > 500 };
+  },
+});
+
 export const listAdmin = query({
   args: { adminSecret: v.string(), now: v.number() },
   returns: v.array(v.object({

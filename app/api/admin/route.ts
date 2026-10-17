@@ -49,6 +49,10 @@ export async function GET(request: NextRequest) {
       const coupons = await client.query(api.coupons.listAdmin, { adminSecret });
       return NextResponse.json(coupons, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "promotions") {
+      const promotions = await client.query(api.promotions.listAdmin, { adminSecret });
+      return NextResponse.json(promotions, { headers: { "Cache-Control": "no-store" } });
+    }
     if (resource === "payments") {
       const payments = await client.query(api.payments.getPaymentSettingsAdmin, { adminSecret });
       return NextResponse.json(payments, { headers: { "Cache-Control": "no-store" } });
@@ -271,6 +275,47 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ success: true, result });
       }
+      case "promotion.create": {
+        const title = stringValue(input.title, "Kampanya adı");
+        const type = stringValue(input.type, "Kampanya türü");
+        if (!["cart_percentage", "buy_x_get_y", "category_free_shipping"].includes(type)) {
+          throw new Error("Kampanya türü geçersiz.");
+        }
+        const numberValue = (value: unknown) => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        };
+        const categorySlug = typeof input.categorySlug === "string" && input.categorySlug.trim()
+          ? input.categorySlug.trim()
+          : undefined;
+        const productId = typeof input.productId === "string" && input.productId.trim()
+          ? input.productId.trim()
+          : undefined;
+        const percentage = numberValue(input.percentage);
+        const buyQuantity = numberValue(input.buyQuantity);
+        const payQuantity = numberValue(input.payQuantity);
+        const minSubtotalKurus = numberValue(input.minSubtotalKurus);
+        const result = await client.mutation(api.promotions.create, {
+          adminSecret,
+          title,
+          type: type as "cart_percentage" | "buy_x_get_y" | "category_free_shipping",
+          isActive: input.isActive !== false,
+          ...(categorySlug ? { categorySlug } : {}),
+          ...(productId ? { productId } : {}),
+          ...(percentage !== undefined ? { percentage } : {}),
+          ...(buyQuantity !== undefined ? { buyQuantity } : {}),
+          ...(payQuantity !== undefined ? { payQuantity } : {}),
+          ...(minSubtotalKurus !== undefined ? { minSubtotalKurus } : {}),
+        });
+        return NextResponse.json({ success: true, result });
+      }
+      case "promotion.disable": {
+        const result = await client.mutation(api.promotions.disable, {
+          adminSecret,
+          id: stringValue(body.id, "Kampanya") as Id<"promotions">,
+        });
+        return NextResponse.json({ success: true, result });
+      }
       case "cart.delete": {
         await client.mutation(api.abandonedCartRecovery.deleteAdmin, {
           adminSecret,
@@ -287,8 +332,15 @@ export async function POST(request: NextRequest) {
           typeof value === "string" ? value : "";
         const logoStorageId = text(input.logoStorageId);
         const lowStockThreshold = Number(input.lowStockThreshold);
+        const newBadgeDays = Number(input.newBadgeDays);
         const freeShippingThreshold = Number(input.freeShippingThreshold);
         const shippingFee = Number(input.shippingFee);
+        const parsedShippingCutoffHour = Number(input.shippingCutoffHour);
+        const shippingCutoffHour = Math.min(
+          23,
+          Math.max(0, Math.trunc(Number.isFinite(parsedShippingCutoffHour) ? parsedShippingCutoffHour : 0)),
+        );
+        const shippingEstimate = text(input.shippingEstimate);
         const result = await client.mutation(api.settings.updateStoreSettings, {
           adminSecret,
           storeName,
@@ -300,8 +352,11 @@ export async function POST(request: NextRequest) {
           announcement: text(input.announcement),
           isOpen: input.isOpen !== false,
           lowStockThreshold: Number.isSafeInteger(lowStockThreshold) ? lowStockThreshold : DEFAULT_LOW_STOCK_THRESHOLD,
+          ...(Number.isSafeInteger(newBadgeDays) ? { newBadgeDays } : {}),
           freeShippingThreshold: Number.isFinite(freeShippingThreshold) ? freeShippingThreshold : 0,
           shippingFee: Number.isFinite(shippingFee) ? shippingFee : 0,
+          shippingCutoffHour,
+          shippingEstimate,
         });
         revalidateTag("store-settings", { expire: 0 });
         revalidatePath("/", "layout");
@@ -464,6 +519,7 @@ export async function POST(request: NextRequest) {
           ...(trackingNumber ? { trackingNumber } : {}),
           ...(trackingUrl ? { trackingUrl } : {}),
         });
+        if (status || paymentStatus) invalidateCatalog("products");
         return NextResponse.json({ success: true, result });
       }
 

@@ -8,9 +8,11 @@ import { TruckIcon, CheckCircleIcon, SparklesIcon } from "@heroicons/react/24/ou
 
 export function FreeShippingBar({
   totalAmount,
+  freeShipping = false,
   className = "",
 }: {
   totalAmount: number;
+  freeShipping?: boolean;
   className?: string;
 }) {
   const settings = useQuery(api.settings.getStoreSettings, {});
@@ -21,9 +23,9 @@ export function FreeShippingBar({
     return null;
   }
 
-  const isFree = totalAmount >= threshold;
+  const isFree = freeShipping || totalAmount >= threshold;
   const remaining = Math.max(0, threshold - totalAmount);
-  const progress = Math.min(100, Math.max(0, Math.round((totalAmount / threshold) * 100)));
+  const progress = isFree ? 100 : Math.min(100, Math.max(0, Math.round((totalAmount / threshold) * 100)));
 
   return (
     <div

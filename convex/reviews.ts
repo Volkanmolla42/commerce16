@@ -41,13 +41,7 @@ export const getByProduct = query({
     reviews: v.array(reviewItemValidator),
     averageRating: v.number(),
     reviewCount: v.number(),
-    distribution: v.object({
-      star1: v.number(),
-      star2: v.number(),
-      star3: v.number(),
-      star4: v.number(),
-      star5: v.number(),
-    }),
+    commentCount: v.number(),
   }),
   handler: async (ctx, args) => {
     const limit = Math.min(Math.max(args.limit ?? 20, 1), 100);
@@ -61,13 +55,12 @@ export const getByProduct = query({
       .take(100);
 
     const reviewCount = allApproved.length;
-    const distribution = { star1: 0, star2: 0, star3: 0, star4: 0, star5: 0 };
     let sum = 0;
+    let commentCount = 0;
 
     for (const r of allApproved) {
-      const star = `star${Math.min(5, Math.max(1, Math.round(r.rating)))}` as keyof typeof distribution;
-      distribution[star] += 1;
       sum += r.rating;
+      if (r.content.trim()) commentCount += 1;
     }
 
     const averageRating = reviewCount > 0 ? Number((sum / reviewCount).toFixed(1)) : 0;
@@ -76,7 +69,7 @@ export const getByProduct = query({
       reviews: allApproved.slice(0, limit),
       averageRating,
       reviewCount,
-      distribution,
+      commentCount,
     };
   },
 });

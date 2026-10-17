@@ -27,6 +27,7 @@ const cardVariantValidator = v.object({
   title: v.string(),
   availableForSale: v.boolean(),
   price: v.object({ amount: v.string(), currencyCode: v.string() }),
+  compareAtPrice: v.optional(v.string()),
   selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
   stockQuantity: v.optional(v.number()),
   sku: v.optional(v.string()),
@@ -35,6 +36,7 @@ const cardVariantValidator = v.object({
 const cardValidator = v.object({
   id: v.id("products"), title: v.string(), slug: v.string(), price: v.string(),
   priceRange: v.object({ min: v.string(), max: v.string() }), images: v.array(imageValidator),
+  soldCount: v.number(), createdAt: v.number(), publishedAt: v.optional(v.number()),
   availableForSale: v.boolean(),
   updatedAt: v.string(), categorySlug: v.optional(v.string()),
   options: v.optional(v.array(cardOptionValidator)),
@@ -43,17 +45,22 @@ const cardValidator = v.object({
 
 async function card(ctx: QueryCtx, product: Doc<"products">) {
   const priceRange = getProductPriceRange(product);
-  const image = getImagesForVariant(product.images, [])[0];
-  const imageUrl = image ? await ctx.storage.getUrl(image.storageId) : null;
+  const images = await Promise.all(
+    getImagesForVariant(product.images, []).slice(0, 2).map(async (image) => {
+      const url = await ctx.storage.getUrl(image.storageId);
+      return url ? { url, ...(image.selectedOptions ? { selectedOptions: image.selectedOptions } : {}) } : null;
+    }),
+  );
   return {
     id: product._id,
     title: product.title,
     slug: product.slug,
     price: priceRange.min,
     priceRange,
-    images: imageUrl && image
-      ? [{ url: imageUrl, ...(image.selectedOptions ? { selectedOptions: image.selectedOptions } : {}) }]
-      : [],
+    soldCount: product.soldCount ?? 0,
+    createdAt: product._creationTime,
+    publishedAt: product.publishedAt,
+    images: images.filter((image): image is NonNullable<typeof image> => Boolean(image)),
     availableForSale: product.availableForSale,
     updatedAt: product.updatedAt,
     categorySlug: product.categorySlug,
@@ -63,6 +70,7 @@ async function card(ctx: QueryCtx, product: Doc<"products">) {
       title: v.title,
       availableForSale: v.availableForSale,
       price: { amount: typeof v.price === "string" ? v.price : (v.price as { amount: string }).amount, currencyCode: "TRY" },
+      compareAtPrice: v.compareAtPrice,
       selectedOptions: v.selectedOptions,
       stockQuantity: v.stockQuantity,
       sku: v.sku,

@@ -12,6 +12,9 @@ export interface OrderPriceSummaryProps {
     paymentFee?: number | null;
     couponCode?: string | null;
     couponDiscountKurus?: number | null;
+    promotionDiscountKurus?: number | null;
+    promotionTitle?: string | null;
+    freeShippingPromotionTitle?: string | null;
     paymentMethod?: string | null;
     paymentMethodTitle?: string | null;
   };
@@ -71,10 +74,29 @@ export function OrderPriceSummary({
         </div>
       )}
 
+      {breakdown.promotionDiscount > 0 && (
+        <div
+          className={
+            isAdmin
+              ? "flex items-center justify-between text-xs pb-2 border-b border-border/70"
+              : "flex justify-between text-emerald-600 dark:text-emerald-400 font-medium text-sm"
+          }
+        >
+          <span className={isAdmin ? "text-muted-foreground" : ""}>
+            Kampanya{order.promotionTitle ? ` (${order.promotionTitle})` : ""}
+          </span>
+          <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+            −{formatMoney(breakdown.promotionDiscount)}
+          </span>
+        </div>
+      )}
+
       <div className={rowClass}>
         <span className="text-muted-foreground">Kargo</span>
         {breakdown.isFreeShipping ? (
-          <span className="font-medium text-emerald-600 dark:text-emerald-400">Ücretsiz</span>
+          <span className="text-right font-medium text-emerald-600 dark:text-emerald-400">
+            Ücretsiz{order.freeShippingPromotionTitle ? ` (${order.freeShippingPromotionTitle})` : ""}
+          </span>
         ) : (
           <span className="font-medium tabular-nums text-foreground">
             +{formatMoney(breakdown.shippingFee)}

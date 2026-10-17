@@ -9,7 +9,10 @@ import {
   ProductViewTracker,
   Shelf,
 } from "@/components/product/recommendation-shelves";
+import { RecentlyViewedShelf } from "@/components/product/recently-viewed-shelf";
+import { ProductInfoTabs } from "@/components/product/product-info-tabs";
 import { ProductDescription } from "@/components/product/product-description";
+import { getDefaultVariant } from "@/lib/catalog/variants";
 import { ProductReviews } from "@/components/product/product-reviews";
 import {
   ProductSkeleton,
@@ -20,6 +23,7 @@ import {
   getProduct,
   getProductRecommendations,
   getRecommendationCatalog,
+  getStoreSettings,
 } from "@/lib/catalog";
 import type { Metadata, ResolvingMetadata } from "next";
 import Link from "next/link";
@@ -48,6 +52,8 @@ function getAbsoluteHttpImageUrls(images: string[]) {
 function getProductDescription(
   product: NonNullable<Awaited<ReturnType<typeof getProduct>>>,
 ) {
+  const description = product.description?.trim();
+  if (description) return description.replace(/\s+/g, " ").slice(0, 160);
   return `${product.title} ürününü ${formatMoney(product.price)} fiyatıyla inceleyin.`;
 }
 
@@ -110,7 +116,7 @@ async function ProductContent({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const [product, settings] = await Promise.all([getProduct(slug), getStoreSettings()]);
 
   if (!product) return notFound();
 
@@ -171,6 +177,8 @@ async function ProductContent({
     ],
   };
 
+  const defaultVariant = getDefaultVariant(product);
+
   return (
     <>
       <script
@@ -193,21 +201,30 @@ async function ProductContent({
       <div className={productPageClassName}>
         {/* Product Details Grid */}
         <div className={productGridClassName}>
-          <div className="min-w-0">
+          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             <Suspense fallback={<ProductGallerySkeleton />}>
-              <Gallery key={product.id} product={product} />
+              <Gallery key={product.id} product={product} defaultVariant={defaultVariant} />
             </Suspense>
           </div>
 
           <div className={productDetailsClassName}>
             <Suspense fallback={<ProductDescriptionSkeleton />}>
-              <ProductDescription product={product} />
+              <ProductDescription
+                key={product.id}
+                product={product}
+                defaultVariant={defaultVariant}
+                shippingCutoffHour={settings.shippingCutoffHour}
+                shippingEstimate={settings.shippingEstimate}
+                shareUrl={productUrl}
+              />
             </Suspense>
           </div>
         </div>
 
         {/* Ürün Değerlendirmeleri ve Yıldız Puanlama */}
         <ProductReviews productId={product.id} />
+
+        <ProductInfoTabs product={product} />
 
         {/* Product Recommendations & Upsells */}
         <Suspense fallback={null}>
@@ -229,14 +246,15 @@ async function ProductMerchandising({
   ]);
 
   return (
-    <div className="border-t border-border/60 pt-10">
+    <>
       <RelatedProducts products={relatedProducts} />
       <BoughtTogetherShelf
         products={recommendationCatalog}
         sourceProducts={[product]}
         sourceProductIds={[product.id]}
       />
-    </div>
+      <RecentlyViewedShelf excludeProductId={product.id} />
+    </>
   );
 }
 

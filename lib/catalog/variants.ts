@@ -1,4 +1,4 @@
-import type { Product, ProductVariant } from "./types";
+import type { Product, ProductImage, ProductVariant } from "./types";
 
 export const MAX_CART_QUANTITY = 999;
 // Tüm ürünlerin en az bir varyantı olmak zorunda; bu değer yalnızca stockQuantity taşımayan bayat önbellek sepetleri içindir.
@@ -71,6 +71,28 @@ export function getSelectedVariant(product: Product, params: Pick<URLSearchParam
       return selected === value;
     }),
   );
+}
+
+/** Görselde tanımlı seçeneklerle eşleşen, tercihen satılabilir varyantı döner. */
+export function getVariantForImage(product: Product, image?: ProductImage): ProductVariant | undefined {
+  const selectedOptions = image?.selectedOptions ?? [];
+  if (selectedOptions.length === 0) return undefined;
+  const matches = (product.variants ?? []).filter((variant) =>
+    selectedOptions.every((option) =>
+      variant.selectedOptions.some((selected) =>
+        selected.name === option.name && selected.value === option.value)));
+  return matches.find(isVariantSellable) ?? matches.find((variant) => variant.availableForSale) ?? matches[0];
+}
+
+/** Sayfa açılışında kullanılacak varsayılan varyant: en ucuz satılabilir, yoksa ilk uygun varyant. */
+export function getDefaultVariant(product: Product): ProductVariant | undefined {
+  const variants = product.variants ?? [];
+  if (variants.length === 0) return undefined;
+  const sellable = variants.filter(isVariantSellable);
+  const available = variants.filter((variant) => variant.availableForSale);
+  const candidates = sellable.length > 0 ? sellable : available.length > 0 ? available : variants;
+  return candidates.reduce((cheapest, variant) =>
+    Number(variant.price.amount) < Number(cheapest.price.amount) ? variant : cheapest);
 }
 
 export function getProductUnitPrice(product: Product, variantId?: string): string {

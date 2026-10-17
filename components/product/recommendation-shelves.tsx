@@ -233,15 +233,18 @@ export function BoughtTogetherShelf({
   );
 }
 
-function mapRecommendationProduct(product: NonNullable<ReturnType<typeof useQuery<typeof api.products.list>>>[number]): Product {
+export function mapRecommendationProduct(product: NonNullable<ReturnType<typeof useQuery<typeof api.products.list>>>[number]): Product {
   return {
     id: product._id,
     slug: product.slug,
     title: product.title,
     price: product.price,
+    createdAt: product._creationTime,
+    publishedAt: product.publishedAt,
+    soldCount: product.soldCount ?? 0,
     availableForSale: product.availableForSale,
     categorySlug: product.categorySlug,
-    images: getProductImages(product).slice(0, 1),
+    images: getProductImages(product).slice(0, 2),
     options: product.options,
     variants: product.variants.map(({ price, ...variant }) => ({
       ...variant,

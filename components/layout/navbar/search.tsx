@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { getRecentSearches, recordRecentSearch } from "@/lib/catalog/search-history";
 import {
   ArrowRightIcon,
   CubeIcon,
@@ -17,7 +20,7 @@ import { createUrl } from "@/lib/utils";
 
 type SearchOption = {
   key: string;
-  kind: "category" | "product";
+  kind: "category" | "product" | "query";
   title: string;
   href: string;
   image?: string | null;
@@ -46,6 +49,12 @@ export default function Search() {
   const [options, setOptions] = useState<SearchOption[]>([]);
   const [suggestionError, setSuggestionError] = useState(false);
   const [completedQuery, setCompletedQuery] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const recordSearchQuery = useMutation(api.search.record);
+  const popularSearches = useQuery(
+    api.search.popular,
+    isOpen && normalizedQuery.length === 0 ? { limit: 5 } : "skip",
+  );
 
   useEffect(() => {
     if (!shouldLoadSuggestions) return;
@@ -80,7 +89,10 @@ export default function Search() {
   useEffect(() => {
     if (!isOpen) return;
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+        setActiveIndex(-1);
+      }
     };
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
@@ -89,8 +101,37 @@ export default function Search() {
   const isQuerySettled =
     normalizedQuery === normalizedDebouncedQuery &&
     normalizeSearchText(completedQuery) === normalizedDebouncedQuery;
-  const visibleOptions = isQuerySettled ? options : [];
-  const panelIsVisible = isOpen && normalizedQuery.length >= 2;
+  const isDiscovery = isOpen && normalizedQuery.length === 0;
+  const recentOptions: SearchOption[] = isDiscovery
+    ? recentSearches.map((term) => ({
+        key: `recent:${term}`,
+        kind: "query",
+        title: term,
+        href: `/search?q=${encodeURIComponent(term)}`,
+      }))
+    : [];
+  const popularOptions: SearchOption[] = isDiscovery
+    ? (popularSearches ?? [])
+        .slice(0, Math.max(0, 8 - recentOptions.length))
+        .map(({ query: term }) => ({
+          key: `popular:${term}`,
+          kind: "query",
+          title: term,
+          href: `/search?q=${encodeURIComponent(term)}`,
+        }))
+    : [];
+  const discoveryOptions = [...recentOptions, ...popularOptions];
+  const discoveryLoading = isDiscovery && popularSearches === undefined;
+  const visibleOptions = isDiscovery ? discoveryOptions : isQuerySettled ? options : [];
+  const panelIsVisible = isDiscovery || (isOpen && normalizedQuery.length >= 2);
+
+  const rememberSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (trimmed.length < 2) return;
+    recordRecentSearch(trimmed);
+    setRecentSearches(getRecentSearches());
+    void recordSearchQuery({ query: trimmed }).catch(() => undefined);
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
@@ -115,16 +156,23 @@ export default function Search() {
       setActiveIndex(visibleOptions.length - 1);
     } else if (event.key === "Enter" && activeIndex >= 0 && visibleOptions[activeIndex]) {
       event.preventDefault();
+      const option = visibleOptions[activeIndex];
+      if (option.kind === "query") {
+        setQuery(option.title);
+        rememberSearch(option.title);
+      }
       setIsOpen(false);
-      router.push(visibleOptions[activeIndex].href);
+      router.push(option.href);
     }
   };
 
   const handleSubmit = (event: React.SyntheticEvent) => {
     event.preventDefault();
+    const trimmed = query.trim();
+    if (trimmed) rememberSearch(trimmed);
     setIsOpen(false);
     const params = new URLSearchParams();
-    if (query.trim()) params.set("q", query.trim());
+    if (trimmed) params.set("q", trimmed);
     router.push(createUrl("/search", params));
   };
 
@@ -138,13 +186,23 @@ export default function Search() {
         role="option"
         aria-selected={isActive}
         onMouseEnter={() => setActiveIndex(index)}
-        onClick={() => setIsOpen(false)}
+        onClick={() => {
+          if (option.kind === "query") {
+            setQuery(option.title);
+            rememberSearch(option.title);
+          }
+          setIsOpen(false);
+        }}
         className={`flex min-w-0 items-center gap-3 rounded-xl px-2.5 py-2 text-left transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-500 ${isActive
           ? "bg-neutral-100 dark:bg-neutral-800"
           : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
           }`}
       >
-        {option.kind === "category" ? (
+        {option.kind === "query" ? (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">
+            <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
+          </span>
+        ) : option.kind === "category" ? (
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">
             <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
           </span>
@@ -167,12 +225,14 @@ export default function Search() {
             {option.title}
           </span>
           <span className="block text-xs text-neutral-500 dark:text-neutral-400">
-            {option.kind === "category"
-              ? "Kategori"
-              : `${formatMoney(option.price ?? "0")}${option.maxPrice && Number(option.maxPrice) !== Number(option.price)
-                ? ` ile ${formatMoney(option.maxPrice)}`
-                : ""
-              }`}
+            {option.kind === "query"
+              ? "Arama"
+              : option.kind === "category"
+                ? "Kategori"
+                : `${formatMoney(option.price ?? "0")}${option.maxPrice && Number(option.maxPrice) !== Number(option.price)
+                  ? ` ile ${formatMoney(option.maxPrice)}`
+                  : ""
+                }`}
           </span>
         </span>
         {option.kind === "category" ? (
@@ -192,7 +252,7 @@ export default function Search() {
   return (
     <div ref={rootRef} className="relative w-full">
       {/* Arama odaktayken sayfayı bulanıklaştıran katman; header stack bağlamı (z-40) üstünde kaldığı için keskin kalır. */}
-      {isOpen
+      {panelIsVisible
         ? createPortal(
           <div
             aria-hidden="true"
@@ -230,7 +290,11 @@ export default function Search() {
           placeholder="Ürün veya kategori ara..."
           autoComplete="off"
           value={query}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            setRecentSearches(getRecentSearches());
+            setActiveIndex(-1);
+            setIsOpen(true);
+          }}
           onChange={(event) => {
             setQuery(event.target.value);
             setActiveIndex(-1);
@@ -245,10 +309,41 @@ export default function Search() {
         <div
           id={listboxId}
           role="listbox"
-          aria-label="Arama önerileri"
+          aria-label={isDiscovery ? "Son ve popüler aramalar" : "Arama önerileri"}
           className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[min(65vh,26rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-2xl backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
         >
-          {!isQuerySettled ? (
+          {isDiscovery ? (
+            <>
+              {recentOptions.length > 0 ? (
+                <div role="group" aria-label="Son aramalarınız" className="pb-2">
+                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                    Son aramalarınız
+                  </p>
+                  {recentOptions.map((option, index) => renderOption(option, index))}
+                </div>
+              ) : null}
+              {discoveryLoading ? (
+                <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
+                  Popüler aramalar yükleniyor...
+                </p>
+              ) : popularOptions.length > 0 ? (
+                <div
+                  role="group"
+                  aria-label="Popüler aramalar"
+                  className={recentOptions.length > 0 ? "border-t border-neutral-100 pt-1 dark:border-neutral-800" : ""}
+                >
+                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                    Popüler aramalar
+                  </p>
+                  {popularOptions.map((option, index) => renderOption(option, recentOptions.length + index))}
+                </div>
+              ) : recentOptions.length === 0 ? (
+                <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
+                  Henüz popüler arama yok.
+                </p>
+              ) : null}
+            </>
+          ) : !isQuerySettled ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
               Öneriler hazırlanıyor...
             </p>
@@ -282,14 +377,20 @@ export default function Search() {
               ) : null}
             </>
           )}
-          <Link
-            href={{ pathname: "/search", query: { q: query.trim() } }}
-            onClick={() => setIsOpen(false)}
-            className="mt-1 flex items-center justify-between border-t border-neutral-100 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:text-black dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white"
-          >
-            <span>&quot;{query.trim()}&quot; için tüm sonuçları gör</span>
-            <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          {!isDiscovery ? (
+            <Link
+              href={{ pathname: "/search", query: { q: query.trim() } }}
+              onClick={() => {
+                const term = query.trim();
+                if (term) rememberSearch(term);
+                setIsOpen(false);
+              }}
+              className="mt-1 flex items-center justify-between border-t border-neutral-100 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:text-black dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white"
+            >
+              <span>&quot;{query.trim()}&quot; için tüm sonuçları gör</span>
+              <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

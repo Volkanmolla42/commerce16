@@ -33,6 +33,7 @@ export type ProductVariant = {
     value: string;
   }[];
   price: Money;
+  compareAtPrice?: string;
   stockQuantity?: number;
 };
 
@@ -68,8 +69,13 @@ export type Product = {
   availableForSale: boolean;
   attributes?: ProductAttribute[];
   categorySlug?: string;
+  description?: string;
+  descriptionImages?: { url: string }[];
   images: ProductImage[];
   options?: ProductOption[];
   variants?: ProductVariant[];
+  createdAt?: number;
+  publishedAt?: number;
+  soldCount?: number;
   updatedAt: string;
 };

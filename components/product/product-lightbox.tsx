@@ -3,29 +3,40 @@
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Counter from "yet-another-react-lightbox/plugins/counter";
-import type { ProductImage } from "@/lib/catalog/types";
+import type { Product, ProductImage } from "@/lib/catalog/types";
 import { useRef, useState } from "react";
-import { CheckIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { useRouter } from "next/navigation";
+import { BoltIcon, ShoppingBagIcon } from "@heroicons/react/24/outline";
+import { useCart } from "@/components/cart/cart-context";
+import { setQuickBuyItem } from "@/components/cart/quick-buy-store";
+import { getVariantImages } from "@/lib/catalog/product-images";
+import {
+  getProductVariantTitle,
+  getVariantForImage,
+  isVariantSellable,
+} from "@/lib/catalog/variants";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/counter.css";
 
 export default function ProductLightbox({
   images,
+  product,
   title,
   index,
-  searchParams,
   onSelectVariant,
   onClose,
 }: {
   images: ProductImage[];
+  product: Product;
   title: string;
   index: number;
-  searchParams?: Pick<URLSearchParams, "get">;
   onSelectVariant?: (options: { name: string; value: string }[]) => void;
   onClose: (index: number) => void;
 }) {
   const activeIndex = useRef(index);
   const [currentIndex, setCurrentIndex] = useState(index);
+  const router = useRouter();
+  const { addItem } = useCart();
 
   return (
     <Lightbox
@@ -60,46 +71,58 @@ export default function ProductLightbox({
         buttonPrev: images.length === 1 ? () => null : undefined,
         buttonNext: images.length === 1 ? () => null : undefined,
         controls: () => {
-          const currentImage = images[currentIndex];
-          const imageOptions = currentImage?.selectedOptions ?? [];
-          if (imageOptions.length === 0) return null;
+          const variant = getVariantForImage(product, images[currentIndex]);
+          if (!variant) return null;
 
-          const isAlreadySelected = searchParams
-            ? imageOptions.every(
-                (opt) =>
-                  searchParams.get(opt.name.toLocaleLowerCase("tr-TR")) ===
-                  opt.value,
-              )
-            : false;
+          const available = isVariantSellable(variant);
+          const variantLabel = variant.selectedOptions.map(({ value }) => value).join(" / ") || variant.title;
+          const selectedProduct: Product = {
+            ...product,
+            price: variant.price.amount,
+            images: getVariantImages(product, variant),
+            title: getProductVariantTitle(product.title, variant),
+          };
 
-          const optionLabel = imageOptions.map((o) => o.value).join(" / ");
+          const addToCart = () => {
+            if (!available) return;
+            onSelectVariant?.(variant.selectedOptions);
+            addItem(selectedProduct, 1, variant.id);
+            onClose(currentIndex);
+          };
+
+          const quickBuy = () => {
+            if (!available) return;
+            onSelectVariant?.(variant.selectedOptions);
+            setQuickBuyItem({ product: selectedProduct, quantity: 1, variantId: variant.id });
+            router.push("/checkout?mode=quick-buy");
+          };
 
           return (
-            <div className="absolute inset-x-0 bottom-6 z-50 flex justify-center pointer-events-none px-4">
-              <div className="pointer-events-auto">
-                {isAlreadySelected ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 z-50 flex justify-center px-4 sm:bottom-6">
+              <div className="pointer-events-auto w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/90 p-3 shadow-2xl backdrop-blur-md">
+                <p className="truncate text-center text-xs text-neutral-400">
+                  Varyant: <span className="font-semibold text-white">{variantLabel}</span>
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => onClose(currentIndex)}
-                    aria-label={`Bu varyant seçili (${optionLabel}), incelemeyi kapat`}
-                    className="flex h-11 items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-950/80 px-5 text-sm font-semibold text-emerald-200 backdrop-blur-md shadow-2xl transition hover:bg-emerald-900/90 active:scale-95"
+                    onClick={addToCart}
+                    disabled={!available}
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-white text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <CheckIcon className="size-4 text-emerald-400 shrink-0" />
-                    <span>Bu varyant seçili ({optionLabel})</span>
+                    <ShoppingBagIcon className="size-4 shrink-0" aria-hidden="true" />
+                    Sepete Ekle
                   </button>
-                ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      onSelectVariant?.(imageOptions);
-                    }}
-                    aria-label={`Bu varyantı seç (${optionLabel})`}
-                    className="flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-neutral-900 shadow-2xl transition hover:bg-neutral-100 active:scale-95"
+                    onClick={quickBuy}
+                    disabled={!available}
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <CheckCircleIcon className="size-4 text-neutral-900 shrink-0" />
-                    <span>Bu varyantı seç ({optionLabel})</span>
+                    <BoltIcon className="size-4 shrink-0" aria-hidden="true" />
+                    Hızlı Satın Al
                   </button>
-                )}
+                </div>
               </div>
             </div>
           );

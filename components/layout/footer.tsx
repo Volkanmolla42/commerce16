@@ -12,7 +12,8 @@ import {
 } from "@heroicons/react/24/outline";
 
 import { formatDate } from "@/lib/format-date";
-import { formatPhone } from "@/lib/orders";
+import { formatPhone, formatWhatsAppUrl } from "@/lib/orders";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 export default async function Footer() {
   "use cache";
@@ -25,6 +26,7 @@ export default async function Footer() {
   ]);
 
   const hasContact = Boolean(settings.phone || settings.email || settings.address);
+  const whatsappUrl = formatWhatsAppUrl(settings.phone, "Merhaba, ürünleriniz hakkında bilgi almak istiyorum.");
 
   return (
     <footer className="w-full border-t border-neutral-200 bg-neutral-50 pb-24 text-sm dark:border-neutral-800 dark:bg-neutral-900 md:pb-0">
@@ -64,6 +66,14 @@ export default async function Footer() {
                     <a href={`tel:${settings.phone}`} className="inline-flex items-center gap-2.5 transition-colors hover:text-black dark:hover:text-white">
                       <PhoneIcon className="size-4 shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
                       {formatPhone(settings.phone)}
+                    </a>
+                  </li>
+                )}
+                {whatsappUrl && (
+                  <li>
+                    <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2.5 transition-colors hover:text-black dark:hover:text-white">
+                      <WhatsAppIcon className="size-4 shrink-0 text-neutral-400 dark:text-neutral-500" />
+                      WhatsApp
                     </a>
                   </li>
                 )}

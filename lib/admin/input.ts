@@ -125,12 +125,20 @@ function productVariantsValue(value: unknown) {
         value: stringValue(selected.value, "Seçenek değeri"),
       };
     });
+    const price = priceValue(item.price, "Varyant fiyatı");
+    const compareAtPrice = item.compareAtPrice === undefined || item.compareAtPrice === null || item.compareAtPrice === ""
+      ? undefined
+      : priceValue(item.compareAtPrice, "Liste fiyatı");
+    if (compareAtPrice !== undefined && Number(compareAtPrice) <= Number(price)) {
+      throw new Error("Liste fiyatı satış fiyatından büyük olmalı.");
+    }
     return {
       id: stringValue(item.id, "Varyant kimliği"),
       title: stringValue(item.title, "Varyant başlığı"),
       availableForSale: item.availableForSale,
       selectedOptions,
-      price: priceValue(item.price, "Varyant fiyatı"),
+      price,
+      ...(compareAtPrice !== undefined ? { compareAtPrice } : {}),
       stockQuantity: item.stockQuantity,
       sku: productSkuValue(item.sku),
     };
@@ -165,11 +173,30 @@ function validateProductVariants(
   }
 }
 
+function productDescriptionValue(value: unknown) {
+  if (typeof value !== "string") throw new Error("Ürün açıklaması metin olmalı.");
+  const text = value.trim();
+  if (text.length > 4000) throw new Error("Ürün açıklaması en fazla 4000 karakter olabilir.");
+  return text;
+}
+
+function productDescriptionImageIds(value: unknown) {
+  if (!Array.isArray(value)) throw new Error("Açıklama görselleri geçersiz.");
+  if (value.length > 12) throw new Error("Açıklamada en fazla 12 görsel olabilir.");
+  const ids = value.map((item) => stringValue(item, "Açıklama görseli") as Id<"_storage">);
+  if (new Set(ids).size !== ids.length) throw new Error("Aynı açıklama görseli birden fazla eklenemez.");
+  return ids;
+}
+
 export function parseProductInput(input: Record<string, unknown>) {
   const options = productOptionsValue(input.options);
   const variants = productVariantsValue(input.variants);
   const images = productImagesValue(input.images);
   const attributes = Object.hasOwn(input, "attributes") ? productAttributesValue(input.attributes) : undefined;
+  const description = input.description === undefined ? undefined : productDescriptionValue(input.description);
+  const descriptionImageStorageIds = input.descriptionImageStorageIds === undefined
+    ? undefined
+    : productDescriptionImageIds(input.descriptionImageStorageIds);
   validateProductVariants(options, variants);
   for (const image of images) {
     const scope = image.selectedOptions ?? [];
@@ -185,6 +212,8 @@ export function parseProductInput(input: Record<string, unknown>) {
     availableForSale: input.availableForSale === true,
     images, options, variants,
     ...(attributes ? { attributes } : {}),
+    ...(description !== undefined ? { description } : {}),
+    ...(descriptionImageStorageIds !== undefined ? { descriptionImageStorageIds } : {}),
     categorySlug: optionalString(input.categorySlug, "Kategori") || "",
   };
 }

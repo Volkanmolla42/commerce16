@@ -39,6 +39,7 @@ import { getAnalyticsSessionIdForOrder, trackAnalyticsEvent } from "@/lib/analyt
 import { trackPixelInitiateCheckout } from "@/lib/analytics/meta-pixel";
 import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
+import { quotePromotions } from "@/lib/promotions";
 
 type CouponPreview = {
   valid: boolean;
@@ -169,6 +170,9 @@ function PriceSummaryRows({
   paymentFee = 0,
   shippingFee = 0,
   isFreeShipping = true,
+  promotionDiscountKurus = 0,
+  promotionTitle = null,
+  freeShippingTitle = null,
 }: {
   couponDiscountKurus: number;
   couponPreview: CouponPreview;
@@ -177,6 +181,9 @@ function PriceSummaryRows({
   paymentFee?: number;
   shippingFee?: number;
   isFreeShipping?: boolean;
+  promotionDiscountKurus?: number;
+  promotionTitle?: string | null;
+  freeShippingTitle?: string | null;
 }) {
   return (
     <div className="space-y-2 pt-1 text-sm">
@@ -186,10 +193,18 @@ function PriceSummaryRows({
           <span className="tabular-nums">−{formatMoney(couponDiscountKurus / 100)}</span>
         </div>
       )}
+      {promotionDiscountKurus > 0 && (
+        <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
+          <span>Kampanya{promotionTitle ? ` (${promotionTitle})` : ""}</span>
+          <span className="tabular-nums">−{formatMoney(promotionDiscountKurus / 100)}</span>
+        </div>
+      )}
       <div className="flex justify-between text-muted-foreground">
         <span>Kargo</span>
         {isFreeShipping ? (
-          <span className="font-medium text-emerald-600 dark:text-emerald-400">Ücretsiz</span>
+          <span className="text-right font-medium text-emerald-600 dark:text-emerald-400">
+            Ücretsiz{freeShippingTitle ? ` (${freeShippingTitle})` : ""}
+          </span>
         ) : (
           <span className="font-medium tabular-nums text-foreground">+{formatMoney(shippingFee)}</span>
         )}
@@ -260,9 +275,24 @@ function CheckoutContent() {
   );
   const couponDiscountKurus = couponPreview?.valid ? couponPreview.discountKurus : 0;
   const payableKurus = Math.max(0, subtotalKurus - couponDiscountKurus);
+  const activePromotions = useQuery(api.promotions.listActive, {});
+  const promotion = quotePromotions(
+    items.map((item) => ({
+      productId: item.product.id,
+      unitPriceKurus: Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100),
+      quantity: item.quantity,
+      categorySlug: item.product.categorySlug,
+    })),
+    activePromotions ?? [],
+    payableKurus,
+    subtotalKurus,
+  );
+  const promotionDiscountKurus = promotion.discountKurus;
+  const discountedPayableKurus = Math.max(0, payableKurus - promotionDiscountKurus);
 
   const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
   const storeSettings = useQuery(api.settings.getStoreSettings, {});
+  const quotesReady = activePromotions !== undefined && storeSettings !== undefined && paymentSettings !== undefined;
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"paytr" | "bank_transfer" | "cash_on_delivery" | null>(null);
 
   // Demo kart bilgileri (PayTR)
@@ -288,11 +318,11 @@ function CheckoutContent() {
 
   const freeShippingThreshold = storeSettings?.freeShippingThreshold ?? 0;
   const standardShippingFee = storeSettings?.shippingFee ?? 0;
-  const isFreeShipping = freeShippingThreshold <= 0 || (subtotalKurus / 100) >= freeShippingThreshold;
+  const isFreeShipping = promotion.freeShipping || freeShippingThreshold <= 0 || (subtotalKurus / 100) >= freeShippingThreshold;
   const shippingFee = isFreeShipping ? 0 : standardShippingFee;
   const shippingFeeKurus = Math.round(shippingFee * 100);
 
-  const finalPayableKurus = payableKurus + codFeeKurus + shippingFeeKurus;
+  const finalPayableKurus = discountedPayableKurus + codFeeKurus + shippingFeeKurus;
   const finalPayableAmount = finalPayableKurus / 100;
 
   const fillDemoCard = () => {
@@ -400,6 +430,12 @@ function CheckoutContent() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    if (!quotesReady) {
+      setErrorMessage("Fiyatlar hazırlanıyor. Birkaç saniye sonra tekrar deneyin.");
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!legalDocuments?.distanceSalesAgreement?.ready || !legalDocuments.preInformationForm?.ready) {
       setErrorMessage("Sözleşmeler onaya hazır değil: mağaza ayarlarındaki satıcı bilgilerini tamamlayın.");
       setIsSubmitting(false);
@@ -425,8 +461,8 @@ function CheckoutContent() {
       setIsSubmitting(false);
       return;
     }
-    if (payableKurus <= 0) {
-      setErrorMessage("Kupon indirimi sepet toplamını sıfırlıyor.");
+    if (discountedPayableKurus <= 0) {
+      setErrorMessage("İndirimler sepet toplamını sıfırlıyor.");
       setIsSubmitting(false);
       return;
     }
@@ -604,6 +640,9 @@ function CheckoutContent() {
               paymentFee={codFee}
               shippingFee={shippingFee}
               isFreeShipping={isFreeShipping}
+              promotionDiscountKurus={promotionDiscountKurus}
+              promotionTitle={promotion.title}
+              freeShippingTitle={promotion.freeShippingTitle}
             />
           </Card>
 
@@ -1248,12 +1287,15 @@ function CheckoutContent() {
               paymentFee={codFee}
               shippingFee={shippingFee}
               isFreeShipping={isFreeShipping}
+              promotionDiscountKurus={promotionDiscountKurus}
+              promotionTitle={promotion.title}
+              freeShippingTitle={promotion.freeShippingTitle}
             />
 
             <Button
               type="submit"
               size="lg"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !quotesReady}
               className="mt-4 w-full h-12 rounded-2xl shadow-lg font-semibold gap-2 cursor-pointer"
             >
               <SubmitButtonContent isSubmitting={isSubmitting} />
@@ -1272,7 +1314,7 @@ function CheckoutContent() {
           type="submit"
           form="checkout-form"
           size="lg"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !quotesReady}
           className={mobileSummaryActionClassName}
         >
           <SubmitButtonContent isSubmitting={isSubmitting} />

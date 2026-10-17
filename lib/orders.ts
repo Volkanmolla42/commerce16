@@ -139,13 +139,14 @@ export function getOrderPaymentMethodTitle(
  */
 export function formatWhatsAppUrl(phone?: string | null, message?: string): string | null {
   if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "").replace(/^00/, "");
   if (!digits) return null;
   const formatted = digits.startsWith("0")
-    ? `9${digits}`
+    ? `90${digits.slice(1)}`
     : digits.startsWith("90")
       ? digits
       : `90${digits}`;
+  if (!/^90\d{10}$/.test(formatted)) return null;
   const base = `https://wa.me/${formatted}`;
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
@@ -214,6 +215,7 @@ export function resolveCarrierTrackingUrl(
 export interface OrderPriceBreakdown {
   itemsSubtotal: number;
   couponDiscount: number;
+  promotionDiscount: number;
   paymentFee: number;
   shippingFee: number;
   isFreeShipping: boolean;
@@ -230,11 +232,14 @@ export function getOrderPriceBreakdown(order?: {
   shippingFee?: number | null;
   paymentFee?: number | null;
   couponDiscountKurus?: number | null;
+  promotionDiscountKurus?: number | null;
+  promotionTitle?: string | null;
 } | null): OrderPriceBreakdown {
   if (!order) {
     return {
       itemsSubtotal: 0,
       couponDiscount: 0,
+      promotionDiscount: 0,
       paymentFee: 0,
       shippingFee: 0,
       isFreeShipping: true,
@@ -251,6 +256,7 @@ export function getOrderPriceBreakdown(order?: {
     0
   );
   const couponDiscount = (order.couponDiscountKurus ?? 0) / 100;
+  const promotionDiscount = (order.promotionDiscountKurus ?? 0) / 100;
   const paymentFee = order.paymentFee ?? 0;
   const shippingFee = order.shippingFee ?? 0;
   const isFreeShipping = shippingFee <= 0;
@@ -258,6 +264,7 @@ export function getOrderPriceBreakdown(order?: {
   return {
     itemsSubtotal,
     couponDiscount,
+    promotionDiscount,
     paymentFee,
     shippingFee,
     isFreeShipping,

@@ -8,6 +8,7 @@ import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Price from "@/components/price";
 import { getProductImages } from "@/lib/catalog/product-images";
 import { getProductPriceRange } from "@/lib/catalog/variants";
+import { ProductBadges } from "./product-badges";
 import { ProductCardActions } from "./product-card-actions";
 import type { Product } from "@/lib/catalog/types";
 
@@ -66,7 +67,9 @@ function ProductCard({
   action?: ReactNode;
 }) {
   const priceRange = getProductPriceRange(product);
-  const imageUrl = getProductImages(product)[0]?.url;
+  const images = getProductImages(product);
+  const imageUrl = images[0]?.url;
+  const hoverImageUrl = images[1]?.url;
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-blue-500/40 hover:shadow-lg">
@@ -89,6 +92,26 @@ function ProductCard({
               />
             </ProductImageTransition>
           ) : null}
+          {hoverImageUrl && hoverImageUrl !== imageUrl ? (
+            <Image
+              src={hoverImageUrl}
+              alt=""
+              fill
+              sizes={imageSizes}
+              loading="lazy"
+              fetchPriority="low"
+              className="pointer-events-none absolute inset-0 z-[1] hidden object-cover opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100 motion-reduce:transition-none [@media(hover:hover)]:block"
+            />
+          ) : null}
+          <div className="pointer-events-none absolute left-2 top-2 z-10">
+            <ProductBadges
+              variants={product.variants}
+              createdAt={product.createdAt}
+              publishedAt={product.publishedAt}
+              soldCount={product.soldCount}
+              compact
+            />
+          </div>
         </div>
         <div className="flex flex-1 flex-col justify-between space-y-1.5 p-3 sm:p-3.5">
           <h2 className="line-clamp-2 text-xs font-medium leading-snug text-foreground sm:text-[13px]">

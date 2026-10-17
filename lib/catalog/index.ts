@@ -24,8 +24,11 @@ export type StoreSettings = {
   announcement: string;
   isOpen: boolean;
   lowStockThreshold: number;
+  newBadgeDays: number;
   freeShippingThreshold: number;
   shippingFee: number;
+  shippingCutoffHour: number;
+  shippingEstimate: string;
 };
 
 export async function getStoreSettings(): Promise<StoreSettings> {

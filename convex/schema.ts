@@ -21,12 +21,16 @@ export default defineSchema({
     slug: v.string(),
     title: v.string(),
     priceValue: v.number(),
+    soldCount: v.optional(v.number()),
+    publishedAt: v.optional(v.number()),
     availableForSale: v.boolean(),
     attributes: v.optional(v.array(v.object({
       key: v.string(),
       value: v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
     }))),
     categorySlug: v.optional(v.string()),
+    description: v.optional(v.string()),
+    descriptionImageStorageIds: v.optional(v.array(v.id("_storage"))),
     images: v.array(v.object({
       storageId: v.id("_storage"),
       fileName: v.string(),
@@ -43,6 +47,7 @@ export default defineSchema({
       availableForSale: v.boolean(),
       selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
       price: v.string(),
+      compareAtPrice: v.optional(v.string()),
       stockQuantity: v.number(),
       sku: v.optional(v.string()),
       barcode: v.optional(v.string()),
@@ -68,6 +73,14 @@ export default defineSchema({
     numericValue: v.optional(v.number()), count: v.number(),
   }).index("by_category_and_key_and_value", ["categorySlug", "key", "value"])
     .index("by_category_and_key_and_numericValue", ["categorySlug", "key", "numericValue"]),
+
+  searchQueries: defineTable({
+    query: v.string(),
+    normalized: v.string(),
+    count: v.number(),
+  })
+    .index("by_normalized", ["normalized"])
+    .index("by_count", ["count"]),
 
   categories: defineTable({
     slug: v.string(),
@@ -101,6 +114,23 @@ export default defineSchema({
     isActive: v.boolean(),
   }).index("by_code", ["code"]),
 
+  promotions: defineTable({
+    title: v.string(),
+    type: v.union(
+      v.literal("cart_percentage"),
+      v.literal("buy_x_get_y"),
+      v.literal("category_free_shipping"),
+    ),
+    categorySlug: v.optional(v.string()),
+    productId: v.optional(v.string()),
+    percentage: v.optional(v.number()),
+    buyQuantity: v.optional(v.number()),
+    payQuantity: v.optional(v.number()),
+    minSubtotalKurus: v.optional(v.number()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_active", ["isActive"]),
+
   orders: defineTable({
     userId: v.optional(v.id("users")),
     customerEmail: v.string(),
@@ -123,6 +153,9 @@ export default defineSchema({
     couponDiscountKurus: v.optional(v.number()),
     couponReserved: v.optional(v.boolean()),
     couponRedeemed: v.optional(v.boolean()),
+    promotionDiscountKurus: v.optional(v.number()),
+    promotionTitle: v.optional(v.string()),
+    freeShippingPromotionTitle: v.optional(v.string()),
     status: orderStatusValidator,
     paymentStatus: orderPaymentStatusValidator,
     paidAt: v.optional(v.number()),
@@ -277,8 +310,11 @@ export default defineSchema({
     announcement: v.optional(v.string()),
     isOpen: v.optional(v.boolean()),
     lowStockThreshold: v.optional(v.number()),
+    newBadgeDays: v.optional(v.number()),
     freeShippingThreshold: v.optional(v.number()),
     shippingFee: v.optional(v.number()),
+    shippingCutoffHour: v.optional(v.number()),
+    shippingEstimate: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   }).index("by_key", ["key"]),
 
@@ -300,7 +336,8 @@ export default defineSchema({
     productSlug: v.string(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_slug", ["userId", "productSlug"]),
+    .index("by_user_and_slug", ["userId", "productSlug"])
+    .index("by_product_slug", ["productSlug"]),
 
   passwordChangeCodes: defineTable({
     userId: v.id("users"),

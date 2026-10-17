@@ -10,10 +10,10 @@ import { ProductImagePreview } from "./product-image-transition";
 
 export function ProductGallerySkeleton() {
   return (
-    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:gap-4">
+    <div className="flex min-w-0 flex-col gap-3">
       <div
         aria-hidden="true"
-        className={`${productGalleryClassName} order-1 bg-muted motion-safe:animate-pulse md:order-2 md:min-w-0 md:flex-1 [&:has(img)]:animate-none`}
+        className={`${productGalleryClassName} order-1 bg-muted motion-safe:animate-pulse [&:has(img)]:animate-none`}
       >
         <Suspense fallback={null}>
           <ProductImagePreview />
@@ -21,10 +21,10 @@ export function ProductGallerySkeleton() {
       </div>
       <div
         aria-hidden="true"
-        className="hidden md:order-1 md:flex md:w-24 md:shrink-0 md:flex-col md:items-center md:gap-2 md:py-2"
+        className="flex items-center gap-2 py-1"
       >
         {[0, 1, 2].map((index) => (
-          <div key={index} className="size-20 rounded-xl bg-muted motion-safe:animate-pulse" />
+          <div key={index} className="size-16 rounded-xl bg-muted motion-safe:animate-pulse sm:size-20" />
         ))}
       </div>
     </div>
@@ -37,7 +37,7 @@ export function ProductDescriptionSkeleton() {
       role="status"
       aria-label="Ürün bilgileri yükleniyor"
       aria-busy="true"
-      className="mx-auto w-full max-w-[560px]"
+      className="mx-auto w-full max-w-[640px]"
     >
       <div aria-hidden="true" className="motion-safe:animate-pulse">
         <div className="border-b border-border pb-5">

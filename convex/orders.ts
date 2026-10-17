@@ -15,7 +15,8 @@ import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation,
 import { patchCatalogProduct } from "./catalogModel";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
-import type { OrderStatusUpdate } from "../lib/orders";
+import { isRevenueOrder, type OrderStatusUpdate } from "../lib/orders";
+import { quotePromotions } from "../lib/promotions";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -232,6 +233,7 @@ export const createOrder = mutation({
     }
     if (args.items.length === 0 || args.items.length > 100) throw new Error("Sipariş 1 ile 100 ürün içermeli.");
     const items = [];
+    const promotionLines: Array<{ productId: string; unitPriceKurus: number; quantity: number; categorySlug?: string }> = [];
     let totalCents = 0;
     // Aynı varyant birden fazla satırsa stok talebini toplayarak doğrula.
     const reservedDemand = new Map<string, number>();
@@ -257,6 +259,7 @@ export const createOrder = mutation({
       if (!Number.isSafeInteger(cents) || cents < 0 || !Number.isSafeInteger(totalCents + cents * item.quantity)) throw new Error("Sipariş tutarı geçersiz.");
       if (Number(item.price) !== Number(price)) throw new Error("Sepet fiyatı değişti. Ürünleri yeniden sepete ekleyin.");
       totalCents += cents * item.quantity;
+      promotionLines.push({ productId: product._id, unitPriceKurus: cents, quantity: item.quantity, categorySlug: product.categorySlug });
       const imageRecord = getImagesForVariant(product.images, variant!.selectedOptions)[0];
       const image = imageRecord ? await ctx.storage.getUrl(imageRecord.storageId) : null;
       items.push({
@@ -274,8 +277,25 @@ export const createOrder = mutation({
     const coupon = args.couponCode?.trim()
       ? await quoteCouponForOrder(ctx, args.couponCode, totalCents)
       : undefined;
-    const payableCents = coupon?.valid ? coupon.totalKurus : totalCents;
-    if (payableCents <= 0) throw new Error("Kupon indirimi sepet toplamını sıfırlıyor; bu ödeme akışında ücretsiz sipariş oluşturulamıyor.");
+    const couponedCents = coupon?.valid ? coupon.totalKurus : totalCents;
+    const activePromotions = await ctx.db.query("promotions").withIndex("by_active", (q) => q.eq("isActive", true)).take(50);
+    const promotion = quotePromotions(
+      promotionLines,
+      activePromotions.map((rule) => ({
+        id: rule._id,
+        title: rule.title,
+        type: rule.type,
+        categorySlug: rule.categorySlug,
+        percentage: rule.percentage,
+        buyQuantity: rule.buyQuantity,
+        payQuantity: rule.payQuantity,
+        minSubtotalKurus: rule.minSubtotalKurus,
+      })),
+      couponedCents,
+      totalCents,
+    );
+    const payableCents = couponedCents - promotion.discountKurus;
+    if (payableCents <= 0) throw new Error("İndirimler sepet toplamını sıfırlıyor; bu ödeme akışında ücretsiz sipariş oluşturulamıyor.");
 
     let paymentMethodTitle: string | undefined = undefined;
     let paymentFee: number | undefined = undefined;
@@ -308,7 +328,7 @@ export const createOrder = mutation({
     }
 
     const freeShippingThreshold = storeSettings.freeShippingThreshold ?? 0;
-    const isFreeShipping = freeShippingThreshold <= 0 || (totalCents / 100) >= freeShippingThreshold;
+    const isFreeShipping = promotion.freeShipping || freeShippingThreshold <= 0 || (totalCents / 100) >= freeShippingThreshold;
     const shippingFee = isFreeShipping ? 0 : (storeSettings.shippingFee ?? 0);
     const shippingFeeCents = Math.round(shippingFee * 100);
 
@@ -366,6 +386,11 @@ export const createOrder = mutation({
         couponDiscountKurus: coupon.discountKurus,
         couponReserved: false,
       } : {}),
+      ...(promotion.discountKurus > 0 ? {
+        promotionDiscountKurus: promotion.discountKurus,
+        ...(promotion.title ? { promotionTitle: promotion.title } : {}),
+      } : {}),
+      ...(promotion.freeShippingTitle ? { freeShippingPromotionTitle: promotion.freeShippingTitle } : {}),
       status: "received",
       paymentStatus: "pending",
       ...(args.paymentMethod ? {
@@ -437,6 +462,18 @@ async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, d
   }
 }
 
+async function syncSoldCount(ctx: MutationCtx, order: Doc<"orders">, delta: number) {
+  for (const item of order.items) {
+    const productId = ctx.db.normalizeId("products", item.productId);
+    if (!productId) continue;
+    const product = await ctx.db.get(productId);
+    if (!product) continue;
+    await ctx.db.patch(productId, {
+      soldCount: Math.max(0, (product.soldCount ?? 0) + delta * item.quantity),
+    });
+  }
+}
+
 async function changeOrderStatus(
   ctx: MutationCtx,
   id: Id<"orders">,
@@ -495,6 +532,12 @@ async function changeOrderStatus(
   if (opts.trackingUrl !== undefined) patchData.trackingUrl = opts.trackingUrl;
 
   await ctx.db.patch(id, patchData);
+
+  const wasRevenue = isRevenueOrder(order);
+  const isRevenue = isRevenueOrder({ status: targetStatus, paymentStatus: targetPaymentStatus });
+  if (wasRevenue !== isRevenue) {
+    await syncSoldCount(ctx, order, isRevenue ? 1 : -1);
+  }
 
   if (statusChanged || paymentStatusChanged) {
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId: id });

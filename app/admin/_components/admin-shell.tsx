@@ -25,6 +25,7 @@ import {
   ShoppingCartIcon,
   Squares2X2Icon,
   TagIcon,
+  BoltIcon,
   UsersIcon,
   EnvelopeIcon,
   CreditCardIcon,
@@ -67,6 +68,12 @@ const navigation: NavEntry[] = [
     icon: Squares2X2Icon,
   },
   {
+    type: "link",
+    label: "Analitik",
+    href: adminPath("analytics"),
+    icon: ChartBarIcon,
+  },
+  {
     type: "group",
     id: "catalog",
     title: "Katalog",
@@ -95,18 +102,15 @@ const navigation: NavEntry[] = [
     icon: TagIcon,
     items: [
       { label: "Kuponlar", href: adminPath("coupons"), icon: TagIcon },
+      { label: "Kampanyalar", href: adminPath("promotions"), icon: BoltIcon },
       { label: "E-Postalar", href: adminPath("emails"), icon: EnvelopeIcon },
     ],
   },
   {
-    type: "group",
-    id: "analytics",
-    title: "Finans & Raporlar",
-    icon: ChartBarIcon,
-    items: [
-      { label: "Analitik", href: adminPath("analytics"), icon: ChartBarIcon },
-      { label: "Ödeme Yöntemleri", href: adminPath("payments"), icon: CreditCardIcon },
-    ],
+    type: "link",
+    label: "Ödeme Yöntemleri",
+    href: adminPath("payments"),
+    icon: CreditCardIcon,
   },
   {
     type: "link",

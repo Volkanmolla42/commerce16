@@ -12,55 +12,46 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import type { Product } from "@/lib/catalog/types";
-import { hasVariantOptionCombination } from "@/lib/catalog/variants";
+import type { Product, ProductVariant } from "@/lib/catalog/types";
+import { getSelectedVariant, getVariantForImage, hasVariantOptionCombination } from "@/lib/catalog/variants";
 import { ProductImageTransition } from "./product-image-transition";
+import { ProductBadges } from "./product-badges";
 
 const ProductLightbox = dynamic(() => import("./product-lightbox"), {
   ssr: false,
 });
 
-export function Gallery({ product }: { product: Product }) {
+export function Gallery({ product, defaultVariant }: { product: Product; defaultVariant?: ProductVariant }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const images = product.images ?? [];
-  const selection =
-    product.options?.flatMap((option) => {
-      const value = searchParams.get(option.name.toLocaleLowerCase("tr-TR"));
-      return value ? [{ name: option.name, value }] : [];
-    }) ?? [];
+  const selectedVariant = getSelectedVariant(product, searchParams) ?? defaultVariant;
+  const selectedVariantImageIndex = selectedVariant
+    ? images.findIndex((image) =>
+        Boolean(image.selectedOptions?.length) &&
+        image.selectedOptions!.every((option) =>
+          selectedVariant.selectedOptions.some((selected) =>
+            selected.name === option.name && selected.value === option.value)))
+    : -1;
 
-  const selectedVariantImageIndex =
-    selection.length > 0
-      ? images.findIndex((img) =>
-          img.selectedOptions?.length &&
-          img.selectedOptions.every((opt) =>
-            selection.some(
-              (s) =>
-                s.name.toLocaleLowerCase("tr-TR") ===
-                  opt.name.toLocaleLowerCase("tr-TR") && s.value === opt.value,
-            ),
-          ),
-        )
-      : -1;
-
-  const hasExplicitImage = searchParams.has("image");
-  const requestedIndex = Number(searchParams.get("image") ?? 0);
-  const imageIndex =
-    hasExplicitImage &&
+  const requestedIndex = Number(searchParams.get("image"));
+  const hasExplicitImage = searchParams.has("image") &&
     Number.isInteger(requestedIndex) &&
     requestedIndex >= 0 &&
-    requestedIndex < images.length
-      ? requestedIndex
-      : selectedVariantImageIndex >= 0
-        ? selectedVariantImageIndex
-        : 0;
+    requestedIndex < images.length;
+  const imageIndex = hasExplicitImage ? requestedIndex : Math.max(0, selectedVariantImageIndex);
   const activeImage = images[imageIndex];
 
   const updateImage = (index: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("image", index.toString());
+    const imageVariant = getVariantForImage(product, images[index]);
+    if (imageVariant) {
+      for (const option of imageVariant.selectedOptions) {
+        params.set(option.name.toLocaleLowerCase("tr-TR"), option.value);
+      }
+    }
     window.history.replaceState(null, "", `?${params.toString()}`);
   };
 
@@ -98,9 +89,9 @@ export function Gallery({ product }: { product: Product }) {
     imageIndex === 0 ? images.length - 1 : imageIndex - 1;
 
   return (
-    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:gap-4">
+    <div className="flex min-w-0 flex-col gap-3">
       <div
-        className={`${productGalleryClassName} order-1 bg-neutral-100 md:order-2 md:min-w-0 md:flex-1 dark:bg-neutral-900`}
+        className={`${productGalleryClassName} order-1 bg-neutral-100 dark:bg-neutral-900`}
       >
         {activeImage && failedImage !== activeImage.url ? (
           <button
@@ -114,7 +105,7 @@ export function Gallery({ product }: { product: Product }) {
                 data-product-gallery-image
                 className="h-full w-full object-contain"
                 fill
-                sizes="(min-width: 1400px) 720px, (min-width: 1024px) 55vw, calc(100vw - 2rem)"
+                sizes="(min-width: 1400px) 600px, (min-width: 1024px) 45vw, calc(100vw - 2rem)"
                 alt={product.title}
                 src={activeImage.url}
                 onError={() => setFailedImage(activeImage.url)}
@@ -135,10 +126,21 @@ export function Gallery({ product }: { product: Product }) {
         )}
 
         {images.length > 1 ? (
-          <span className="absolute left-2 top-2 rounded-full bg-white/85 px-2 py-1 text-[11px] font-medium text-neutral-900">
+          <span className="absolute right-2 top-2 z-10 rounded-full bg-white/85 px-2 py-1 text-[11px] font-medium text-neutral-900">
             {imageIndex + 1} / {images.length}
           </span>
         ) : null}
+
+        <div className="pointer-events-none absolute left-2 top-2 z-10">
+          <ProductBadges
+            variants={product.variants}
+            createdAt={product.createdAt}
+            publishedAt={product.publishedAt}
+            soldCount={product.soldCount}
+            selectedVariantId={selectedVariant?.id}
+            size="md"
+          />
+        </div>
 
         {images.length > 1 ? (
           <>
@@ -165,7 +167,7 @@ export function Gallery({ product }: { product: Product }) {
       {images.length > 1 ? (
         <ul
           aria-label="Diğer ürün görselleri"
-          className="no-scrollbar order-2 flex max-w-full items-center gap-2 overflow-x-auto px-1 py-2 md:order-1 md:max-h-[min(76vh,760px)] md:w-24 md:shrink-0 md:flex-col md:items-center md:overflow-x-hidden md:overflow-y-auto md:px-2 md:py-2"
+          className="no-scrollbar order-2 flex max-w-full items-center gap-2 overflow-x-auto px-1 py-1"
         >
           {images.map((image, index) => {
             const isActive = index === imageIndex;
@@ -204,9 +206,9 @@ export function Gallery({ product }: { product: Product }) {
       {lightboxOpen ? (
         <ProductLightbox
           images={images}
+          product={product}
           title={product.title}
           index={imageIndex}
-          searchParams={searchParams}
           onSelectVariant={handleSelectVariantFromLightbox}
           onClose={(index) => {
             setLightboxOpen(false);

@@ -32,14 +32,18 @@ import { VariantOptionValuesInput } from "./variant-option-values-input";
 type StoredImage = NonNullable<Doc<"products">["images"]>[number] & {
   url: string | null;
 };
-export type Product = Omit<Doc<"products">, "priceValue" | "images"> & { images: StoredImage[] };
+export type Product = Omit<Doc<"products">, "priceValue" | "images"> & {
+  images: StoredImage[];
+  descriptionImages: { storageId: string; url: string | null }[];
+};
 export type Category = Doc<"categories">;
-type ResolvedPendingImage = { storageId: string; fileName: string; selectedOptions?: { name: string; value: string }[] };
+type ResolvedPendingImage = { storageId: string; fileName: string; kind: "gallery" | "description"; selectedOptions?: { name: string; value: string }[] };
 type PendingImage = {
   id: string;
   blob: Blob;
   fileName: string;
   previewUrl: string;
+  kind: "gallery" | "description";
   status: "uploading" | "uploaded" | "error";
   storageId?: string;
   uploadPromise?: Promise<string | null>;
@@ -51,6 +55,8 @@ type ExitState = {
   title: string;
   slug: string;
   categorySlug: string;
+  description: string;
+  descriptionImageStorageIds: string[];
   attributeValues: Record<string, string | string[]>;
   categoryAttributes: CategoryAttributeDefinition[];
   variantOptions: { id: string; name: string; values: string[] }[];
@@ -64,6 +70,7 @@ type VariantDraft = {
   sku: string;
   barcode?: string;
   price: string;
+  compareAtPrice: string;
   stockQuantity: string;
   availableForSale: boolean;
 };
@@ -131,6 +138,7 @@ function toResolvedPendingImage(image: PendingImage): ResolvedPendingImage {
   return {
     storageId: image.storageId!,
     fileName: image.fileName,
+    kind: image.kind,
     ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
   };
 }
@@ -167,14 +175,15 @@ function draftAttributes(
   return attributes;
 }
 
-function minimalDraftPayload(uploaded: ResolvedPendingImage[]) {
+function minimalDraftPayload(uploaded: ResolvedPendingImage[], descriptionImageStorageIds: string[]) {
   const slug = `taslak-${Date.now()}`;
   return {
     title: "Taslak",
     slug,
     categorySlug: "",
     attributes: [] as ProductAttribute[],
-    images: imagesPayload(uploaded),
+    images: imagesPayload(uploaded.filter((image) => image.kind === "gallery")),
+    ...(descriptionImageStorageIds.length > 0 ? { descriptionImageStorageIds } : {}),
     availableForSale: false,
     options: [],
     variants: [{
@@ -191,31 +200,42 @@ function minimalDraftPayload(uploaded: ResolvedPendingImage[]) {
 
 function draftSaveAttempts(state: ExitState, uploaded: ResolvedPendingImage[]) {
   const slug = state.slug.trim() || `taslak-${Date.now()}`;
+  const descriptionImageStorageIds = [
+    ...state.descriptionImageStorageIds,
+    ...uploaded.filter((image) => image.kind === "description").map((image) => image.storageId),
+  ];
   const full = {
     title: state.title.trim() || "Taslak",
     slug,
     categorySlug: state.categorySlug,
+    description: state.description.trim(),
+    ...(descriptionImageStorageIds.length > 0 ? { descriptionImageStorageIds } : {}),
     attributes: draftAttributes(state.categoryAttributes, state.attributeValues),
-    images: imagesPayload(uploaded),
+    images: imagesPayload(uploaded.filter((image) => image.kind === "gallery")),
     availableForSale: false,
     options: state.variantOptions
       .map((option) => ({ id: option.id, name: option.name.trim(), values: option.values.map((value) => value.trim()).filter(Boolean) }))
       .filter((option) => option.name && option.values.length > 0),
     variants: state.variantRows.map((variant) => {
       const selectedOptions = variant.selectedOptions;
+      const price = /^\d+([.,]\d{1,2})?$/.test(variant.price.trim()) ? variant.price.trim().replace(",", ".") : "0";
+      const compareAtPrice = /^\d+([.,]\d{1,2})?$/.test(variant.compareAtPrice.trim())
+        ? variant.compareAtPrice.trim().replace(",", ".")
+        : null;
       return {
         id: variant.id || createEditorId(),
         sku: variant.sku.trim() || generatedVariantSku(slug, selectedOptions),
         ...(variant.barcode?.trim() ? { barcode: variant.barcode.trim() } : {}),
         title: selectedOptions.map(({ value }) => value).join(" / ") || "Ürünün kendisi",
         selectedOptions,
-        price: /^\d+([.,]\d{1,2})?$/.test(variant.price.trim()) ? variant.price.trim().replace(",", ".") : "0",
+        price,
+        ...(compareAtPrice && Number(compareAtPrice) > Number(price) ? { compareAtPrice } : {}),
         stockQuantity: Number(variant.stockQuantity) || 0,
         availableForSale: false,
       };
     }),
   };
-  return [full, minimalDraftPayload(uploaded)];
+  return [full, minimalDraftPayload(uploaded, descriptionImageStorageIds)];
 }
 
 async function postAdminAction(action: string, input: unknown) {
@@ -347,6 +367,7 @@ function ProductEditor({
         sku: variant.sku ?? "",
         barcode: variant.barcode ?? "",
         price: variant.price,
+        compareAtPrice: variant.compareAtPrice ?? "",
         stockQuantity: String(variant.stockQuantity),
         availableForSale: variant.availableForSale,
       }));
@@ -356,10 +377,18 @@ function ProductEditor({
       sku: generatedVariantSku(product?.slug || "", []),
       barcode: "",
       price: "",
+      compareAtPrice: "",
       stockQuantity: "0",
       availableForSale: true,
     }];
   });
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [descriptionImages, setDescriptionImages] = useState<{ storageId: string; url: string | null }[]>(
+    product?.descriptionImages?.map((image) => ({ storageId: String(image.storageId), url: image.url })) ?? [],
+  );
+  const galleryPendingImages = pendingImages.filter((image) => image.kind === "gallery");
+  const descriptionPendingImages = pendingImages.filter((image) => image.kind === "description");
+  const descriptionImageLimitReached = descriptionImages.length + descriptionPendingImages.length >= 12;
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -372,6 +401,11 @@ function ProductEditor({
       title,
       slug,
       categorySlug,
+      description,
+      descriptionImageStorageIds: [
+        ...descriptionImages.map((image) => image.storageId),
+        ...descriptionPendingImages.flatMap((image) => image.storageId ? [image.storageId] : []),
+      ],
       attributeValues,
       categoryAttributes,
       variantOptions,
@@ -380,9 +414,9 @@ function ProductEditor({
     };
   });
 
-  const uploadingCount = pendingImages.filter((image) => image.status === "uploading").length;
-  const uploadedCount = pendingImages.filter((image) => image.status === "uploaded").length;
-  const failedCount = pendingImages.filter((image) => image.status === "error").length;
+  const uploadingCount = galleryPendingImages.filter((image) => image.status === "uploading").length;
+  const uploadedCount = galleryPendingImages.filter((image) => image.status === "uploaded").length;
+  const failedCount = galleryPendingImages.filter((image) => image.status === "error").length;
 
   const changeCategory = (nextSlug: string) => {
     setCategorySlug(nextSlug);
@@ -421,7 +455,7 @@ function ProductEditor({
         return;
       }
       navigator.sendBeacon("/api/admin", new Blob(
-        [JSON.stringify({ action: "product.create", input: minimalDraftPayload(uploaded) })],
+        [JSON.stringify({ action: "product.create", input: minimalDraftPayload(uploaded, state.descriptionImageStorageIds) })],
         { type: "application/json" },
       ));
     };
@@ -570,6 +604,7 @@ function ProductEditor({
           sku,
           barcode: claimCount === 0 ? (bestMatch.barcode ?? "") : "",
           price: bestMatch.price || defaultRow?.price || variantRows[0]?.price || "",
+          compareAtPrice: bestMatch.compareAtPrice || "",
           stockQuantity: "0",
           availableForSale: bestMatch.availableForSale ?? true,
         };
@@ -590,6 +625,7 @@ function ProductEditor({
         sku,
         barcode: "",
         price: defaultRow?.price || variantRows[0]?.price || "",
+        compareAtPrice: defaultRow?.compareAtPrice || variantRows[0]?.compareAtPrice || "",
         stockQuantity: "0",
         availableForSale: true,
       };
@@ -642,12 +678,16 @@ function ProductEditor({
   const removeVariant = (index: number) => {
     setVariantRows((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
-  const handleImageSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelection = async (event: React.ChangeEvent<HTMLInputElement>, kind: "gallery" | "description") => {
     const files = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
     if (!files.length) return;
-    if (images.length + pendingImages.length + files.length > 20) {
+    if (kind === "gallery" && images.length + galleryPendingImages.length + files.length > 20) {
       setError("Bir üründe en fazla 20 görsel olabilir.");
+      return;
+    }
+    if (kind === "description" && descriptionImages.length + descriptionPendingImages.length + files.length > 12) {
+      setError("Açıklamada en fazla 12 görsel olabilir.");
       return;
     }
 
@@ -655,7 +695,9 @@ function ProductEditor({
     setError(null);
     try {
       const blobs = await Promise.all(files.map((file) => convertImageToWebp(file)));
-      const startIndex = images.length + pendingImages.length;
+      const startIndex = kind === "gallery"
+        ? images.length + galleryPendingImages.length
+        : descriptionImages.length + descriptionPendingImages.length;
       const { uploadUrls } = await runAdminAction<{ uploadUrls: string[] }>("product.image-upload-urls", {
         count: blobs.length,
       });
@@ -679,7 +721,7 @@ function ProductEditor({
             return null;
           }
         })();
-        return { id, blob, fileName, previewUrl, status: "uploading" as const, uploadPromise };
+        return { id, blob, fileName, previewUrl, kind, status: "uploading" as const, uploadPromise };
       });
       setPendingImages((current) => [...current, ...nextImages]);
     } catch (cause) {
@@ -704,6 +746,10 @@ function ProductEditor({
     previewUrls.current = previewUrls.current.filter((url) => url !== image.previewUrl);
     setPendingImages((current) => current.filter((item) => item.id !== image.id));
     discardPendingImage(image);
+  };
+
+  const removeDescriptionImage = (storageId: string) => {
+    setDescriptionImages((current) => current.filter((image) => image.storageId !== storageId));
   };
 
   const handleExit = async () => {
@@ -839,6 +885,11 @@ function ProductEditor({
       setError("Her kombinasyon için geçerli bir satış fiyatı gir.");
         return;
       }
+      const compareAtPrice = draft.compareAtPrice.trim().replace(",", ".");
+      if (compareAtPrice && (!/^\d+(?:[.,]\d{1,2})?$/.test(draft.compareAtPrice.trim()) || Number(compareAtPrice) <= Number(draft.price.trim().replace(",", ".")))) {
+        setError("Liste fiyatı satış fiyatından büyük ve geçerli bir tutar olmalı.");
+        return;
+      }
       if (!/^\d+$/.test(draft.stockQuantity) || !Number.isSafeInteger(Number(draft.stockQuantity))) {
         setError("Her kombinasyon için sıfır veya daha büyük tam sayı stok gir.");
         return;
@@ -848,7 +899,7 @@ function ProductEditor({
       setError("Her kombinasyonun SKU kodu birbirinden farklı olmalı.");
       return;
     }
-    if (images.length + pendingImages.length > 20) {
+    if (images.length + galleryPendingImages.length > 20) {
       setError("Bir üründe en fazla 20 görsel olabilir.");
       return;
     }
@@ -859,6 +910,8 @@ function ProductEditor({
       title: title.trim(),
       slug: slug.trim(),
       categorySlug,
+      description: description.trim(),
+      descriptionImageStorageIds: descriptionImages.map((image) => image.storageId),
       attributes: productAttributes,
       images: [],
       availableForSale: targetAvailableForSale,
@@ -872,6 +925,7 @@ function ProductEditor({
           title: selectedOptions.map(({ value }) => value).join(" / ") || "Ürünün kendisi",
           selectedOptions,
           price: variant.price.trim().replace(",", "."),
+          ...(variant.compareAtPrice.trim() ? { compareAtPrice: variant.compareAtPrice.trim().replace(",", ".") } : {}),
           stockQuantity: Number(variant.stockQuantity),
           availableForSale: variant.availableForSale,
         };
@@ -890,7 +944,11 @@ function ProductEditor({
       }
       await runAdminAction(product ? "product.update" : "product.create", {
         ...input,
-        images: imagesPayload([...images, ...uploadedImages]),
+        descriptionImageStorageIds: [
+          ...input.descriptionImageStorageIds,
+          ...uploadedImages.flatMap((image) => image.kind === "description" ? [image.storageId] : []),
+        ],
+        images: imagesPayload([...images, ...uploadedImages.filter((image) => image.kind === "gallery")]),
       });
       savedRef.current = true;
       if (exitStateRef.current) exitStateRef.current.saved = true;
@@ -914,18 +972,18 @@ function ProductEditor({
                 {uploadingCount + failedCount > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground" role="status">
                     <ArrowPathIcon className={`size-3 ${uploadingCount > 0 ? "animate-spin" : ""}`} aria-hidden="true" />
-                    {uploadedCount}/{pendingImages.length} yüklendi
+                    {uploadedCount}/{galleryPendingImages.length} yüklendi
                   </span>
                 )}
               </div>
               <label htmlFor="product-image-upload" className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:bg-muted ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
                 <PlusCircleIcon className="size-4" />
                 <span>{processingImages ? "Hazırlanıyor…" : "Görsel ekle"}</span>
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{images.length + pendingImages.length}/20</span>
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{images.length + galleryPendingImages.length}/20</span>
               </label>
             </div>
-            <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event)} className="sr-only" />
-            {(images.length > 0 || pendingImages.length > 0) ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event, "gallery")} className="sr-only" />
+            {(images.length > 0 || galleryPendingImages.length > 0) ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {images.map((image) => <div key={image.storageId} className="group overflow-hidden rounded-xl border border-border bg-background">
                 <div className="relative aspect-[4/5] overflow-hidden bg-card">
                   {image.url ? <Image src={image.url} alt={title} width={400} height={500} unoptimized className="size-full object-cover" /> : null}
@@ -946,7 +1004,7 @@ function ProductEditor({
                   }))}
                 </select>}
               </div>)}
-              {pendingImages.map((image) => <div key={image.id} className="group overflow-hidden rounded-xl border border-border bg-background">
+              {galleryPendingImages.map((image) => <div key={image.id} className="group overflow-hidden rounded-xl border border-border bg-background">
                 <div className="relative aspect-[4/5] overflow-hidden bg-card">
                   <Image src={image.previewUrl} alt={title} width={400} height={500} unoptimized className="size-full object-cover" />
                   {image.status === "uploading" && <div className="absolute inset-0 grid place-items-center bg-background/60"><ArrowPathIcon className="size-5 animate-spin text-muted-foreground" aria-hidden="true" /></div>}
@@ -1167,12 +1225,13 @@ function ProductEditor({
                   </section>
 
                   <div className="hidden overflow-x-auto rounded-xl border border-border md:block">
-                      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+                      <table className="w-full min-w-[880px] border-collapse text-left text-xs">
                         <thead className="bg-background text-muted-foreground">
                           <tr>
                             <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
                             <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
                             <th scope="col" className="px-3 py-3 font-medium">Fiyat (TL) <span className="text-destructive">*</span></th>
+                            <th scope="col" className="px-3 py-3 font-medium">Liste fiyatı (TL)</th>
                             <th scope="col" className="px-3 py-3 font-medium">Stok</th>
                             <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-destructive">*</span></th>
                             <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
@@ -1184,6 +1243,7 @@ function ProductEditor({
                             <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" /></td>
                             <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-foreground">{variant.selectedOptions.map(({ value }) => value).join(" / ") || "Tek ürün"}</td>
                             <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
+                            <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} liste fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" placeholder="Opsiyonel" value={variant.compareAtPrice} onChange={(event) => updateVariant(index, { compareAtPrice: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
                             <td className="w-24 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
                             <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
                             <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
@@ -1204,10 +1264,108 @@ function ProductEditor({
                           <div className="space-y-1.5"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (TL) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
                           <div className="space-y-1.5"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-muted-foreground">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
                         </div>
+                        <div className="space-y-1.5"><Label htmlFor={`mobile-variant-compare-at-${index}`} className="text-xs text-muted-foreground">Liste fiyatı (TL)</Label><Input id={`mobile-variant-compare-at-${index}`} type="number" inputMode="decimal" min="0" step="0.01" placeholder="Opsiyonel" value={variant.compareAtPrice} onChange={(event) => updateVariant(index, { compareAtPrice: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
                         <div className="space-y-1.5"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-muted-foreground">SKU <span className="text-destructive">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>
                         <div className="space-y-1.5"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-muted-foreground">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>
                       </section>)}
                   </div>
+            </div>
+          </section>
+
+          <section aria-label="Açıklama" className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
+            <div className="space-y-5">
+              <h2 className="text-sm font-semibold text-foreground">Açıklama</h2>
+              <div className="space-y-1.5">
+                <Label htmlFor="product-description">Ürün açıklaması</Label>
+                <textarea
+                  id="product-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  maxLength={4000}
+                  rows={6}
+                  placeholder="Kumaş, kalıp, bakım ve kullanım bilgileri..."
+                  className="min-h-32 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+                />
+                <p className="text-[11px] text-muted-foreground leading-normal">
+                  Paragraflar için alt satır kullanın. En fazla 4000 karakter.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-semibold text-foreground">Açıklama görselleri</h3>
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Ürün galerisinden bağımsızdır; yalnızca açıklama bölümünde gösterilir. En fazla 12 görsel.
+                    </p>
+                  </div>
+                  <label
+                    htmlFor="product-description-image-upload"
+                    className={`inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted ${
+                      processingImages || saving || descriptionImageLimitReached ? "pointer-events-none opacity-60" : ""
+                    }`}
+                  >
+                    <PlusCircleIcon className="size-4" />
+                    <span>{processingImages ? "Yükleniyor…" : "Görsel ekle"}</span>
+                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {descriptionImages.length + descriptionPendingImages.length}/12
+                    </span>
+                  </label>
+                </div>
+                <input
+                  id="product-description-image-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={saving || processingImages || descriptionImageLimitReached}
+                  onChange={(event) => void handleImageSelection(event, "description")}
+                  className="sr-only"
+                />
+                {descriptionImages.length > 0 || descriptionPendingImages.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                    {descriptionImages.map((image) => (
+                      <div key={image.storageId} className="group relative aspect-[4/5] overflow-hidden rounded-xl border border-border bg-background">
+                        {image.url ? (
+                          <Image src={image.url} alt="" width={200} height={250} unoptimized className="size-full object-cover" />
+                        ) : (
+                          <span className="grid size-full place-items-center bg-muted text-[10px] text-muted-foreground">Görsel yok</span>
+                        )}
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          aria-label="Açıklama görselini kaldır"
+                          title="Görseli kaldır"
+                          disabled={saving}
+                          className="absolute right-1.5 top-1.5 size-8 rounded-full border border-white/10 bg-background/90 text-foreground hover:bg-muted hover:text-foreground"
+                          onClick={() => removeDescriptionImage(image.storageId)}
+                        >
+                          <TrashIcon className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    {descriptionPendingImages.map((image) => (
+                      <div key={image.id} className="group relative aspect-[4/5] overflow-hidden rounded-xl border border-border bg-background">
+                        <Image src={image.previewUrl} alt="" width={200} height={250} unoptimized className="size-full object-cover" />
+                        {image.status === "uploading" && <div className="absolute inset-0 grid place-items-center bg-background/60"><ArrowPathIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" /></div>}
+                        {image.status === "error" && <div className="absolute inset-x-0 bottom-0 bg-destructive px-1 py-0.5 text-center text-[9px] font-medium text-white">Yüklenemedi</div>}
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          aria-label="Açıklama görselini kaldır"
+                          title="Görseli kaldır"
+                          disabled={saving}
+                          className="absolute right-1.5 top-1.5 size-8 rounded-full border border-white/10 bg-background/90 text-foreground hover:bg-muted hover:text-foreground"
+                          onClick={() => removePendingImage(image)}
+                        >
+                          <TrashIcon className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </section>
         </div>
