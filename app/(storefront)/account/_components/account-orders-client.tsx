@@ -13,7 +13,7 @@ import { formatMoney } from "@/lib/format-money";
 import { getOrderCode } from "@/lib/orders";
 import { formatDate } from "@/lib/format-date";
 import { Button, Card, CardContent } from "@/components/ui";
-import { OrderStatusBadge } from "./order-status-badge";
+import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
 import { ArrowRight01Icon, ShoppingBag01Icon } from "hugeicons-react";

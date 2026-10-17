@@ -2,6 +2,8 @@ Gereksiz npm run build çalıştırma.
 Birinci görev bitmeden diğerine geçme: aynı anda birden fazla görev verilirse sırayla bitir, bir görev tamamen bitmeden (kod + doğrulama) sonrakine başlama.
 Kullanıcıya gösterilen her bir harfin, kelimenin, butonun, div'in, kartın ve tüm UI bileşenlerinin somut bir amacı ve işlevi olmalı. Boş dekoratif süslemeler, gereksiz açıklamalar, dolgu metinleri veya işlevsiz arayüz elemanları asla eklenmemeli; görünen her şey kullanıcı için doğrudan bir amaca hizmet etmeli.
 useMemo ve useCallback kullanımı YASAKTIR. Next.js ve Cache Components mimarisi kullanıldığı için bu tarz manuel memoization kodlarına yer verilmez
+Barrel export (re-export) kullanımı YASAKTIR. Bileşenler ve modüller doğrudan tanımlandıkları özgün dosyalardan import edilmelidir.
+Test dosyası yazmak KESİNLİKLE YASAKTIR. Projede test dosyası (.test.ts, .spec.ts vb.) oluşturulmaz, test kütüphaneleri eklenmez ve test kodu yazılmaz.
 Kod yazmadan önce düşünme protokolü (Senior Mühendislik Standardı):
 - Kod yazmadan önce her zaman en cerrahi, minimal ve hatasız çözümü hedefle; aşırı mühendislikten (over-engineering), spekülatif soyutlamalardan ve gereksiz yardımcı kodlardan kaçın.
 - Mevcut mimariyi, sözleşmeleri ve tip tanımlarını bozma; varsayım yapmak yerine ilgili dosyaları oku ve doğrula.

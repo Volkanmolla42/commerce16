@@ -39,6 +39,12 @@ import { CsvExportButton } from "../_components/export-button";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import {
   orderStatusLabels,
+  orderPaymentStatusLabels,
+  ORDER_STATUS_KEYS,
+  ORDER_PAYMENT_STATUS_KEYS,
+  type OrderStatus,
+  type OrderPaymentStatus,
+  type OrderStatusUpdate,
   getOrderCode,
   getOrderPaymentMethodTitle,
   formatWhatsAppUrl,
@@ -49,16 +55,19 @@ import {
 } from "@/lib/orders";
 import { formatDateTime } from "@/lib/format-date";
 import { formatMoney } from "@/lib/format-money";
+import {
+  OrderPaymentStatusBadge,
+  ORDER_PAYMENT_STATUS_STYLES,
+} from "@/components/orders/order-badges";
 import { OrderPriceSummary } from "@/components/orders/order-price-summary";
 import { adminPath } from "@/lib/admin/routes";
 
 type Order = Doc<"orders"> & {
   emailEvents?: Doc<"orderEmailEvents">[];
 };
-type OrderStatus = Order["status"];
 type OrderEmailEvent = Doc<"orderEmailEvents">["event"];
 
-const statuses: OrderStatus[] = ["pending", "paid", "shipped", "delivered", "cancelled"];
+const statuses = ORDER_STATUS_KEYS;
 
 const LIST_COLUMNS = "lg:grid-cols-[minmax(180px,1fr)_minmax(160px,1fr)_110px_150px_88px]";
 
@@ -230,7 +239,10 @@ function OrderDetails({
   onClose: () => void;
   onRetryEmail: (event: OrderEmailEvent) => void;
   retryingEmailKey: string | null;
-  onUpdateStatus: (order: Order, status: OrderStatus, shippingInfo?: { carrier?: string; trackingNumber?: string }) => Promise<void>;
+  onUpdateStatus: (
+    order: Order,
+    update: OrderStatusUpdate
+  ) => Promise<void>;
   onOpenShippingDialog: (order: Order) => void;
   isUpdatingStatus: boolean;
 }) {
@@ -286,7 +298,7 @@ function OrderDetails({
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -299,9 +311,10 @@ function OrderDetails({
                 <span>Yazdır</span>
               </Button>
 
-              <div>
+              {/* Lojistik Durumu */}
+              <div className="flex items-center gap-1.5">
                 <Label htmlFor={`modal-status-${order._id}`} className="sr-only">
-                  Sipariş Durumu
+                  Lojistik Durumu
                 </Label>
                 <select
                   id={`modal-status-${order._id}`}
@@ -312,14 +325,39 @@ function OrderDetails({
                     if (newStatus === "shipped") {
                       onOpenShippingDialog(order);
                     } else {
-                      void onUpdateStatus(order, newStatus);
+                      void onUpdateStatus(order, { status: newStatus });
                     }
                   }}
                   className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-semibold text-foreground outline-none focus-visible:border-ring disabled:opacity-50 cursor-pointer"
+                  title="Lojistik Durumu"
                 >
                   {statuses.map((s) => (
                     <option key={s} value={s}>
                       {orderStatusLabels[s]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ödeme Durumu */}
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor={`modal-payment-status-${order._id}`} className="sr-only">
+                  Ödeme Durumu
+                </Label>
+                <select
+                  id={`modal-payment-status-${order._id}`}
+                  value={order.paymentStatus}
+                  disabled={isUpdatingStatus}
+                  onChange={(e) => {
+                    const newPaymentStatus = e.target.value as OrderPaymentStatus;
+                    void onUpdateStatus(order, { paymentStatus: newPaymentStatus });
+                  }}
+                  className={`h-8 rounded-md border px-2.5 text-xs font-semibold outline-none focus-visible:border-ring disabled:opacity-50 cursor-pointer ${ORDER_PAYMENT_STATUS_STYLES[order.paymentStatus]}`}
+                  title="Finansal Ödeme Durumu"
+                >
+                  {ORDER_PAYMENT_STATUS_KEYS.map((paymentStatus) => (
+                    <option key={paymentStatus} value={paymentStatus}>
+                      {orderPaymentStatusLabels[paymentStatus]}
                     </option>
                   ))}
                 </select>
@@ -329,7 +367,27 @@ function OrderDetails({
         </DialogHeader>
 
         {/* 1. ÖNCELİK: Operasyonel Durum & Eylem Şeridi */}
-        {order.status === "pending" && order.paymentMethod === "cash_on_delivery" && (
+        {order.paymentStatus === "pending" && order.paymentMethod === "bank_transfer" && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
+            <div className="space-y-1">
+              <p className="font-bold text-foreground">Havale / EFT Bekleniyor</p>
+              <p className="text-xs text-muted-foreground">
+                Hesabınıza <strong className="tabular-nums text-foreground">{formatMoney(priceBreakdown.total)}</strong> geçtiğinde ödemeyi onaylayınız.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isUpdatingStatus}
+              onClick={() => void onUpdateStatus(order, { paymentStatus: "paid" })}
+              className="h-8 text-xs shrink-0 cursor-pointer"
+            >
+              Havale Ödemesini Onayla
+            </Button>
+          </div>
+        )}
+
+        {order.paymentMethod === "cash_on_delivery" && (
           <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -337,51 +395,37 @@ function OrderDetails({
                 <span className="inline-flex items-center font-mono text-[11px] font-semibold bg-background border border-border px-2 py-0.5 rounded-md text-foreground tabular-nums">
                   Tahsil Edilecek: {formatMoney(priceBreakdown.total)}
                 </span>
+                {order.paymentStatus === "paid" && (
+                  <span className="text-[11px] font-semibold text-emerald-500">Tahsil Edildi</span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Müşteri kargocuya nakit/kart ile ödeyecektir. Ürünleri paketleyip kargolayabilirsiniz.
+                Müşteri kargocuya nakit/kart ile ödeyecektir. Teslim edildiğinde ödeme durumu otomatik &ldquo;Ödendi&rdquo; olur.
               </p>
             </div>
-            <Button
-              size="sm"
-              onClick={() => onOpenShippingDialog(order)}
-              className="h-8 text-xs shrink-0 cursor-pointer"
-            >
-              <TruckIcon className="mr-1.5 size-3.5" /> Kargo Girişi Yap
-            </Button>
+            {order.status !== "shipped" && order.status !== "delivered" && order.status !== "cancelled" && (
+              <Button
+                size="sm"
+                onClick={() => onOpenShippingDialog(order)}
+                className="h-8 text-xs shrink-0 cursor-pointer"
+              >
+                <TruckIcon className="mr-1.5 size-3.5" /> Kargo Girişi Yap
+              </Button>
+            )}
           </div>
         )}
 
-        {order.status === "pending" && order.paymentMethod === "bank_transfer" && (
-          <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
-            <div className="space-y-1">
-              <p className="font-bold text-foreground">Havale / EFT Bekleniyor</p>
-              <p className="text-xs text-muted-foreground">
-                Hesabınıza <strong className="tabular-nums text-foreground">{formatMoney(priceBreakdown.total)}</strong> geçtiğinde siparişi &ldquo;Ödendi&rdquo; yapınız.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isUpdatingStatus}
-              onClick={() => void onUpdateStatus(order, "paid")}
-              className="h-8 text-xs shrink-0 cursor-pointer"
-            >
-              Ödeme Alındı Olarak İşaretle
-            </Button>
-          </div>
-        )}
-
-        {order.status === "paid" && (
+        {order.status === "received" && order.paymentStatus === "paid" && order.paymentMethod !== "cash_on_delivery" && (
           <div className="rounded-xl border border-border bg-muted/40 p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-foreground">
             <div className="space-y-1">
               <p className="font-bold text-foreground">Ödeme Onaylandı — Kargolanmaya Hazır</p>
               <p className="text-xs text-muted-foreground">
-                Sipariş bedeli tahsil edildi ({formatMoney(priceBreakdown.total)}). Kargo takip bilgisini girerek siparişi kargoya verin.
+                Sipariş bedeli tahsil edildi. Paketleme tamamlandığında kargo firmasını ve takip numarasını girerek siparişi kargoya verin.
               </p>
             </div>
             <Button
               size="sm"
+              disabled={isUpdatingStatus}
               onClick={() => onOpenShippingDialog(order)}
               className="h-8 text-xs shrink-0 cursor-pointer"
             >
@@ -669,7 +713,8 @@ function AdminOrdersContent() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [dateFilter, setDateFilter] = useState<DateRangeFilter>("all");
-  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
   const [selectedOrderOverride, setSelectedOrderOverride] = useState<Order | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [shippingDialogOrder, setShippingDialogOrder] = useState<Order | null>(null);
@@ -709,8 +754,11 @@ function AdminOrdersContent() {
         .includes(term);
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesDate = matchesDateRange(order._creationTime, dateFilter);
-    const matchesPayment = paymentFilter === "all" || order.paymentMethod === paymentFilter;
-    return matchesTerm && matchesStatus && matchesDate && matchesPayment;
+    const matchesPayment =
+      paymentMethodFilter === "all" || order.paymentMethod === paymentMethodFilter;
+    const matchesPaymentStatus =
+      paymentStatusFilter === "all" || order.paymentStatus === paymentStatusFilter;
+    return matchesTerm && matchesStatus && matchesDate && matchesPayment && matchesPaymentStatus;
   });
 
   const baseForCounts = (orders || []).filter((order) => {
@@ -720,8 +768,10 @@ function AdminOrdersContent() {
         .toLocaleLowerCase("tr-TR")
         .includes(term);
     const matchesDate = matchesDateRange(order._creationTime, dateFilter);
-    const matchesPayment = paymentFilter === "all" || order.paymentMethod === paymentFilter;
-    return matchesTerm && matchesDate && matchesPayment;
+    const matchesPayment = paymentMethodFilter === "all" || order.paymentMethod === paymentMethodFilter;
+    const matchesPaymentStatus =
+      paymentStatusFilter === "all" || order.paymentStatus === paymentStatusFilter;
+    return matchesTerm && matchesDate && matchesPayment && matchesPaymentStatus;
   });
 
   const counts = baseForCounts.reduce<Record<string, number>>(
@@ -734,19 +784,21 @@ function AdminOrdersContent() {
 
   const updateStatus = async (
     order: Order,
-    status: OrderStatus,
-    shippingInfo?: { carrier?: string; trackingNumber?: string }
+    update: OrderStatusUpdate
   ) => {
     setUpdatingId(order._id);
     setActionError(null);
     setMessage(null);
     try {
-      await runAdminAction("order.status", { id: order._id, status, ...shippingInfo });
+      await runAdminAction("order.status", { id: order._id, ...update });
       setSelectedOrderOverride((prev) =>
-        prev && prev._id === order._id ? { ...prev, status, ...shippingInfo } : prev
+        prev && prev._id === order._id ? { ...prev, ...update } : prev
       );
       setMessage(`Sipariş ${getOrderCode(order, true)} güncellendi.`);
       await refresh();
+      // Sunucuda türetilen alanlar (ör. teslimatta otomatik ödeme) taze veride gelir;
+      // override bırakılınca modal listedeki güncel siparişi gösterir.
+      setSelectedOrderOverride(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Sipariş durumu güncellenemedi.");
     } finally {
@@ -881,8 +933,8 @@ function AdminOrdersContent() {
               />
               <select
                 id="order-payment-filter"
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value)}
+                value={paymentMethodFilter}
+                onChange={(e) => setPaymentMethodFilter(e.target.value)}
                 className="h-9 rounded-md border border-input bg-background pl-8 pr-7 text-xs font-medium text-foreground outline-none focus-visible:border-ring cursor-pointer"
               >
                 <option value="all">Tüm Ödemeler</option>
@@ -892,13 +944,35 @@ function AdminOrdersContent() {
               </select>
             </div>
 
+            {/* Ödeme Durumu (Finans) Filtresi */}
+            <div className="relative shrink-0">
+              <Label htmlFor="order-payment-status-filter" className="sr-only">
+                Ödeme Durumu
+              </Label>
+              <select
+                id="order-payment-status-filter"
+                value={paymentStatusFilter}
+                onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground outline-none focus-visible:border-ring cursor-pointer"
+              >
+                <option value="all">Tüm Tahsilat Durumları</option>
+                {ORDER_PAYMENT_STATUS_KEYS.map((paymentStatus) => (
+                  <option key={paymentStatus} value={paymentStatus}>
+                    {orderPaymentStatusLabels[paymentStatus]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Filtreleri Sıfırla (Aktif filtre varsa) */}
-            {(dateFilter !== "all" || paymentFilter !== "all" || query.trim() !== "") && (
+            {(dateFilter !== "all" || paymentMethodFilter !== "all" || paymentStatusFilter !== "all" || query.trim() !== "") && (
               <button
                 type="button"
                 onClick={() => {
+                  setStatusFilter("all");
                   setDateFilter("all");
-                  setPaymentFilter("all");
+                  setPaymentMethodFilter("all");
+                  setPaymentStatusFilter("all");
                   setQuery("");
                 }}
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline px-1 py-1 cursor-pointer transition-colors"
@@ -999,9 +1073,17 @@ function AdminOrdersContent() {
                   {formatDateTime(order._creationTime, { dateStyle: "medium", timeStyle: "short" })}
                 </p>
 
-                <p className="text-sm font-semibold tabular-nums text-foreground">
-                  {formatMoney(order.total)}
-                </p>
+                <div>
+                  <p className="text-sm font-semibold tabular-nums text-foreground">
+                    {formatMoney(order.total)}
+                  </p>
+                  <div className="mt-0.5">
+                    <OrderPaymentStatusBadge
+                      status={order.paymentStatus}
+                      className="text-[10px] px-1.5 py-0"
+                    />
+                  </div>
+                </div>
 
                 <div>
                   <Label htmlFor={`status-${order._id}`} className="sr-only">
@@ -1017,7 +1099,7 @@ function AdminOrdersContent() {
                       if (newStatus === "shipped") {
                         setShippingDialogOrder(order);
                       } else {
-                        void updateStatus(order, newStatus);
+                        void updateStatus(order, { status: newStatus });
                       }
                     }}
                     className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground outline-none focus-visible:border-ring disabled:opacity-60 cursor-pointer"
@@ -1065,7 +1147,8 @@ function AdminOrdersContent() {
           order={shippingDialogOrder}
           onClose={() => setShippingDialogOrder(null)}
           onSubmit={async (carrier, trackingNumber) => {
-            await updateStatus(shippingDialogOrder, "shipped", {
+            await updateStatus(shippingDialogOrder, {
+              status: "shipped",
               carrier: carrier || undefined,
               trackingNumber: trackingNumber || undefined,
             });

@@ -9,16 +9,14 @@ import Image from "next/image";
 import {
   ArrowLeftIcon,
   ShoppingBagIcon,
-  CheckBadgeIcon,
-  ClockIcon,
   XCircleIcon,
   MapPinIcon,
   CreditCardIcon,
   TruckIcon,
-  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 import {
-  orderStatusLabels,
+  ORDER_TRACKING_STEPS,
+  getOrderStepIndex,
   getOrderCode,
   formatPhone,
   resolveCarrierTrackingUrl,
@@ -34,19 +32,12 @@ import {
   CardTitle,
   Separator,
 } from "@/components/ui";
-import { OrderStatusBadge } from "./order-status-badge";
+import { OrderStatusBadge, OrderPaymentStatusBadge, ORDER_STATUS_ICONS } from "@/components/orders/order-badges";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
 import { OrderReviewModal } from "@/components/account/order-review-modal";
 
 export function AccountOrderDetailsSkeleton() {
-  const stepLabels = [
-    "Sipariş Alındı",
-    "Hazırlanıyor",
-    "Kargoya Verildi",
-    "Teslim Edildi",
-  ];
-
   return (
     <div className="space-y-6">
       {/* Sipariş Edilen Ürünler İskeleti */}
@@ -103,13 +94,13 @@ export function AccountOrderDetailsSkeleton() {
           <div className="py-2">
             <div className="relative flex items-start justify-between">
               <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted" />
-              {stepLabels.map((label) => (
-                <div key={label} className="relative z-10 flex flex-col items-center">
+              {ORDER_TRACKING_STEPS.map((step) => (
+                <div key={step.key} className="relative z-10 flex flex-col items-center">
                   <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 border-border bg-card">
                     <Sk className="h-5 w-5 rounded-full" />
                   </div>
                   <span className="mt-2 text-center text-xs font-semibold text-muted-foreground">
-                    {label}
+                    {step.label}
                   </span>
                 </div>
               ))}
@@ -209,22 +200,8 @@ export default function AccountOrderDetailsClient({
     );
   }
 
-  const steps = [
-    { key: "pending", label: "Sipariş Alındı", icon: ClockIcon },
-    { key: "paid", label: "Hazırlanıyor", icon: ArchiveBoxIcon },
-    { key: "shipped", label: "Kargoya Verildi", icon: TruckIcon },
-    { key: "delivered", label: "Teslim Edildi", icon: CheckBadgeIcon },
-  ];
-
-  const stepIndexMap: Record<string, number> = {
-    pending: 0,
-    paid: 1,
-    shipped: 2,
-    delivered: 3,
-  };
-
   const isCancelled = order.status === "cancelled";
-  const currentStep = stepIndexMap[order.status] ?? 0;
+  const currentStep = getOrderStepIndex(order.status);
 
   return (
     <div className="space-y-6">
@@ -334,13 +311,15 @@ export default function AccountOrderDetailsClient({
                 <div className="absolute left-5 right-5 sm:left-6 sm:right-6 top-5 sm:top-6 h-1 bg-muted">
                   <div
                     className="h-full bg-primary transition-[width] duration-300 ease-out"
-                    style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+                    style={{
+                      width: `${(Math.max(0, currentStep) / (ORDER_TRACKING_STEPS.length - 1)) * 100}%`,
+                    }}
                   />
                 </div>
 
                 {/* Adımlar */}
-                {steps.map((step, idx) => {
-                  const Icon = step.icon;
+                {ORDER_TRACKING_STEPS.map((step, idx) => {
+                  const Icon = ORDER_STATUS_ICONS[step.key];
                   const isPassed = idx <= currentStep;
                   const isCurrent = idx === currentStep;
 
@@ -453,12 +432,17 @@ export default function AccountOrderDetailsClient({
 
           <OrderPriceSummary order={order} variant="storefront" />
 
-            <div className="mt-4 rounded-2xl bg-muted/40 p-3.5 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">
-                Sipariş Durumu: {orderStatusLabels[order.status] ?? order.status.toUpperCase()}
-              </p>
-              <p className="mt-0.5">
-                Sipariş numaranız: <span className="font-mono font-semibold">{getOrderCode(order, true)}</span>
+            <div className="mt-4 rounded-2xl bg-muted/40 p-3.5 text-xs text-muted-foreground space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">Sipariş Durumu:</span>
+                <OrderStatusBadge status={order.status} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">Ödeme Durumu:</span>
+                <OrderPaymentStatusBadge status={order.paymentStatus} />
+              </div>
+              <p className="pt-2 border-t border-border/50 text-[11px]">
+                Sipariş numaranız: <span className="font-mono font-semibold text-foreground">{getOrderCode(order, true)}</span>
               </p>
             </div>
         </Card>

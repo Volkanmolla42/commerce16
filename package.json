@@ -8,8 +8,7 @@
     "dev:convex": "convex dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test": "vitest run"
+    "lint": "eslint"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.96",
@@ -36,7 +35,6 @@
     "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
-    "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^26.6.4",
@@ -44,11 +42,9 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "concurrently": "^10.0.5",
-    "convex-test": "^0.0.60",
     "eslint": "^9",
     "eslint-config-next": "^16.4.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^5.0.3"
+    "typescript": "^5"
   }
 }

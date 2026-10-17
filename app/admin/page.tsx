@@ -14,12 +14,13 @@ import {
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, Badge } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "./_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice } from "./_components/admin-primitives";
+import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { useAdminResource } from "./_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
 import { formatDateTime } from "@/lib/format-date";
-import { getOrderCode } from "@/lib/orders";
+import { getOrderCode, isRevenueOrder } from "@/lib/orders";
 
 
 type LowStockItem = {
@@ -50,9 +51,8 @@ export default function AdminOverviewPage() {
   const { data, error, loading } = useAdminResource<AdminOverview>("overview");
 
   const orders = data?.orders ?? [];
-  const totalRevenue = orders.reduce((sum, order) => sum + (Number.parseFloat(order.total) || 0), 0);
-  const pendingOrders = orders.filter((order) => order.status === "pending");
-  const paidOrders = orders.filter((order) => order.status === "paid");
+  const totalRevenue = orders.filter((order) => isRevenueOrder(order)).reduce((sum, order) => sum + (Number.parseFloat(order.total) || 0), 0);
+  const receivedOrders = orders.filter((order) => order.status === "received");
   const shippedOrders = orders.filter((order) => order.status === "shipped");
   const deliveredOrders = orders.filter((order) => order.status === "delivered");
   const cancelledOrders = orders.filter((order) => order.status === "cancelled");
@@ -122,21 +122,21 @@ export default function AdminOverviewPage() {
               </div>
             </Link>
 
-            {/* Bekleyen Siparişler */}
+            {/* Yeni Siparişler */}
             <Link
               href={adminPath("orders")}
               className={`group rounded-xl border bg-card p-4 transition-all hover:shadow-xs flex flex-col justify-between cursor-pointer ${
-                pendingOrders.length > 0
-                  ? "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50"
+                receivedOrders.length > 0
+                  ? "border-blue-500/30 bg-blue-500/5 hover:border-blue-500/50"
                   : "border-border hover:border-border/80"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Bekleyen Siparişler</span>
+                <span className="text-xs font-medium text-muted-foreground">Yeni Siparişler</span>
                 <div
                   className={`rounded-lg p-1.5 transition-colors ${
-                    pendingOrders.length > 0
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    receivedOrders.length > 0
+                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
@@ -145,10 +145,10 @@ export default function AdminOverviewPage() {
               </div>
               <div className="mt-3">
                 <div className="text-xl sm:text-2xl font-bold tabular-nums text-foreground">
-                  {pendingOrders.length}
+                  {receivedOrders.length}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {pendingOrders.length > 0 ? "İşlem ve kargo bekliyor" : "Tüm siparişler güncel"}
+                  {receivedOrders.length > 0 ? "İşlem bekliyor" : "Tüm siparişler güncel"}
                 </p>
               </div>
             </Link>
@@ -276,15 +276,8 @@ export default function AdminOverviewPage() {
                     href={adminPath("orders")}
                     className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/40 transition-colors cursor-pointer"
                   >
-                    <span className="text-muted-foreground">Bekleyen</span>
-                    <span className="font-semibold tabular-nums text-foreground">{pendingOrders.length}</span>
-                  </Link>
-                  <Link
-                    href={adminPath("orders")}
-                    className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/40 transition-colors cursor-pointer"
-                  >
-                    <span className="text-muted-foreground">Ödenen</span>
-                    <span className="font-semibold tabular-nums text-foreground">{paidOrders.length}</span>
+                    <span className="text-muted-foreground">Yeni Sipariş</span>
+                    <span className="font-semibold tabular-nums text-foreground">{receivedOrders.length}</span>
                   </Link>
                   <Link
                     href={adminPath("orders")}

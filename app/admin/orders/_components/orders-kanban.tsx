@@ -13,9 +13,11 @@ import {
   getOrderCode,
   getOrderPaymentMethodTitle,
   type OrderStatus,
+  type OrderStatusUpdate,
 } from "@/lib/orders";
 import { formatMoney } from "@/lib/format-money";
 import { TruckIcon } from "@heroicons/react/24/outline";
+import { OrderPaymentStatusBadge } from "@/components/orders/order-badges";
 
 type Order = Doc<"orders"> & {
   emailEvents?: Doc<"orderEmailEvents">[];
@@ -27,8 +29,7 @@ interface OrdersKanbanProps {
   onOpenOrder: (order: Order) => void;
   onUpdateStatus: (
     order: Order,
-    status: OrderStatus,
-    shippingInfo?: { carrier?: string; trackingNumber?: string }
+    update: OrderStatusUpdate
   ) => Promise<void>;
   onOpenShippingDialog: (order: Order) => void;
   updatingId: string | null;
@@ -68,7 +69,7 @@ export function OrdersKanban({
     if (newStatus === "shipped") {
       onOpenShippingDialog(targetOrder);
     } else {
-      void onUpdateStatus(targetOrder, newStatus);
+      void onUpdateStatus(targetOrder, { status: newStatus });
     }
   };
 
@@ -154,14 +155,20 @@ export function OrdersKanban({
                                     : ""
                                 } ${isUpdating ? "opacity-50 pointer-events-none" : ""}`}
                               >
-                                {/* 1. Sipariş No & Tutar: Operasyonel Kimlik & Finansal Büyüklük */}
-                                <div className="flex items-center justify-between gap-2">
+                                {/* 1. Sipariş No & Tutar & Ödeme Rozeti */}
+                                <div className="flex items-center justify-between gap-1.5">
                                   <span className="font-mono text-xs font-bold text-foreground tracking-tight">
                                     {getOrderCode(order, true)}
                                   </span>
-                                  <span className="font-mono text-xs font-bold text-foreground tabular-nums">
-                                    {formatMoney(order.total)}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="font-mono text-xs font-bold text-foreground tabular-nums">
+                                      {formatMoney(order.total)}
+                                    </span>
+                                    <OrderPaymentStatusBadge
+                                      status={order.paymentStatus}
+                                      className="text-[9px] px-1.5 py-0.5"
+                                    />
+                                  </div>
                                 </div>
 
                                 {/* 2. Sipariş İçeriği: Kartın Odak Noktası */}
@@ -221,13 +228,19 @@ export function OrdersKanban({
                     onClick={() => onOpenOrder(order)}
                     className="rounded-lg border border-border bg-card p-3 space-y-2 cursor-pointer"
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-1.5">
                       <span className="font-mono text-xs font-bold text-foreground tracking-tight">
                         {getOrderCode(order, true)}
                       </span>
-                      <span className="font-mono text-xs font-bold text-foreground tabular-nums">
-                        {formatMoney(order.total)}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-mono text-xs font-bold text-foreground tabular-nums">
+                          {formatMoney(order.total)}
+                        </span>
+                        <OrderPaymentStatusBadge
+                          status={order.paymentStatus}
+                          className="text-[9px] px-1.5 py-0.5"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-1 py-0.5">
                       {order.items.slice(0, 2).map((item, idx) => (

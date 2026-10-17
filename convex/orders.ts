@@ -15,6 +15,7 @@ import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation,
 import { patchCatalogProduct } from "./catalogModel";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
+import type { OrderStatusUpdate } from "../lib/orders";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -26,6 +27,7 @@ const orderValidator = schema.doc("orders");
 const customerOrderValidator = orderValidator;
 const orderItemValidator = orderValidator.fields.items.element;
 const orderStatusValidator = orderValidator.fields.status;
+const orderPaymentStatusValidator = orderValidator.fields.paymentStatus;
 
 export const getMyOrders = query({
   args: {},
@@ -56,12 +58,13 @@ export const getFrequentlyBoughtTogether = query({
 
     const orders = await ctx.db
       .query("orders")
-      .withIndex("by_status", (q) => q.eq("status", "paid"))
+      .withIndex("by_payment_status", (q) => q.eq("paymentStatus", "paid"))
       .order("desc")
       .take(200);
     const counts = new Map<string, number>();
 
     for (const order of orders) {
+      if (order.status === "cancelled") continue;
       const productIdsInOrder = new Set(order.items.map((item) => item.productId));
       if (![...sourceIds].some((id) => productIdsInOrder.has(id))) continue;
       for (const productId of productIdsInOrder) {
@@ -84,12 +87,13 @@ export const getRecentPurchaseActivity = query({
     const since = now - day;
     const recentOrders = await ctx.db
       .query("orders")
-      .withIndex("by_status", (q) => q.eq("status", "paid").gte("_creationTime", since))
+      .withIndex("by_payment_status", (q) => q.eq("paymentStatus", "paid").gte("_creationTime", since))
       .order("desc")
       .take(250);
     const latestPurchaseByBuyer = new Map<string, number>();
 
     for (const order of recentOrders) {
+      if (order.status === "cancelled") continue;
       if (!order.items.some((item) => item.productId === productId)) continue;
       const buyer = order.customerEmail.trim().toLowerCase();
       latestPurchaseByBuyer.set(buyer, Math.max(latestPurchaseByBuyer.get(buyer) ?? 0, order._creationTime));
@@ -347,6 +351,8 @@ export const createOrder = mutation({
     }
 
     // 3. Siparişi oluştur
+    // Tüm siparişler "Sipariş Alındı" ("received") ve "Ödeme Bekliyor" ("pending") olarak açılır.
+    // "paid" yalnızca yönetici ödeme onayıyla yazılır; PayTR demo akışı da gerçek tahsilat yapmaz.
     const orderId = await ctx.db.insert("orders", {
       userId: userId ?? undefined,
       customerEmail: args.customerEmail.trim(),
@@ -360,8 +366,8 @@ export const createOrder = mutation({
         couponDiscountKurus: coupon.discountKurus,
         couponReserved: false,
       } : {}),
-      // Oluşturma hiçbir ödeme yönteminde ödeme alınmış saymaz; "paid" yalnız yönetici durum geçişiyle yazılır.
-      status: "pending",
+      status: "received",
+      paymentStatus: "pending",
       ...(args.paymentMethod ? {
         paymentMethod: args.paymentMethod,
         paymentMethodTitle,
@@ -389,8 +395,6 @@ export const createOrder = mutation({
     return orderId;
   },
 });
-
-type OrderStatus = "pending" | "paid" | "shipped" | "delivered" | "cancelled";
 
 async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, direction: -1 | 1) {
   const productDeltas = new Map<string, Map<string, number>>();
@@ -436,15 +440,34 @@ async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, d
 async function changeOrderStatus(
   ctx: MutationCtx,
   id: Id<"orders">,
-  status: OrderStatus,
-  shippingInfo?: { carrier?: string; trackingNumber?: string; trackingUrl?: string }
+  opts: OrderStatusUpdate
 ) {
   const order = await ctx.db.get(id);
   if (!order) throw new Error("Sipariş bulunamadı.");
-  if (order.status === status) return null;
 
-  const canceling = order.status !== "cancelled" && status === "cancelled";
-  const unCanceling = order.status === "cancelled" && status !== "cancelled";
+  const targetStatus = opts.status ?? order.status;
+  let targetPaymentStatus = opts.paymentStatus ?? order.paymentStatus;
+
+  // Kapıda ödeme teslim edildiğinde otomatik olarak ödendi ("paid") olarak işaretlenir
+  if (targetStatus === "delivered" && order.paymentMethod === "cash_on_delivery" && targetPaymentStatus === "pending") {
+    targetPaymentStatus = "paid";
+  }
+
+  const statusChanged = targetStatus !== order.status;
+  const paymentStatusChanged = targetPaymentStatus !== order.paymentStatus;
+
+  if (
+    !statusChanged &&
+    !paymentStatusChanged &&
+    opts.carrier === undefined &&
+    opts.trackingNumber === undefined &&
+    opts.trackingUrl === undefined
+  ) {
+    return null;
+  }
+
+  const canceling = order.status !== "cancelled" && targetStatus === "cancelled";
+  const unCanceling = order.status === "cancelled" && targetStatus !== "cancelled";
 
   if (canceling) {
     await releaseCouponReservation(ctx, order);
@@ -455,37 +478,38 @@ async function changeOrderStatus(
     await adjustInventoryForOrder(ctx, order, -1);
   }
 
-  if (!canceling && status !== "pending" && status !== "cancelled") {
+  if (!canceling && ((targetStatus !== "received" && targetStatus !== "cancelled") || targetPaymentStatus === "paid")) {
     await commitCouponReservation(ctx, order);
   }
 
   const patchData: Record<string, unknown> = {
-    status,
-    ...(status === "paid" && !order.paidAt ? { paidAt: Date.now() } : {}),
-    ...(status === "shipped" && !order.shippedAt ? { shippedAt: Date.now() } : {}),
-    ...(status === "delivered" && !order.deliveredAt ? { deliveredAt: Date.now() } : {}),
+    status: targetStatus,
+    paymentStatus: targetPaymentStatus,
+    ...(targetPaymentStatus === "paid" && !order.paidAt ? { paidAt: Date.now() } : {}),
+    ...(targetStatus === "shipped" && !order.shippedAt ? { shippedAt: Date.now() } : {}),
+    ...(targetStatus === "delivered" && !order.deliveredAt ? { deliveredAt: Date.now() } : {}),
   };
 
-  if (shippingInfo?.carrier !== undefined) patchData.carrier = shippingInfo.carrier;
-  if (shippingInfo?.trackingNumber !== undefined) patchData.trackingNumber = shippingInfo.trackingNumber;
-  if (shippingInfo?.trackingUrl !== undefined) patchData.trackingUrl = shippingInfo.trackingUrl;
+  if (opts.carrier !== undefined) patchData.carrier = opts.carrier;
+  if (opts.trackingNumber !== undefined) patchData.trackingNumber = opts.trackingNumber;
+  if (opts.trackingUrl !== undefined) patchData.trackingUrl = opts.trackingUrl;
 
   await ctx.db.patch(id, patchData);
 
-  if (order.status !== status) {
+  if (statusChanged || paymentStatusChanged) {
     await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId: id });
   }
 
-  if (order.status !== "paid" && status === "paid") {
+  if (paymentStatusChanged && targetPaymentStatus === "paid") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmed" });
   }
-  if (order.status !== "shipped" && status === "shipped") {
+  if (statusChanged && targetStatus === "shipped") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_shipped" });
   }
-  if (order.status !== "cancelled" && status === "cancelled") {
+  if (statusChanged && targetStatus === "cancelled") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_cancelled" });
   }
-  if (order.status !== "delivered" && status === "delivered") {
+  if (statusChanged && targetStatus === "delivered") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_delivered" });
   }
   return null;
@@ -495,7 +519,8 @@ export const updateStatus = mutation({
   args: {
     adminSecret: v.string(),
     id: v.id("orders"),
-    status: orderStatusValidator,
+    status: v.optional(orderStatusValidator),
+    paymentStatus: v.optional(orderPaymentStatusValidator),
     carrier: v.optional(v.string()),
     trackingNumber: v.optional(v.string()),
     trackingUrl: v.optional(v.string()),
@@ -503,7 +528,9 @@ export const updateStatus = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
-    return await changeOrderStatus(ctx, args.id, args.status, {
+    return await changeOrderStatus(ctx, args.id, {
+      status: args.status,
+      paymentStatus: args.paymentStatus,
       carrier: args.carrier,
       trackingNumber: args.trackingNumber,
       trackingUrl: args.trackingUrl,
@@ -511,26 +538,26 @@ export const updateStatus = mutation({
   },
 });
 
-// Ödemesi bu süre içinde tamamlanmayan bekleyen siparişler otomatik iptal edilir; rezerve edilen stok geri yüklenir.
-const PENDING_ORDER_TTL_MS = 2 * 60 * 60 * 1000;
+// Ödemesi bu süre içinde tamamlanmayan ödeme bekleyen siparişler otomatik iptal edilir; rezerve edilen stok geri yüklenir.
+const UNPAID_ORDER_TTL_MS = 2 * 60 * 60 * 1000;
 
-export const cancelStalePending = internalMutation({
+export const cancelStaleUnpaid = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const cutoff = Date.now() - PENDING_ORDER_TTL_MS;
+    const cutoff = Date.now() - UNPAID_ORDER_TTL_MS;
+    // Yalnızca "sipariş alındı + ödeme bekliyor + süresi geçmiş" kayıtlar taranır;
+    // iptal edilince kayıt bu index aralığından çıkar, böylece kuyruk tıkanmaz.
     const stale = await ctx.db.query("orders")
-      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .withIndex("by_status_and_payment_status", (q) =>
+        q.eq("status", "received").eq("paymentStatus", "pending").lt("_creationTime", cutoff)
+      )
       .take(100);
-    let cancelledCount = 0;
     for (const order of stale) {
-      if (order._creationTime < cutoff) {
-        await changeOrderStatus(ctx, order._id, "cancelled");
-        cancelledCount++;
-      }
+      await changeOrderStatus(ctx, order._id, { status: "cancelled" });
     }
-    if (stale.length === 100 && cancelledCount > 0) {
-      await ctx.scheduler.runAfter(0, internal.orders.cancelStalePending, {});
+    if (stale.length === 100) {
+      await ctx.scheduler.runAfter(0, internal.orders.cancelStaleUnpaid, {});
     }
     return null;
   },

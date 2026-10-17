@@ -3,7 +3,7 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import { toCsv } from "@/lib/admin/csv";
-import { orderStatusLabels, getOrderCode } from "@/lib/orders";
+import { orderStatusLabels, orderPaymentStatusLabels, getOrderCode, getOrderPaymentMethodTitle } from "@/lib/orders";
 import { kurusToLira } from "@/lib/format-money";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 import { getProductPriceRange } from "@/lib/catalog/variants";
@@ -93,7 +93,9 @@ export async function GET(request: NextRequest) {
       const rows = allOrders.map((order) => [
         getOrderCode(order, true),
         formatDateTime(order._creationTime, { dateStyle: "short", timeStyle: "short" }),
-        orderStatusLabels[order.status as keyof typeof orderStatusLabels] ?? order.status,
+        orderStatusLabels[order.status],
+        orderPaymentStatusLabels[order.paymentStatus],
+        getOrderPaymentMethodTitle(order),
         order.customerName,
         order.customerEmail,
         order.customerPhone ?? "",
@@ -107,7 +109,7 @@ export async function GET(request: NextRequest) {
       return csvResponse(
         "siparisler.csv",
         toCsv(
-          ["Sipariş No", "Tarih", "Durum", "Müşteri", "E-posta", "Telefon", "Ürün adedi", "Tutar (TL)", "Kupon", "İndirim (TL)", "Kargo (TL)", "Teslimat adresi"],
+          ["Sipariş No", "Tarih", "Lojistik Durumu", "Ödeme Durumu", "Ödeme Yöntemi", "Müşteri", "E-posta", "Telefon", "Ürün adedi", "Tutar (TL)", "Kupon", "İndirim (TL)", "Kargo (TL)", "Teslimat adresi"],
           rows,
         ),
       );

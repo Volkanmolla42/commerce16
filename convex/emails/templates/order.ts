@@ -82,7 +82,7 @@ function copyFor(payload: OrderEmailPayload): OrderCopy {
         subject: `Ödemeniz Onaylandı — #${code} | ${payload.storeName}`,
         icon: ICONS.checkCircle,
         title: "Ödemeniz Onaylandı",
-        intro: `${greeting}#${code} numaralı siparişinizin ödemesi alındı. Siparişiniz hazırlanmaya başlandı.`,
+        intro: `${greeting}#${code} numaralı siparişinizin ödemesi alındı. Siparişiniz işleme alındı.`,
         badge: { text: "Ödeme Onaylandı", tone: "success" },
         nextStepTitle: "Sırada Ne Var?",
         nextStepMessage:

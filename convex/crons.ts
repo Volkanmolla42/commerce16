@@ -25,9 +25,9 @@ crons.cron(
 );
 
 crons.interval(
-  "cancel stale pending orders",
+  "cancel stale unpaid orders",
   { minutes: 15 },
-  internal.orders.cancelStalePending,
+  internal.orders.cancelStaleUnpaid,
   {},
 );
 

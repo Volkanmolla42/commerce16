@@ -1,4 +1,5 @@
 import { v, type Infer } from "convex/values";
+import type { OrderStatus } from "../../lib/orders";
 
 /**
  * Sipariş e-postası olayları. Her olay tek bir anlama gelir ve
@@ -16,7 +17,7 @@ export const orderEmailEventValidator = v.union(
 export type OrderEmailEvent = Infer<typeof orderEmailEventValidator>;
 
 /** Olayın gönderilebileceği sipariş durumları. */
-export function canSendOrderEvent(event: OrderEmailEvent, status: string): boolean {
+export function canSendOrderEvent(event: OrderEmailEvent, status: OrderStatus): boolean {
   switch (event) {
     case "order_placed":
     case "payment_confirmed":

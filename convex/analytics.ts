@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { env, internalMutation, mutation, query } from "./_generated/server";
 import { assertAdminApiSecret } from "./adminAuth";
+import { isRevenueOrder } from "../lib/orders";
 
 async function hashCustomerKey(email: string, secret?: string) {
   const data = new TextEncoder().encode(`customer:${secret ?? "analytics"}:${email}`);
@@ -198,7 +199,7 @@ export const syncOrderAttribution = internalMutation({
     const existing = await ctx.db.query("analyticsPurchases")
       .withIndex("by_order_id", (q) => q.eq("orderId", orderId))
       .unique();
-    const isPaid = order.status === "paid";
+    const isPaid = isRevenueOrder(order);
     if (!isPaid) {
       if (existing) await ctx.db.delete(existing._id);
       return null;
@@ -301,7 +302,7 @@ export const getDashboard = query({
         .withIndex("by_paid_at", (q) => q.gte("paidAt", from))
         .order("desc")
         .take(5_001),
-      ctx.db.query("orders").withIndex("by_status", (q) => q.eq("status", "paid").gte("_creationTime", historyFrom)).order("desc").take(750),
+      ctx.db.query("orders").withIndex("by_payment_status", (q) => q.eq("paymentStatus", "paid").gte("_creationTime", historyFrom)).order("desc").take(750),
     ]);
 
     const sessions = sessionRows.slice(0, 5_000);
@@ -310,6 +311,7 @@ export const getDashboard = query({
     const orderHistoryLimited = paidByStatus.length === 750;
     const customers = new Map<string, Array<{ orderId: string; paidAt: number; amountCents: number; month: string }>>();
     for (const order of paidOrders) {
+      if (order.status === "cancelled") continue;
       const customerKey = await hashCustomerKey(order.customerEmail.trim().toLowerCase(), env.ADMIN_API_SECRET);
       const orders = customers.get(customerKey) ?? [];
       orders.push({

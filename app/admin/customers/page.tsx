@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Button, Card, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from "@/components/ui";
-import { AdminEmpty, AdminLoading, AdminNotice, OrderStatusBadge } from "../_components/admin-primitives";
+import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { OrderStatusBadge, OrderPaymentStatusBadge } from "@/components/orders/order-badges";
 import { CsvExportButton } from "../_components/export-button";
 import { useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
-import { formatOrderCode } from "@/lib/orders";
+import { formatOrderCode, type OrderStatus, type OrderPaymentStatus } from "@/lib/orders";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 
 type Customer = {
@@ -47,7 +48,8 @@ type CustomerAddress = {
 type CustomerOrder = {
   _id: string;
   _creationTime: number;
-  status: "pending" | "paid" | "cancelled";
+  status: OrderStatus;
+  paymentStatus: OrderPaymentStatus;
   total: string;
   itemCount: number;
 };
@@ -179,8 +181,12 @@ function CustomerDetailsDialog({ customer, onClose }: { customer: Customer; onCl
                           {formatDateTime(order._creationTime)} · {order.itemCount} adet ürün
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-3">
+                      <div className="flex shrink-0 items-center gap-2.5">
                         <OrderStatusBadge status={order.status} />
+                        <OrderPaymentStatusBadge
+                          status={order.paymentStatus}
+                          className="text-[10px] px-1.5 py-0.5"
+                        />
                         <span className="text-sm font-semibold tabular-nums text-foreground">{formatMoney(order.total)}</span>
                       </div>
                     </Link>

@@ -8,6 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { isRetryableOrderEvent, type OrderEmailEvent } from "@/convex/emails/events";
 import { hasAdminSession, isSameOriginRequest } from "@/lib/admin/session";
 import { isRecord, stringValue, parseProductInput, parseCategoryInput } from "@/lib/admin/input";
+import { ORDER_STATUS_KEYS, ORDER_PAYMENT_STATUS_KEYS, type OrderStatus, type OrderPaymentStatus } from "@/lib/orders";
 import { readJsonLimited } from "@/lib/http/read-json-limited";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -440,14 +441,15 @@ export async function POST(request: NextRequest) {
       }
       case "order.status": {
         const status = input.status;
-        if (
-          status !== "pending" &&
-          status !== "paid" &&
-          status !== "shipped" &&
-          status !== "delivered" &&
-          status !== "cancelled"
-        ) {
-          throw new Error("Sipariş durumu geçersiz.");
+        if (status !== undefined && !ORDER_STATUS_KEYS.includes(status as OrderStatus)) {
+          throw new Error("Sipariş lojistik durumu geçersiz.");
+        }
+        const paymentStatus = input.paymentStatus;
+        if (paymentStatus !== undefined && !ORDER_PAYMENT_STATUS_KEYS.includes(paymentStatus as OrderPaymentStatus)) {
+          throw new Error("Sipariş ödeme durumu geçersiz.");
+        }
+        if (!status && !paymentStatus && !input.carrier && !input.trackingNumber && !input.trackingUrl) {
+          throw new Error("Güncellenecek bir durum veya kargo bilgisi belirtilmedi.");
         }
         const carrier = typeof input.carrier === "string" ? input.carrier.trim() : undefined;
         const trackingNumber = typeof input.trackingNumber === "string" ? input.trackingNumber.trim() : undefined;
@@ -456,7 +458,8 @@ export async function POST(request: NextRequest) {
         const result = await client.mutation(api.orders.updateStatus, {
           adminSecret,
           id: stringValue(input.id, "Sipariş") as Id<"orders">,
-          status,
+          ...(status ? { status: status as OrderStatus } : {}),
+          ...(paymentStatus ? { paymentStatus: paymentStatus as OrderPaymentStatus } : {}),
           ...(carrier ? { carrier } : {}),
           ...(trackingNumber ? { trackingNumber } : {}),
           ...(trackingUrl ? { trackingUrl } : {}),

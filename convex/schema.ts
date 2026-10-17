@@ -2,12 +2,17 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { orderEmailEventValidator } from "./emails/events";
+import { ORDER_STATUS_KEYS, ORDER_PAYMENT_STATUS_KEYS } from "../lib/orders";
 
 const attributeTemplateFields = {
   label: v.string(),
   type: v.union(v.literal("text"), v.literal("number"), v.literal("select"), v.literal("multiselect"), v.literal("boolean")),
   unit: v.optional(v.string()), options: v.optional(v.array(v.string())), required: v.boolean(),
 };
+
+// Sipariş durumları lib/orders.ts'teki tek kaynaktan türetilir; yeni durum orada tanımlanır.
+const orderStatusValidator = v.union(...ORDER_STATUS_KEYS.map((key) => v.literal(key)));
+const orderPaymentStatusValidator = v.union(...ORDER_PAYMENT_STATUS_KEYS.map((key) => v.literal(key)));
 
 export default defineSchema({
   ...authTables,
@@ -118,13 +123,8 @@ export default defineSchema({
     couponDiscountKurus: v.optional(v.number()),
     couponReserved: v.optional(v.boolean()),
     couponRedeemed: v.optional(v.boolean()),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("paid"),
-      v.literal("shipped"),
-      v.literal("delivered"),
-      v.literal("cancelled")
-    ),
+    status: orderStatusValidator,
+    paymentStatus: orderPaymentStatusValidator,
     paidAt: v.optional(v.number()),
     shippedAt: v.optional(v.number()),
     deliveredAt: v.optional(v.number()),
@@ -156,7 +156,8 @@ export default defineSchema({
     shippingFee: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
-    .index("by_status", ["status"])
+    .index("by_payment_status", ["paymentStatus"])
+    .index("by_status_and_payment_status", ["status", "paymentStatus"])
     .index("by_customerEmail", ["customerEmail"])
     .index("by_analytics_session_id", ["analyticsSessionId"]),
 

@@ -1,8 +1,6 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Badge } from "@/components/ui";
-import { orderStatusLabels } from "@/lib/orders";
 
 export function AdminNotice({
   children,
@@ -17,21 +15,6 @@ export function AdminNotice({
     success: "border-border bg-muted text-foreground",
   }[kind];
   return <p role={kind === "error" ? "alert" : "status"} aria-live="polite" className={`rounded-md border px-4 py-3 text-sm ${style}`}>{children}</p>;
-}
-
-export function OrderStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    pending: "border-border bg-muted text-muted-foreground",
-    paid: "border-transparent bg-primary text-primary-foreground",
-    shipped: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-    delivered: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    cancelled: "border-border bg-card text-muted-foreground",
-  };
-  return (
-    <Badge variant="outline" className={`rounded-md px-2 py-0.5 text-xs font-medium ${styles[status] || "border-border bg-muted text-muted-foreground"}`}>
-      {orderStatusLabels[status as keyof typeof orderStatusLabels] || status}
-    </Badge>
-  );
 }
 
 type AdminLoadingVariant = "page" | "table" | "list" | "form" | "overview" | "analytics" | "settings" | "overview-content" | "analytics-content" | "settings-content" | "form-content";

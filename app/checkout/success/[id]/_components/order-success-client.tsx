@@ -23,7 +23,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Button, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
-import { OrderStatusBadge } from "@/app/(storefront)/account/_components/order-status-badge";
+import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { useCart } from "@/components/cart/cart-context";
 import { clearQuickBuyItem } from "@/components/cart/quick-buy-store";
 import { clearCartRecoverySessionKey } from "@/components/cart/recovery-store";
@@ -338,17 +338,17 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
             </Card>
           )}
 
-          {order.paymentMethod === "paytr" && order.status === "pending" && (
+          {order.paymentMethod === "paytr" && order.paymentStatus === "pending" && (
             <Card className="rounded-3xl border-border bg-card p-6 shadow-xs space-y-3">
               <CardTitle className="text-base font-bold text-foreground flex items-center gap-2 pb-3 border-b border-border">
                 <CreditCardIcon className="size-5 text-primary" />
-                <span>Ödeme Doğrulaması</span>
+                <span>Ödeme Onayı</span>
               </CardTitle>
 
               <div className="rounded-xl border border-border bg-muted/20 p-3.5 text-xs text-muted-foreground leading-relaxed space-y-1">
-                <p className="font-semibold text-foreground text-sm">Ödemeniz Doğrulanıyor</p>
+                <p className="font-semibold text-foreground text-sm">Ödeme Onayı Bekleniyor</p>
                 <p>
-                  Siparişiniz kaydedildi ve ürünleriniz sizin için rezerve edildi. Kartlı işleminiz
+                  Siparişiniz kaydedildi ve ürünleriniz sizin için rezerve edildi. Ödemeniz
                   onaylandığında siparişiniz işleme alınır ve size e-posta ile bildirilir.
                 </p>
               </div>

@@ -40,7 +40,7 @@ function ResultContent() {
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {isSuccess
-            ? "Sipariş kaydınız oluşturuldu. Ödeme henüz alınmadı; siparişiniz ödeme bekliyor."
+            ? "Sipariş kaydınız başarıyla oluşturuldu. Detaylar e-posta adresinize iletilecektir."
             : "Siparişiniz oluşturulamadı. Sepetiniz korunuyor; lütfen tekrar deneyin."}
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">

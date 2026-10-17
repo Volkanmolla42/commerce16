@@ -1,6 +1,8 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
+import schema from "./schema";
+import { isRevenueOrder } from "../lib/orders";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const MAX_PAGE_SIZE = 100;
@@ -35,13 +37,8 @@ const addressValidator = v.object({
 const customerOrderValidator = v.object({
   _id: v.id("orders"),
   _creationTime: v.number(),
-  status: v.union(
-    v.literal("pending"),
-    v.literal("paid"),
-    v.literal("shipped"),
-    v.literal("delivered"),
-    v.literal("cancelled")
-  ),
+  status: schema.doc("orders").fields.status,
+  paymentStatus: schema.doc("orders").fields.paymentStatus,
   total: v.string(),
   itemCount: v.number(),
 });
@@ -127,7 +124,9 @@ export const listAdmin = query({
       const owner = (order.userId ? registeredById.get(order.userId) : undefined) ?? (email ? registeredByEmail.get(email) : undefined);
       const bucket = bucketFor(owner ? `user:${owner._id}` : `email:${email}`);
       bucket.orderCount += 1;
-      bucket.totalKurus += toKurus(order.total);
+      if (isRevenueOrder(order)) {
+        bucket.totalKurus += toKurus(order.total);
+      }
       if (bucket.firstOrderAt === null || order._creationTime < bucket.firstOrderAt) bucket.firstOrderAt = order._creationTime;
       if (bucket.lastOrderAt === null || order._creationTime > bucket.lastOrderAt) {
         bucket.lastOrderAt = order._creationTime;
@@ -256,7 +255,7 @@ export const getAdmin = query({
       firstOrderAt: orders.length ? orders[orders.length - 1]._creationTime : undefined,
       lastOrderAt: latestOrder?._creationTime,
       orderCount: orders.length,
-      totalSpent: (orders.reduce((sum, order) => sum + toKurus(order.total), 0) / 100).toFixed(2),
+      totalSpent: (orders.filter((o) => isRevenueOrder(o)).reduce((sum, order) => sum + toKurus(order.total), 0) / 100).toFixed(2),
       addresses: addresses.map((address) => ({
         _id: address._id,
         title: address.title,
@@ -271,6 +270,7 @@ export const getAdmin = query({
         _id: order._id,
         _creationTime: order._creationTime,
         status: order.status,
+        paymentStatus: order.paymentStatus,
         total: order.total,
         itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
       })),

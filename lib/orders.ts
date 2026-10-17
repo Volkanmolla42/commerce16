@@ -1,12 +1,74 @@
-export const orderStatusLabels = {
-  pending: "Beklemede",
-  paid: "Ödendi",
-  shipped: "Kargoya verildi",
-  delivered: "Teslim edildi",
-  cancelled: "İptal edildi",
+export const ORDER_STATUS_CONFIG = {
+  received: {
+    label: "Sipariş Alındı",
+    step: 0,
+  },
+  shipped: {
+    label: "Kargoya verildi",
+    step: 1,
+  },
+  delivered: {
+    label: "Teslim edildi",
+    step: 2,
+  },
+  cancelled: {
+    label: "İptal edildi",
+    step: -1,
+  },
 } as const;
 
-export type OrderStatus = keyof typeof orderStatusLabels;
+export type OrderStatus = keyof typeof ORDER_STATUS_CONFIG;
+export const ORDER_STATUS_KEYS = Object.keys(ORDER_STATUS_CONFIG) as OrderStatus[];
+
+export const ORDER_PAYMENT_STATUS_CONFIG = {
+  pending: {
+    label: "Ödeme Bekliyor",
+  },
+  paid: {
+    label: "Ödendi",
+  },
+  failed: {
+    label: "Başarısız",
+  },
+  refunded: {
+    label: "İade Edildi",
+  },
+} as const;
+
+export type OrderPaymentStatus = keyof typeof ORDER_PAYMENT_STATUS_CONFIG;
+export const ORDER_PAYMENT_STATUS_KEYS = Object.keys(ORDER_PAYMENT_STATUS_CONFIG) as OrderPaymentStatus[];
+
+function toLabelMap<T extends Record<string, { label: string }>>(config: T): Record<keyof T, string> {
+  return Object.fromEntries(
+    Object.entries(config).map(([key, value]) => [key, value.label])
+  ) as Record<keyof T, string>;
+}
+
+export const orderStatusLabels = toLabelMap(ORDER_STATUS_CONFIG);
+export const orderPaymentStatusLabels = toLabelMap(ORDER_PAYMENT_STATUS_CONFIG);
+
+export const ORDER_TRACKING_STEPS = ORDER_STATUS_KEYS
+  .filter((key) => ORDER_STATUS_CONFIG[key].step >= 0)
+  .map((key) => ({ key, label: ORDER_STATUS_CONFIG[key].label }));
+
+export function getOrderStepIndex(status?: string | null): number {
+  if (!status || !Object.hasOwn(ORDER_STATUS_CONFIG, status)) return 0;
+  return ORDER_STATUS_CONFIG[status as OrderStatus].step;
+}
+
+/** İptal edilmemiş ve ödemesi alınmış siparişler ciro/satın alma sayılır. */
+export function isRevenueOrder(order: { status: OrderStatus; paymentStatus: OrderPaymentStatus }): boolean {
+  return order.status !== "cancelled" && order.paymentStatus === "paid";
+}
+
+/** Sipariş durum/kargo güncellemesinin ortak şekli. */
+export type OrderStatusUpdate = {
+  status?: OrderStatus;
+  paymentStatus?: OrderPaymentStatus;
+  carrier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+};
 
 export const paymentMethodLabels: Record<string, string> = {
   paytr: "PayTR (Demo)",
