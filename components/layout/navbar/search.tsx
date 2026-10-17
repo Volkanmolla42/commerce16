@@ -31,6 +31,8 @@ type SearchOption = {
 const headerInputClassName =
   "min-h-10 w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-3 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900";
 
+const SEARCH_PLACEHOLDER = "Ürün veya kategori ara...";
+
 export default function Search() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -287,7 +289,7 @@ export default function Search() {
           aria-activedescendant={
             panelIsVisible && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
           }
-          placeholder="Ürün veya kategori ara..."
+          placeholder={SEARCH_PLACEHOLDER}
           autoComplete="off"
           value={query}
           onFocus={() => {
@@ -404,8 +406,8 @@ export function SearchSkeleton() {
         <MagnifyingGlassIcon className="size-4" aria-hidden="true" />
       </span>
       <input
-        aria-label="Arama yükleniyor"
-        placeholder="Ara..."
+        aria-label={SEARCH_PLACEHOLDER}
+        placeholder={SEARCH_PLACEHOLDER}
         disabled
         className={headerInputClassName}
       />
