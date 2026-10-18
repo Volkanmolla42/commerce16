@@ -15,7 +15,7 @@ import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation,
 import { patchCatalogProduct } from "./catalogModel";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
-import { isRevenueOrder, type OrderStatusUpdate } from "../lib/orders";
+import { isRevenueOrder, isValidTaxNumber, type OrderStatusUpdate } from "../lib/orders";
 import { quotePromotions } from "../lib/promotions";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
@@ -166,6 +166,11 @@ export const createOrder = mutation({
     provinceId: v.string(),
     districtId: v.string(),
     shippingAddress: v.optional(v.string()),
+    billingType: v.optional(v.union(v.literal("individual"), v.literal("corporate"))),
+    companyName: v.optional(v.string()),
+    taxOffice: v.optional(v.string()),
+    taxNumber: v.optional(v.string()),
+    billingAddress: v.optional(v.string()),
     legalAcceptance: v.optional(v.object({
       accepted: v.literal(true),
       distanceSalesAgreementVersion: v.optional(v.string()),
@@ -199,6 +204,28 @@ export const createOrder = mutation({
     }
     if (args.shippingAddress && args.shippingAddress.trim().length > 500) {
       throw new Error("Teslimat adresi en fazla 500 karakter olabilir.");
+    }
+    const billingType = args.billingType ?? "individual";
+    const companyName = args.companyName?.trim();
+    const taxOffice = args.taxOffice?.trim();
+    const taxNumber = args.taxNumber?.trim();
+    const billingAddress = args.billingAddress?.trim() || args.shippingAddress?.trim();
+
+    if (billingType === "corporate") {
+      if (!companyName || companyName.length > 200) {
+        throw new Error("Kurumsal fatura için firma unvanı gereklidir (en fazla 200 karakter).");
+      }
+      if (!taxOffice || taxOffice.length > 100) {
+        throw new Error("Kurumsal fatura için vergi dairesi gereklidir (en fazla 100 karakter).");
+      }
+      if (!taxNumber || !isValidTaxNumber(taxNumber)) {
+        throw new Error("Geçerli bir Vergi Kimlik Numarası (10 hane) veya TCKN (11 hane) girin.");
+      }
+      if (!billingAddress || billingAddress.length > 500) {
+        throw new Error("Fatura adresi en fazla 500 karakter olabilir.");
+      }
+    } else if (billingAddress && billingAddress.length > 500) {
+      throw new Error("Fatura adresi en fazla 500 karakter olabilir.");
     }
     const storeSettings = await readStoreSettings(ctx);
     let recordedLegalAcceptance = undefined;
@@ -401,6 +428,13 @@ export const createOrder = mutation({
       ...(shippingFee > 0 ? { shippingFee } : {}),
       ...(analyticsSessionId ? { analyticsSessionId } : {}),
       shippingAddress: args.shippingAddress,
+      billingType,
+      ...(billingType === "corporate" ? {
+        companyName,
+        taxOffice,
+        taxNumber,
+      } : {}),
+      ...(billingAddress ? { billingAddress } : {}),
       ...(recordedLegalAcceptance ? { legalAcceptance: recordedLegalAcceptance } : {}),
     });
     const createdOrder = await ctx.db.get(orderId);

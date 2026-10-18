@@ -1,6 +1,6 @@
 import type { EmailContent } from "./content";
 import { adminLink, siteLink, siteUrl } from "./config";
-import { renderContactEmail, renderLowStockEmail } from "./templates/alerts";
+import { renderContactEmail, renderLowStockEmail, renderProductQuestionEmail } from "./templates/alerts";
 import { renderOtpEmail, renderWelcomeEmail } from "./templates/account";
 import { renderCartRecoveryEmail, renderRestockEmail } from "./templates/marketing";
 import { renderOrderEmail, sampleOrderPayload } from "./templates/order";
@@ -16,6 +16,7 @@ export type EmailTemplateKey =
   | "password_reset_otp"
   | "password_change_otp"
   | "contact_form_alert"
+  | "product_question_alert"
   | "low_stock_alert"
   | "abandoned_cart_recovery"
   | "restock_notification";
@@ -122,6 +123,22 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
         messageSubject: "Kargo süresi",
         message: "Merhaba, siparişim kaç günde kargoya veriliyor?",
         createdAt: 1_700_000_000_000,
+      }),
+  },
+  {
+    key: "product_question_alert",
+    name: "Ürün Sorusu",
+    category: "admin",
+    description: "Ürün sayfasından yeni bir soru geldiğinde ADMIN_ALERT_EMAIL adresine gider.",
+    preview: (store) =>
+      renderProductQuestionEmail({
+        storeName: store.storeName,
+        productTitle: "Klasik Pamuk Gömlek",
+        productUrl: siteLink("/product/klasik-pamuk-gomlek"),
+        user: { name: "Ayşe Demir", email: "ayse@example.com" },
+        question: "Bu ürünün kumaşı yazın terletir mi? Beden olarak normal kalıp mı?",
+        createdAt: 1_700_000_000_000,
+        adminQuestionsUrl: adminLink("questions"),
       }),
   },
   {

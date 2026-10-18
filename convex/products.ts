@@ -416,13 +416,24 @@ const exportProductValidator = v.object({
   slug: v.string(),
   title: v.string(),
   categorySlug: v.optional(v.string()),
+  description: v.optional(v.string()),
   availableForSale: v.boolean(),
+  options: v.array(v.object({
+    id: v.string(),
+    name: v.string(),
+    values: v.array(v.string()),
+  })),
   variants: v.array(v.object({
     id: v.string(),
     title: v.string(),
+    sku: v.optional(v.string()),
+    barcode: v.optional(v.string()),
     price: v.string(),
+    compareAtPrice: v.optional(v.string()),
     stockQuantity: v.number(),
+    selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
   })),
+  imageUrls: v.array(v.string()),
   updatedAt: v.string(),
 });
 
@@ -439,21 +450,144 @@ export const listForExportAdmin = query({
       .query("products")
       .order("desc")
       .paginate({ numItems: Math.min(args.limit ?? 250, 500), cursor: args.cursor });
-    return {
-      ...result,
-      page: result.page.map((item) => ({
+    const page = await Promise.all(result.page.map(async (item) => {
+      const imageUrls = (await Promise.all(
+        item.images.map((img) => ctx.storage.getUrl(img.storageId))
+      )).filter((url): url is string => Boolean(url));
+      return {
         slug: item.slug,
         title: item.title,
         categorySlug: item.categorySlug,
+        description: item.description,
         availableForSale: item.availableForSale,
+        options: item.options,
         variants: item.variants.map((v) => ({
           id: v.id,
           title: v.title,
+          sku: v.sku,
+          barcode: v.barcode,
           price: v.price,
+          compareAtPrice: v.compareAtPrice,
           stockQuantity: v.stockQuantity,
+          selectedOptions: v.selectedOptions,
         })),
+        imageUrls,
         updatedAt: item.updatedAt,
-      })),
+      };
+    }));
+    return {
+      ...result,
+      page,
+    };
+  },
+});
+
+const importProductInputValidator = v.object({
+  slug: v.string(),
+  title: v.string(),
+  categorySlug: v.optional(v.string()),
+  description: v.optional(v.string()),
+  availableForSale: v.boolean(),
+  options: v.array(v.object({
+    id: v.string(),
+    name: v.string(),
+    values: v.array(v.string()),
+  })),
+  variants: v.array(v.object({
+    id: v.string(),
+    title: v.string(),
+    availableForSale: v.optional(v.boolean()),
+    sku: v.optional(v.string()),
+    barcode: v.optional(v.string()),
+    price: v.string(),
+    compareAtPrice: v.optional(v.string()),
+    stockQuantity: v.number(),
+    selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
+  })),
+  images: v.optional(v.array(v.object({
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+  }))),
+});
+
+export const importBatchAdmin = mutation({
+  args: {
+    adminSecret: v.string(),
+    products: v.array(importProductInputValidator),
+  },
+  returns: v.object({
+    total: v.number(),
+    created: v.number(),
+    updated: v.number(),
+    errors: v.array(v.object({
+      slug: v.string(),
+      error: v.string(),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    let created = 0;
+    let updated = 0;
+    const errors: Array<{ slug: string; error: string }> = [];
+
+    for (const item of args.products) {
+      try {
+        const productData = {
+          ...item,
+          images: item.images ?? [],
+          variants: item.variants.map((v) => ({
+            ...v,
+            availableForSale: v.availableForSale ?? (v.stockQuantity > 0),
+          })),
+        };
+        const normalized = normalizeVariantSkus(productData);
+        validateProductVariantsAndOptions(normalized);
+
+        const existing = await ctx.db
+          .query("products")
+          .withIndex("by_slug", (q) => q.eq("slug", normalized.slug))
+          .first();
+
+        const updatedAt = new Date().toISOString();
+
+        if (existing) {
+          const nextImages = item.images && item.images.length > 0 ? item.images : existing.images;
+          const publishedAt = !existing.availableForSale && normalized.availableForSale && existing.publishedAt === undefined
+            ? Date.now()
+            : existing.publishedAt;
+
+          await syncProductSkus(ctx, existing._id, normalized);
+          await patchCatalogProduct(ctx, existing, {
+            ...normalized,
+            images: nextImages,
+            publishedAt,
+            updatedAt,
+          });
+          updated++;
+        } else {
+          const productId = await insertCatalogProduct(ctx, {
+            ...normalized,
+            images: normalized.images,
+            publishedAt: normalized.availableForSale ? Date.now() : undefined,
+            updatedAt,
+          });
+          await syncProductSkus(ctx, productId, normalized);
+          created++;
+        }
+      } catch (cause) {
+        errors.push({
+          slug: item.slug,
+          error: cause instanceof Error ? cause.message : "Ürün aktarılırken hata oluştu.",
+        });
+      }
+    }
+
+    return {
+      total: args.products.length,
+      created,
+      updated,
+      errors,
     };
   },
 });
@@ -614,12 +748,14 @@ export const getBySlugs = query({
 });
 
 export const getByIds = query({
-  args: { ids: v.array(v.id("products")) },
+  args: { ids: v.array(v.string()) },
   returns: v.array(productValidator),
   handler: async (ctx, { ids }) => {
     if (ids.length > 100) throw new Error("En fazla 100 ürün aynı anda yüklenebilir.");
     const products = [];
-    for (const id of new Set(ids)) {
+    for (const rawId of new Set(ids)) {
+      const id = ctx.db.normalizeId("products", rawId);
+      if (!id) continue;
       const product = await ctx.db.get(id);
       if (product?.availableForSale) products.push(await withPublicImageUrls(ctx, product));
     }

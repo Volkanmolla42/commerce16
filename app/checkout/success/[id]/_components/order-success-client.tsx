@@ -20,6 +20,7 @@ import {
   TruckIcon,
   BanknotesIcon,
   CreditCardIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { formatMoney } from "@/lib/format-money";
@@ -275,6 +276,30 @@ export default function OrderSuccessClient({ orderId }: { orderId: string }) {
                 <p className="text-foreground leading-relaxed">
                   {order.shippingAddress || "Standart Teslimat Adresi"}
                 </p>
+              </div>
+
+              <div className="sm:col-span-2 pt-2 border-t border-border/60 space-y-1">
+                <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
+                  <DocumentTextIcon className="size-3.5" />
+                  Fatura Bilgileri ({order.billingType === "corporate" ? "Kurumsal Fatura" : "Bireysel Fatura"})
+                </span>
+                {order.billingType === "corporate" ? (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs space-y-1 text-foreground">
+                    <div className="font-semibold">{order.companyName}</div>
+                    <div className="text-muted-foreground">
+                      {order.taxOffice} Vergi Dairesi — Vergi No/TCKN: <span className="font-mono font-medium text-foreground">{order.taxNumber}</span>
+                    </div>
+                    {order.billingAddress && (
+                      <div className="text-muted-foreground pt-0.5">
+                        <span className="font-medium text-foreground">Fatura Adresi:</span> {order.billingAddress}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-foreground leading-relaxed">
+                    {order.billingAddress || order.shippingAddress || "Teslimat adresiyle aynı"}
+                  </p>
+                )}
               </div>
             </div>
           </Card>

@@ -20,6 +20,8 @@ import {
   CalendarDaysIcon,
   CreditCardIcon,
   XMarkIcon,
+  DocumentTextIcon,
+  BuildingOffice2Icon,
 } from "@heroicons/react/24/outline";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { OrdersKanban } from "./_components/orders-kanban";
@@ -644,6 +646,75 @@ function OrderDetails({
           </div>
         </div>
 
+        {/* Fatura Bilgileri (Kurumsal / Bireysel) */}
+        <div className="rounded-xl border border-border bg-card/60 p-3.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground flex items-center gap-1.5">
+              <DocumentTextIcon className="size-3.5 text-primary" /> Fatura Bilgileri
+              <span
+                className={`ml-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  order.billingType === "corporate"
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "bg-muted text-muted-foreground border border-border"
+                }`}
+              >
+                {order.billingType === "corporate" ? "Kurumsal Fatura" : "Bireysel Fatura"}
+              </span>
+            </h3>
+            {order.billingAddress && (
+              <button
+                type="button"
+                onClick={() => copyToClipboard(order.billingAddress!, "billingAddress")}
+                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                {copiedKey === "billingAddress" ? (
+                  <span className="text-emerald-500 font-medium">Kopyalandı</span>
+                ) : (
+                  <>
+                    <ClipboardDocumentIcon className="size-3" />
+                    <span>Fatura Adresini Kopyala</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {order.billingType === "corporate" ? (
+            <div className="space-y-2.5 bg-muted/30 p-2.5 rounded-lg border border-border/50 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="sm:col-span-2">
+                  <span className="text-muted-foreground block text-[11px]">Firma Resmi Unvanı:</span>
+                  <span className="font-semibold text-foreground text-xs leading-snug">
+                    {order.companyName || "Belirtilmemiş"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Vergi No / TCKN:</span>
+                  <span className="font-mono font-medium text-foreground text-xs">
+                    {order.taxNumber || "Belirtilmemiş"}
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1.5 border-t border-border/40">
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Vergi Dairesi:</span>
+                  <span className="font-medium text-foreground">{order.taxOffice || "Belirtilmemiş"}</span>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-muted-foreground block text-[11px]">Fatura Adresi:</span>
+                  <span className="font-medium text-foreground leading-relaxed">
+                    {order.billingAddress || order.shippingAddress || "Teslimat adresiyle aynı."}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap text-xs font-medium leading-relaxed text-foreground bg-muted/30 p-2.5 rounded-lg border border-border/50">
+              {order.billingAddress || order.shippingAddress || "Teslimat adresiyle aynı."}
+            </p>
+          )}
+        </div>
+
         {/* 4. ÖNCELİK: Finansal Tutar & Hesap Özeti (Sıfır Kod Tekrarı: OrderPriceSummary) */}
         <div className="rounded-xl border border-border bg-card p-4">
           <h3 className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground pb-2 mb-2 border-b border-border">
@@ -1059,6 +1130,12 @@ function AdminOrdersContent() {
                   <p className="truncate text-[11px] font-medium text-primary mt-0.5">
                     {getOrderPaymentMethodTitle(order)}
                   </p>
+                  {order.billingType === "corporate" && (
+                    <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                      <BuildingOffice2Icon className="size-3" />
+                      Kurumsal Fatura
+                    </span>
+                  )}
                 </div>
 
                 <p className="text-xs text-muted-foreground">

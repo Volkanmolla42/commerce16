@@ -271,3 +271,59 @@ export function getOrderPriceBreakdown(order?: {
     total,
   };
 }
+
+export const BILLING_TYPE_CONFIG = {
+  individual: {
+    label: "Bireysel",
+  },
+  corporate: {
+    label: "Kurumsal",
+  },
+} as const;
+
+export type BillingType = keyof typeof BILLING_TYPE_CONFIG;
+export const BILLING_TYPE_KEYS = Object.keys(BILLING_TYPE_CONFIG) as BillingType[];
+export const billingTypeLabels = toLabelMap(BILLING_TYPE_CONFIG);
+
+/**
+ * 11 haneli T.C. Kimlik Numarası (TCKN) doğrulaması.
+ */
+export function isValidTCKN(tckn: string): boolean {
+  const clean = tckn.trim();
+  if (!/^[1-9]\d{10}$/.test(clean)) return false;
+  const digits = clean.split("").map(Number);
+  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
+  const evenSum = digits[1] + digits[3] + digits[5] + digits[7];
+  const digit10 = (((oddSum * 7) - evenSum) % 10 + 10) % 10;
+  if (digit10 !== digits[9]) return false;
+  const sum10 = digits.slice(0, 10).reduce((acc, curr) => acc + curr, 0);
+  return sum10 % 10 === digits[10];
+}
+
+/**
+ * 10 haneli Vergi Kimlik Numarası (VKN) doğrulaması (GİB algoritması).
+ */
+export function isValidVKN(vkn: string): boolean {
+  const clean = vkn.trim();
+  if (!/^\d{10}$/.test(clean)) return false;
+  const digits = clean.split("").map(Number);
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    const v = (digits[i] + (9 - i)) % 10;
+    if (v === 0) continue;
+    const c = (v * Math.pow(2, 9 - i)) % 9;
+    sum += c === 0 ? 9 : c;
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === digits[9];
+}
+
+/**
+ * Kurumsal fatura için VKN (10 hane) veya şahıs şirketi için TCKN (11 hane) kontrolü.
+ */
+export function isValidTaxNumber(val: string): boolean {
+  const clean = val.trim();
+  if (clean.length === 10) return isValidVKN(clean);
+  if (clean.length === 11) return isValidTCKN(clean);
+  return false;
+}

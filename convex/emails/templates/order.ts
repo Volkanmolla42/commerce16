@@ -40,6 +40,11 @@ export const orderEmailPayloadValidator = v.object({
   customerEmail: v.string(),
   customerName: v.string(),
   shippingAddress: v.union(v.string(), v.null()),
+  billingType: v.optional(v.union(v.string(), v.null())),
+  companyName: v.optional(v.union(v.string(), v.null())),
+  taxNumber: v.optional(v.union(v.string(), v.null())),
+  taxOffice: v.optional(v.union(v.string(), v.null())),
+  billingAddress: v.optional(v.union(v.string(), v.null())),
   total: v.string(),
   couponCode: v.union(v.string(), v.null()),
   couponDiscountKurus: v.union(v.number(), v.null()),
@@ -263,7 +268,15 @@ export function renderOrderEmail(payload: OrderEmailPayload): EmailContent {
       field("Tarih", escapeHtml(dateText)),
       payload.shippingAddress
         ? field("Teslimat Adresi", `<span style="line-height:1.5;">${escapeHtml(payload.shippingAddress)}</span>`)
-        : ""
+        : "",
+      payload.billingType === "corporate"
+        ? field(
+            "Fatura Bilgileri",
+            `<span style="line-height:1.5;"><strong>Kurumsal:</strong> ${escapeHtml(payload.companyName || "")}<br/>${escapeHtml(payload.taxOffice || "")} VD - Vergi No: ${escapeHtml(payload.taxNumber || "")}${payload.billingAddress ? `<br/>Adres: ${escapeHtml(payload.billingAddress)}` : ""}</span>`
+          )
+        : payload.billingAddress && payload.billingAddress !== payload.shippingAddress
+          ? field("Fatura Adresi", `<span style="line-height:1.5;">${escapeHtml(payload.billingAddress)}</span>`)
+          : "",
     ])
   );
 

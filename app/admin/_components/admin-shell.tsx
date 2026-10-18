@@ -28,6 +28,7 @@ import {
   BoltIcon,
   UsersIcon,
   EnvelopeIcon,
+  QuestionMarkCircleIcon,
   CreditCardIcon,
   ArrowTopRightOnSquareIcon,
   ChevronDownIcon,
@@ -82,6 +83,7 @@ const navigation: NavEntry[] = [
       { label: "Ürünler", href: adminPath("products"), icon: CubeIcon },
       { label: "Stok", href: adminPath("inventory"), icon: ArchiveBoxIcon },
       { label: "Kategoriler", href: adminPath("categories"), icon: FolderIcon },
+      { label: "Sorular", href: adminPath("questions"), icon: QuestionMarkCircleIcon },
     ],
   },
   {

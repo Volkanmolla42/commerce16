@@ -13,6 +13,7 @@ Kod yazmadan önce düşünme protokolü (Senior Mühendislik Standardı):
 asla git checkout git add -u gibi tüm dosyayı etkileyen kırıcı git komutları kullanma.
 mağazayı şuan kimse kullanmıyor. kırıcı değişiklik yapmaktan korkma. asla geriye dönük uyumluluk ekleme.
 
+HER ZAMAN /ponytail SKILLİNİ KULLAN.
 ## Projenin amacı
 
 Bu repo, müşteriler için e-ticaret sitelerini hızlıca uyarlayıp teslim etmeye yarayan bir boilerplate'tir. Mevcut mağaza verisini boilerplate'in evrensel kuralı kabul etme.

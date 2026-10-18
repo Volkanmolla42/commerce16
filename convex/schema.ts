@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { orderEmailEventValidator } from "./emails/events";
-import { ORDER_STATUS_KEYS, ORDER_PAYMENT_STATUS_KEYS } from "../lib/orders";
+import { ORDER_STATUS_KEYS, ORDER_PAYMENT_STATUS_KEYS, BILLING_TYPE_KEYS } from "../lib/orders";
 
 const attributeTemplateFields = {
   label: v.string(),
@@ -13,6 +13,7 @@ const attributeTemplateFields = {
 // Sipariş durumları lib/orders.ts'teki tek kaynaktan türetilir; yeni durum orada tanımlanır.
 const orderStatusValidator = v.union(...ORDER_STATUS_KEYS.map((key) => v.literal(key)));
 const orderPaymentStatusValidator = v.union(...ORDER_PAYMENT_STATUS_KEYS.map((key) => v.literal(key)));
+const billingTypeValidator = v.union(...BILLING_TYPE_KEYS.map((key) => v.literal(key)));
 
 export default defineSchema({
   ...authTables,
@@ -74,13 +75,6 @@ export default defineSchema({
   }).index("by_category_and_key_and_value", ["categorySlug", "key", "value"])
     .index("by_category_and_key_and_numericValue", ["categorySlug", "key", "numericValue"]),
 
-  searchQueries: defineTable({
-    query: v.string(),
-    normalized: v.string(),
-    count: v.number(),
-  })
-    .index("by_normalized", ["normalized"])
-    .index("by_count", ["count"]),
 
   categories: defineTable({
     slug: v.string(),
@@ -166,6 +160,11 @@ export default defineSchema({
     trackingUrl: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
     shippingAddress: v.optional(v.string()),
+    billingType: v.optional(billingTypeValidator),
+    companyName: v.optional(v.string()),
+    taxOffice: v.optional(v.string()),
+    taxNumber: v.optional(v.string()),
+    billingAddress: v.optional(v.string()),
     legalAcceptance: v.optional(v.object({
       acceptedAt: v.number(),
       distanceSalesAgreement: v.object({
@@ -425,6 +424,17 @@ export default defineSchema({
     }),
     updatedAt: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  productQuestions: defineTable({
+    productId: v.id("products"),
+    userId: v.id("users"),
+    question: v.string(),
+    answer: v.optional(v.string()),
+    answeredAt: v.optional(v.number()),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+  })
+    .index("by_product_and_status", ["productId", "status"])
+    .index("by_status", ["status"]),
 
   reviews: defineTable({
     productId: v.id("products"),

@@ -65,6 +65,14 @@ export async function GET(request: NextRequest) {
       const sent = await client.query(api.adminEmails.listSentEmailsAdmin, { adminSecret, limit: 100 });
       return NextResponse.json(sent, { headers: { "Cache-Control": "no-store" } });
     }
+    if (resource === "product-questions") {
+      const rawStatus = request.nextUrl.searchParams.get("status");
+      const status = rawStatus === "pending" || rawStatus === "approved" || rawStatus === "rejected"
+        ? rawStatus
+        : "all";
+      const questions = await client.query(api.productQuestions.listForAdmin, { adminSecret, status });
+      return NextResponse.json(questions, { headers: { "Cache-Control": "no-store" } });
+    }
 
     if (resource === "products") {
       const [products, favoriteCounts] = await Promise.all([
@@ -320,6 +328,33 @@ export async function POST(request: NextRequest) {
         await client.mutation(api.abandonedCartRecovery.deleteAdmin, {
           adminSecret,
           id: stringValue(body.id, "Sepet") as Id<"abandonedCarts">,
+        });
+        return NextResponse.json({ success: true });
+      }
+      case "product-question.answer": {
+        await client.mutation(api.productQuestions.answer, {
+          adminSecret,
+          id: stringValue(body.id, "Soru") as Id<"productQuestions">,
+          answer: stringValue(input.answer, "Yanıt"),
+        });
+        return NextResponse.json({ success: true });
+      }
+      case "product-question.status": {
+        const status = input.status;
+        if (status !== "pending" && status !== "approved" && status !== "rejected") {
+          throw new Error("Soru durumu geçersiz.");
+        }
+        await client.mutation(api.productQuestions.updateStatus, {
+          adminSecret,
+          id: stringValue(body.id, "Soru") as Id<"productQuestions">,
+          status,
+        });
+        return NextResponse.json({ success: true });
+      }
+      case "product-question.delete": {
+        await client.mutation(api.productQuestions.remove, {
+          adminSecret,
+          id: stringValue(body.id, "Soru") as Id<"productQuestions">,
         });
         return NextResponse.json({ success: true });
       }

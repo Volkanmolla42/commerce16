@@ -18,6 +18,8 @@ import {
   CreditCardIcon,
   BanknotesIcon,
   TruckIcon,
+  UserIcon,
+  BuildingOffice2Icon,
 } from "@heroicons/react/24/outline";
 import {
   Button,
@@ -40,6 +42,7 @@ import { trackPixelInitiateCheckout } from "@/lib/analytics/meta-pixel";
 import { getProvinceById, TURKEY_PROVINCES } from "@/lib/turkey-provinces";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
 import { quotePromotions } from "@/lib/promotions";
+import { isValidTaxNumber } from "@/lib/orders";
 
 type CouponPreview = {
   valid: boolean;
@@ -345,6 +348,18 @@ function CheckoutContent() {
     getCheckoutDetails({ profile, addresses, selection: addressSelection, draft });
   const districtOptions = getProvinceById(provinceId)?.districts ?? [];
 
+  // Fatura & Kurumsal Durumu
+  const [billingType, setBillingType] = useState<"individual" | "corporate">("individual");
+  const [companyName, setCompanyName] = useState("");
+  const [taxOffice, setTaxOffice] = useState("");
+  const [taxNumber, setTaxNumber] = useState("");
+  const [sameAsShippingAddress, setSameAsShippingAddress] = useState(true);
+  const [billingAddressSelection, setBillingAddressSelection] = useState<string | null>(null);
+  const [billingAddressLine, setBillingAddressLine] = useState("");
+  const [billingProvinceId, setBillingProvinceId] = useState("");
+  const [billingDistrictId, setBillingDistrictId] = useState("");
+  const billingDistrictOptions = getProvinceById(billingProvinceId)?.districts ?? [];
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -478,7 +493,50 @@ function CheckoutContent() {
         return;
       }
     }
+
+    if (billingType === "corporate") {
+      if (!companyName.trim()) {
+        setErrorMessage("Kurumsal fatura için firma resmi unvanı zorunludur.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!taxNumber.trim() || !isValidTaxNumber(taxNumber.trim())) {
+        setErrorMessage("Lütfen geçerli bir Vergi Kimlik Numarası (10 hane) veya şahıs şirketi için TCKN (11 hane) girin.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!taxOffice.trim()) {
+        setErrorMessage("Kurumsal fatura için vergi dairesi zorunludur.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const fullShippingAddress = `${customerName}, Tel: ${phone} - ${addressLine}, ${district}/${city}`;
+
+    let fullBillingAddress = fullShippingAddress;
+    if (!sameAsShippingAddress) {
+      if (billingAddressSelection && billingAddressSelection !== "custom") {
+        const selectedBilling = addresses?.find((a) => a._id === billingAddressSelection);
+        if (selectedBilling) {
+          fullBillingAddress = `${customerName}, Tel: ${phone} - ${selectedBilling.addressLine1}, ${selectedBilling.district}/${selectedBilling.city}`;
+        }
+      } else {
+        if (!billingProvinceId || !billingDistrictId) {
+          setErrorMessage("Fatura adresi için lütfen geçerli bir il ve ilçe seçin.");
+          setIsSubmitting(false);
+          return;
+        }
+        if (!billingAddressLine.trim()) {
+          setErrorMessage("Lütfen açık fatura adresini girin.");
+          setIsSubmitting(false);
+          return;
+        }
+        const billingProvince = getProvinceById(billingProvinceId);
+        const billingDistrict = billingDistrictOptions.find((d) => d.id === billingDistrictId);
+        fullBillingAddress = `${billingAddressLine.trim()}, ${billingDistrict?.name ?? ""}/${billingProvince?.name ?? ""}`;
+      }
+    }
     const isNewAddress = selectedAddressId === "custom" || !addresses || addresses.length === 0;
     const shouldSave = isAuthenticated && isNewAddress && saveAddressToBook;
 
@@ -529,6 +587,13 @@ function CheckoutContent() {
         customerPhone: phone.trim() || undefined,
         ...(analyticsSessionId ? { analyticsSessionId } : {}),
         shippingAddress: fullShippingAddress,
+        billingType,
+        ...(billingType === "corporate" ? {
+          companyName: companyName.trim(),
+          taxNumber: taxNumber.trim(),
+          taxOffice: taxOffice.trim(),
+        } : {}),
+        billingAddress: fullBillingAddress,
         total: finalPayableAmount.toFixed(2),
         paymentMethod: effectivePaymentMethod,
         ...(couponPreview?.valid ? { couponCode: couponPreview.code } : {}),
@@ -711,11 +776,11 @@ function CheckoutContent() {
             </div>
           </Card>
 
-          {/* 2. Teslimat Adresi */}
+          {/* 2. Teslimat ve Fatura Bilgileri */}
           <Card className="rounded-2xl border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
             <CardHeader className="p-0">
               <CardTitle className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                2. Teslimat Adresi
+                2. Teslimat ve Fatura Bilgileri
               </CardTitle>
             </CardHeader>
             <Separator />
@@ -927,6 +992,266 @@ function CheckoutContent() {
                 </Button>
               </div>
             )}
+
+            {/* Fatura Bilgileri Bölümü */}
+            <div className="pt-4 space-y-4 border-t border-border/70">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                Fatura Türü ve Bilgileri
+              </span>
+
+              {/* Fatura Türü Seçimi: Bireysel / Kurumsal */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setBillingType("individual")}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left cursor-pointer ${
+                    billingType === "individual"
+                      ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30 shadow-xs"
+                      : "border-border bg-card hover:border-muted-foreground/30 text-muted-foreground"
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg shrink-0 ${billingType === "individual" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    <UserIcon className="size-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Bireysel</div>
+                    <div className="text-xs text-muted-foreground">Kişisel fatura</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingType("corporate")}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left cursor-pointer ${
+                    billingType === "corporate"
+                      ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30 shadow-xs"
+                      : "border-border bg-card hover:border-muted-foreground/30 text-muted-foreground"
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg shrink-0 ${billingType === "corporate" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    <BuildingOffice2Icon className="size-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Kurumsal</div>
+                    <div className="text-xs text-muted-foreground">Şirket faturası</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Kurumsal Fatura Alanları */}
+              {billingType === "corporate" && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3.5 animate-in fade-in-50 duration-200">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="checkout-company-name" className="text-sm font-medium text-foreground">
+                      Firma Resmi Unvanı <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="checkout-company-name"
+                      type="text"
+                      required
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Örn: ABC Bilişim Sanayi ve Ticaret A.Ş."
+                      className="h-11 text-base sm:text-sm rounded-xl bg-background"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="checkout-tax-number" className="text-sm font-medium text-foreground">
+                          Vergi Kimlik No / TCKN <span className="text-destructive">*</span>
+                        </Label>
+                        {taxNumber.trim().length === 10 && (
+                          <span className="text-[10px] font-semibold text-primary uppercase">VKN (10 Hane)</span>
+                        )}
+                        {taxNumber.trim().length === 11 && (
+                          <span className="text-[10px] font-semibold text-primary uppercase">TCKN (11 Hane)</span>
+                        )}
+                      </div>
+                      <Input
+                        id="checkout-tax-number"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={11}
+                        required
+                        value={taxNumber}
+                        onChange={(e) => setTaxNumber(e.target.value.replace(/\D/g, ""))}
+                        placeholder="10 haneli VKN veya 11 haneli TCKN"
+                        className="h-11 text-base sm:text-sm rounded-xl bg-background tabular-nums"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="checkout-tax-office" className="text-sm font-medium text-foreground">
+                        Vergi Dairesi <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="checkout-tax-office"
+                        type="text"
+                        required
+                        value={taxOffice}
+                        onChange={(e) => setTaxOffice(e.target.value)}
+                        placeholder="Örn: Kadıköy Vergi Dairesi"
+                        className="h-11 text-base sm:text-sm rounded-xl bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fatura Adresi Ayrımı (Checkbox) */}
+              <div className="flex items-center space-x-2.5 pt-1">
+                <input
+                  type="checkbox"
+                  id="same-billing-address"
+                  checked={sameAsShippingAddress}
+                  onChange={(e) => setSameAsShippingAddress(e.target.checked)}
+                  className="size-4 rounded border-input accent-primary cursor-pointer"
+                />
+                <Label htmlFor="same-billing-address" className="text-xs sm:text-sm font-medium text-foreground cursor-pointer select-none">
+                  Fatura adresim teslimat adresimle aynı
+                </Label>
+              </div>
+
+              {/* Farklı Fatura Adresi Alanları */}
+              {!sameAsShippingAddress && (
+                <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3.5 animate-in fade-in-50 duration-200">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Farklı Fatura Adresi
+                  </div>
+
+                  {/* Kayıtlı Adreslerden Seçim (Varsa) */}
+                  {isAuthenticated && addresses && addresses.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {addresses.map((addr) => {
+                        const isSelected = billingAddressSelection === addr._id;
+                        return (
+                          <label
+                            key={`billing-${addr._id}`}
+                            className={`flex flex-col p-3 rounded-lg border cursor-pointer transition text-xs select-none ${
+                              isSelected
+                                ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                : "border-border bg-card hover:border-muted-foreground/40"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between font-semibold text-foreground">
+                              <span>{addr.title}</span>
+                              <input
+                                type="radio"
+                                name="billing-address"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setBillingAddressSelection(addr._id);
+                                  setBillingProvinceId(addr.provinceId ?? "");
+                                  setBillingDistrictId(addr.districtId ?? "");
+                                  setBillingAddressLine(addr.addressLine1);
+                                }}
+                                className="size-3.5 accent-primary"
+                              />
+                            </div>
+                            <span className="text-muted-foreground line-clamp-1 mt-0.5">
+                              {addr.addressLine1}, {addr.district}/{addr.city}
+                            </span>
+                          </label>
+                        );
+                      })}
+                      <label
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition text-xs select-none ${
+                          billingAddressSelection === "custom" || !billingAddressSelection
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                            : "border-border bg-card hover:border-muted-foreground/40"
+                        }`}
+                      >
+                        <span className="font-semibold text-foreground">+ Farklı Fatura Adresi Gir</span>
+                        <input
+                          type="radio"
+                          name="billing-address"
+                          checked={billingAddressSelection === "custom" || !billingAddressSelection}
+                          onChange={() => setBillingAddressSelection("custom")}
+                          className="size-3.5 accent-primary"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Fatura Adresi Giriş Kutuları */}
+                  {(billingAddressSelection === "custom" || !addresses || addresses.length === 0) && (
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 pt-1">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="checkout-billing-city" className="text-sm font-medium text-foreground">
+                          Fatura İli (Şehir) <span className="text-destructive">*</span>
+                        </Label>
+                        <div className="relative">
+                          <select
+                            id="checkout-billing-city"
+                            value={billingProvinceId}
+                            onChange={(e) => {
+                              setBillingAddressSelection("custom");
+                              setBillingProvinceId(e.target.value);
+                              setBillingDistrictId("");
+                            }}
+                            className="h-11 w-full appearance-none rounded-xl border border-input bg-background px-3.5 pr-10 text-base sm:text-sm font-normal text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 transition shadow-2xs"
+                          >
+                            <option value="">İl seçin</option>
+                            {TURKEY_PROVINCES.map((province) => (
+                              <option key={province.id} value={province.id}>
+                                {province.name}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDownIcon className="pointer-events-none absolute right-3.5 top-3.5 size-4 text-muted-foreground" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="checkout-billing-district" className="text-sm font-medium text-foreground">
+                          Fatura İlçesi <span className="text-destructive">*</span>
+                        </Label>
+                        <div className="relative">
+                          <select
+                            id="checkout-billing-district"
+                            disabled={!billingProvinceId}
+                            value={billingDistrictId}
+                            onChange={(e) => {
+                              setBillingAddressSelection("custom");
+                              setBillingDistrictId(e.target.value);
+                            }}
+                            className="h-11 w-full appearance-none rounded-xl border border-input bg-background px-3.5 pr-10 text-base sm:text-sm font-normal text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 transition shadow-2xs"
+                          >
+                            <option value="">{billingProvinceId ? "İlçe seçin" : "Önce il seçin"}</option>
+                            {[...billingDistrictOptions]
+                              .sort((a, b) => a.name.localeCompare(b.name, "tr"))
+                              .map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.name}
+                                </option>
+                              ))}
+                          </select>
+                          <ChevronDownIcon className="pointer-events-none absolute right-3.5 top-3.5 size-4 text-muted-foreground" />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <Label htmlFor="checkout-billing-address" className="text-sm font-medium text-foreground">
+                          Açık Fatura Adresi <span className="text-destructive">*</span>
+                        </Label>
+                        <textarea
+                          id="checkout-billing-address"
+                          rows={2}
+                          value={billingAddressLine}
+                          onChange={(e) => {
+                            setBillingAddressSelection("custom");
+                            setBillingAddressLine(e.target.value);
+                          }}
+                          placeholder="Faturada görünecek açık adres..."
+                          className="flex w-full rounded-xl border border-input bg-background p-3 text-base sm:text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 transition resize-none shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </Card>
 
           {/* 3. Ödeme Yöntemi */}

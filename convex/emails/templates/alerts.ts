@@ -116,3 +116,64 @@ export function renderLowStockEmail(data: LowStockEmailData): EmailContent {
 
   return { subject, html, text };
 }
+
+export interface ProductQuestionEmailData {
+  storeName: string;
+  productTitle: string | null;
+  productUrl: string;
+  user: { name: string; email: string | null };
+  question: string;
+  createdAt: number;
+  adminQuestionsUrl: string;
+}
+
+export function renderProductQuestionEmail(data: ProductQuestionEmailData): EmailContent {
+  const productTitle = data.productTitle ?? "Ürün silinmiş";
+  const subject = `Yeni Ürün Sorusu: ${productTitle} (${data.user.name}) | ${data.storeName}`;
+  const dateText = formatDateTime(data.createdAt, { dateStyle: "full", timeStyle: "short" });
+
+  const rows = [
+    field("Ürün", `<strong>${escapeHtml(productTitle)}</strong>`),
+    field("Müşteri", escapeHtml(data.user.name)),
+    data.user.email
+      ? field("E-posta", `<a href="mailto:${escapeHtml(data.user.email)}" style="color:#09090b;font-weight:600;text-decoration:none;">${escapeHtml(data.user.email)}</a>`)
+      : "",
+    field("Tarih", escapeHtml(dateText)),
+  ];
+
+  const html = renderEmail({
+    storeName: data.storeName,
+    subject,
+    icon: ICONS.mail,
+    title: "Yeni Ürün Sorusu",
+    intro: "Ürün sayfasından yeni bir soru geldi. Yanıtladığınızda soru otomatik olarak yayınlanır.",
+    badge: { text: "Soru Cevap", tone: "warning" },
+    blocks: [
+      panel("Soru Bilgileri", fieldTable(rows)),
+      panel(
+        "Soru",
+        `<div style="font-size:13px;color:#18181b;line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.question)}</div>`
+      ),
+      data.productUrl ? cta(data.productUrl, "Ürünü Görüntüle") : "",
+      cta(data.adminQuestionsUrl, "Soruları Yönet"),
+    ],
+  });
+
+  const text = renderText({
+    storeName: data.storeName,
+    title: "Yeni Ürün Sorusu",
+    lines: [
+      `Ürün: ${productTitle}`,
+      `Müşteri: ${data.user.name}`,
+      data.user.email ? `E-posta: ${data.user.email}` : "",
+      `Tarih: ${dateText}`,
+      "",
+      "Soru:",
+      data.question,
+      "",
+      `Soruları yönetmek için: ${data.adminQuestionsUrl}`,
+    ],
+  });
+
+  return { subject, html, text };
+}

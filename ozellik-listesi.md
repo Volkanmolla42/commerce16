@@ -1,6 +1,6 @@
-# Özellik Listesi — Commit Planı
+# Özellik Listesi 
 
-Her satır tek bir commit. S/M/L = commit büyüklüğü. Sıra, sert bağımlılıklara göre düzenlendi.
+ S/M/L = görev büyüklüğü. Sıra, sert bağımlılıklara göre düzenlendi.
 
 ## Faz 1 — Vitrin hızlı kazanımlar
 
@@ -17,13 +17,13 @@ Her satır tek bir commit. S/M/L = commit büyüklüğü. Sıra, sert bağımlı
 ## Faz 2 — Sepet ve satış artırma
 
 - [x] 10. **Otomatik kampanya motoru** — 3 al 2 öde, sepette %X, kategoriye kargo bedava; mevcut kupon ve kargo eşiğiyle aynı hesap hattında. (L) — tamamlandı; üç kural türü admin oluşturma, sepet + ödeme satırı, sipariş kaydı ve mobil + masaüstü tarayıcı testi geçti (2026-10-17).
-- [ ] 12. **Ürün Soru-Cevap** — soru sorma, admin yanıtı, PDP listesi. (M)
-- [ ] 13. **Tek tıkla tekrar sipariş** — sipariş detayından güncel sepete aktarma. (S/M)
+- [x] 12. **Ürün Soru-Cevap** — soru sorma, admin yanıtı, PDP listesi. (M) — tamamlandı; giriş zorunlu soru formu (ad/e-posta hesaptan gelir, soru kullanıcıya bağlanır, rate limit) + admin e-posta uyarısı, moderasyon ekranı (yanıtla/yayınla, reddet, yayından kaldır, sil) ve PDP'de maskeli adla onaylı soru-cevap listesi; mobil + masaüstü tarayıcı testi geçti (2026-10-18).
+- [x] 13. **Tek tıkla tekrar sipariş** — sipariş detayından güncel sepete aktarma. (S/M) — tamamlandı; güncel stok/satış doğrulama, sepete aktarma ve eklenemeyen ürünler modal özeti entegre edildi (2026-10-18).
 
 ## Faz 3 — Operasyon (yüksek öncelik)
 
-- [ ] 14. **Kurumsal fatura & adres ayrımı** — firma adı, vergi no/TCKN, fatura adresi; bireysel/kurumsal seçimi. (M)
-- [ ] 15. **Excel içe/dışa aktar** — mevcut dışa aktarımı genişletme + ürün içe aktarma (varyant, fiyat, stok, SKU, barkod, liste fiyatı, görsel URL). (L)
+- [x] 14. **Kurumsal fatura & adres ayrımı** — firma adı, vergi no/TCKN, fatura adresi; bireysel/kurumsal seçimi. (M) — tamamlandı; VKN (10 hane) / TCKN (11 hane) GİB checksum algoritması, ödeme sayfası bireysel/kurumsal ve bağımsız fatura adresi seçimi, sipariş kaydı, e-posta şablonu, müşteri hesabı, admin sipariş detayı ve CSV/Excel export entegrasyonu; mobil + masaüstü tarayıcı testi geçti (2026-10-18).
+- [x] 15. **Excel içe/dışa aktar** — mevcut dışa aktarımı genişletme + ürün içe aktarma (varyant, fiyat, stok, SKU, barkod, liste fiyatı, görsel URL). (L) — tamamlandı; Excel/CSV içe ve dışa aktarım, barkod taşıma ve doğrulama geçti (2026-10-18).
 - [ ] 16. **Kargo barkod / etiket PDF** — admin sipariş detayından barkodlu teslimat fişi. (M)
 
 
@@ -44,9 +44,9 @@ Her satır tek bir commit. S/M/L = commit büyüklüğü. Sıra, sert bağımlı
 ## Notlar
 
 - Taksit tablosu mevcut demo PayTR akışıyla yanıltıcı olur; gerçek PayTR gelene kadar yapılmamalı.
-- Ürün formundaki `barcode` alanı `parseProductInput` tarafından taşınmıyor; Excel import commit'inde ayrıca düzeltilecek.
+- Ürün formundaki `barcode` alanı `parseProductInput` tarafından taşınmıyor; Excel import görevinde ayrıca düzeltilecek.
 - Proje kuralı gereği test dosyası yazılmayacak. Doğrulama: `npx tsc --noEmit` + `npx convex dev --once` + tarayıcı kontrolü.
-- Her görev için zorunlu akış: plan → kod → bağımsız review → mobil (390×844) tarayıcı testi → masaüstü (1440×900) tarayıcı testi. Sorun yoksa madde `[x]` işaretlenir ve sıradaki göreve geçilir.
+- Her görev için zorunlu akış: plan → kod → bağımsız review → mobil (390×844) tarayıcı testi → masaüstü (1440×900) tarayıcı testi. Sorun yoksa madde `[x]` işaretlenir 
 - Playwright tarayıcı testleri `http://localhost:3000` üzerinden yapılır; `127.0.0.1` bu dev ortamında hydrate olmuyor.
 
 ---
@@ -95,11 +95,11 @@ Bizim stack'te karşılığı: fiyat, stok, kampanya ve sipariş kuralları **Co
 - **Shopify'da:** Core'da "recently viewed" yoktur; temalar ve app'ler localStorage/cookie ile yapar. Recommendation API daha çok "benzer/ilgili" içindir.
 - **Bizim stack'te:** Mevcut localStorage takibi (20 slug) kullanılır; yeni bir `getProductsBySlugs` query'si ile güncel fiyat/stok alınır, son 5 ürün yatay raf olarak gösterilir. Stokta olmayanlar filtrelenir.
 
-## 7. Popüler ve son aramalar
+## 7. Son aramalar
 
-- **Endüstri standardı:** En az 2 karakter + debounce ile öneri; son aramalar tarayıcıda; popüler aramalar ise normalize edilmiş arama kayıtlarının toplamından üretilir. Kişisel veri değil, yalnızca sorgu metni saklanır.
-- **Shopify'da:** **Search & Discovery** app'i ve **Predictive Search API** (`/search/suggest.json`) önerileri sağlar. Popüler aramalar genellikle app/analytics tarafında; son aramalar tema tarafında tutulur.
-- **Bizim stack'te:** Mevcut autosuggest korunur. Yeni `searchQueries` tablosunda normalize sorgu + sayım tutulur; son aramalar localStorage'da. Sorgu yazımı rate-limit'lenir, kişisel veri kaydedilmez.
+- **Endüstri standardı:** En az 2 karakter + debounce ile öneri; son aramalar tarayıcıda tutulur.
+- **Shopify'da:** **Search & Discovery** app'i ve **Predictive Search API** (`/search/suggest.json`) önerileri sağlar. Son aramalar tema tarafında localStorage ile tutulur.
+- **Bizim stack'te:** Mevcut autosuggest korunur. Son aramalar localStorage'da tutulur.
 
 ## 8. Ürün açıklaması ve bağımsız görseller
 
@@ -123,7 +123,7 @@ Bizim stack'te karşılığı: fiyat, stok, kampanya ve sipariş kuralları **Co
 
 - **Endüstri standardı:** Soru tablosu; durumlar (beklemede/onaylı/reddedildi); rate limit ve spam kontrolü; admin moderasyonu; onaylı soruların PDP'de gösterimi; isteğe bağlı FAQPage schema.
 - **Shopify'da:** Native Q&A yoktur; AC Q&A, Inquiris, Growave gibi app'ler veya statik FAQ için metafields kullanılır. App'ler moderasyon ve AI yanıtı ekleyebilir.
-- **Bizim stack'te:** `productQuestions` tablosu + herkese açık `ask` mutation (rate limit) + admin onay/yanıt ekranı. Yalnızca onaylılar gösterilir; admin'e e-posta bildirimi mevcut mail altyapısından gönderilir.
+- **Bizim stack'te:** `productQuestions` tablosu + giriş zorunlu `ask` mutation (rate limit) + admin onay/yanıt ekranı. Ad ve e-posta hesaptan okunur, soru `userId`'ye bağlanır; yalnızca onaylılar gösterilir; admin'e e-posta bildirimi mevcut mail altyapısından gönderilir.
 
 ## 13. Tek tıkla tekrar sipariş
 

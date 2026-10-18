@@ -5,8 +5,6 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { getRecentSearches, recordRecentSearch } from "@/lib/catalog/search-history";
 import {
   ArrowRightIcon,
@@ -52,11 +50,6 @@ export default function Search() {
   const [suggestionError, setSuggestionError] = useState(false);
   const [completedQuery, setCompletedQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const recordSearchQuery = useMutation(api.search.record);
-  const popularSearches = useQuery(
-    api.search.popular,
-    isOpen && normalizedQuery.length === 0 ? { limit: 5 } : "skip",
-  );
 
   useEffect(() => {
     if (!shouldLoadSuggestions) return;
@@ -103,28 +96,16 @@ export default function Search() {
   const isQuerySettled =
     normalizedQuery === normalizedDebouncedQuery &&
     normalizeSearchText(completedQuery) === normalizedDebouncedQuery;
-  const isDiscovery = isOpen && normalizedQuery.length === 0;
+  const isDiscovery = isOpen && normalizedQuery.length === 0 && recentSearches.length > 0;
   const recentOptions: SearchOption[] = isDiscovery
-    ? recentSearches.map((term) => ({
+    ? recentSearches.slice(0, 8).map((term) => ({
         key: `recent:${term}`,
         kind: "query",
         title: term,
         href: `/search?q=${encodeURIComponent(term)}`,
       }))
     : [];
-  const popularOptions: SearchOption[] = isDiscovery
-    ? (popularSearches ?? [])
-        .slice(0, Math.max(0, 8 - recentOptions.length))
-        .map(({ query: term }) => ({
-          key: `popular:${term}`,
-          kind: "query",
-          title: term,
-          href: `/search?q=${encodeURIComponent(term)}`,
-        }))
-    : [];
-  const discoveryOptions = [...recentOptions, ...popularOptions];
-  const discoveryLoading = isDiscovery && popularSearches === undefined;
-  const visibleOptions = isDiscovery ? discoveryOptions : isQuerySettled ? options : [];
+  const visibleOptions = isDiscovery ? recentOptions : isQuerySettled ? options : [];
   const panelIsVisible = isDiscovery || (isOpen && normalizedQuery.length >= 2);
 
   const rememberSearch = (term: string) => {
@@ -132,7 +113,6 @@ export default function Search() {
     if (trimmed.length < 2) return;
     recordRecentSearch(trimmed);
     setRecentSearches(getRecentSearches());
-    void recordSearchQuery({ query: trimmed }).catch(() => undefined);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -311,40 +291,16 @@ export default function Search() {
         <div
           id={listboxId}
           role="listbox"
-          aria-label={isDiscovery ? "Son ve popüler aramalar" : "Arama önerileri"}
+          aria-label={isDiscovery ? "Son aramalar" : "Arama önerileri"}
           className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-[min(65vh,26rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 text-black shadow-2xl backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
         >
           {isDiscovery ? (
-            <>
-              {recentOptions.length > 0 ? (
-                <div role="group" aria-label="Son aramalarınız" className="pb-2">
-                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                    Son aramalarınız
-                  </p>
-                  {recentOptions.map((option, index) => renderOption(option, index))}
-                </div>
-              ) : null}
-              {discoveryLoading ? (
-                <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
-                  Popüler aramalar yükleniyor...
-                </p>
-              ) : popularOptions.length > 0 ? (
-                <div
-                  role="group"
-                  aria-label="Popüler aramalar"
-                  className={recentOptions.length > 0 ? "border-t border-neutral-100 pt-1 dark:border-neutral-800" : ""}
-                >
-                  <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                    Popüler aramalar
-                  </p>
-                  {popularOptions.map((option, index) => renderOption(option, recentOptions.length + index))}
-                </div>
-              ) : recentOptions.length === 0 ? (
-                <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
-                  Henüz popüler arama yok.
-                </p>
-              ) : null}
-            </>
+            <div role="group" aria-label="Son aramalarınız">
+              <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                Son aramalarınız
+              </p>
+              {recentOptions.map((option, index) => renderOption(option, index))}
+            </div>
           ) : !isQuerySettled ? (
             <p role="status" className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">
               Öneriler hazırlanıyor...

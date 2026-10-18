@@ -10,11 +10,17 @@ import {
   TrashIcon,
   PlusIcon,
   PhotoIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Input, Card, Badge, Label } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { CsvExportButton } from "../_components/export-button";
+import { ProductImportDialog } from "./_components/product-import-dialog";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -44,6 +50,7 @@ export default function AdminProductsPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "active" | "inactive">("all");
+  const [importOpen, setImportOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -95,12 +102,24 @@ export default function AdminProductsPage() {
   return (
     <>
       <AdminHeaderAction route={adminPath("products")}>
-        <Button asChild size="sm" className="h-9 gap-1.5 cursor-pointer">
-          <Link href={adminPath("products/add")}>
-            <PlusIcon className="size-4" />
-            <span>Yeni Ürün Ekle</span>
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 cursor-pointer"
+            onClick={() => setImportOpen(true)}
+          >
+            <ArrowUpTrayIcon className="size-4" />
+            <span>İçe Aktar</span>
+          </Button>
+          <Button asChild size="sm" className="h-9 gap-1.5 cursor-pointer">
+            <Link href={adminPath("products/add")}>
+              <PlusIcon className="size-4" />
+              <span>Yeni Ürün Ekle</span>
+            </Link>
+          </Button>
+        </div>
       </AdminHeaderAction>
 
       {(message || actionError || error) && (
@@ -196,7 +215,8 @@ export default function AdminProductsPage() {
                 Filtreleri Temizle
               </Button>
             )}
-            <CsvExportButton type="products" label="CSV İndir" />
+            <CsvExportButton type="products" label="Excel İndir" format="xlsx" />
+            <CsvExportButton type="products" label="CSV İndir" format="csv" />
           </div>
         </div>
 
@@ -366,6 +386,12 @@ export default function AdminProductsPage() {
           </nav>
         )}
       </Card>
+
+      <ProductImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={refresh}
+      />
     </>
   );
 }

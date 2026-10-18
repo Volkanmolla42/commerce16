@@ -84,6 +84,14 @@ function productSkuValue(value: unknown) {
   return sku;
 }
 
+function productBarcodeValue(value: unknown) {
+  const barcode = optionalString(value, "Barkod");
+  if (barcode && barcode.length > 64) {
+    throw new Error("Barkod en fazla 64 karakter olabilir.");
+  }
+  return barcode;
+}
+
 function productOptionsValue(value: unknown) {
   if (!Array.isArray(value)) throw new Error("Varyant seçenekleri geçersiz.");
   const options = value.map((item) => {
@@ -132,6 +140,7 @@ function productVariantsValue(value: unknown) {
     if (compareAtPrice !== undefined && Number(compareAtPrice) <= Number(price)) {
       throw new Error("Liste fiyatı satış fiyatından büyük olmalı.");
     }
+    const barcode = productBarcodeValue(item.barcode);
     return {
       id: stringValue(item.id, "Varyant kimliği"),
       title: stringValue(item.title, "Varyant başlığı"),
@@ -139,6 +148,7 @@ function productVariantsValue(value: unknown) {
       selectedOptions,
       price,
       ...(compareAtPrice !== undefined ? { compareAtPrice } : {}),
+      ...(barcode !== undefined ? { barcode } : {}),
       stockQuantity: item.stockQuantity,
       sku: productSkuValue(item.sku),
     };

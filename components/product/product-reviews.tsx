@@ -7,19 +7,12 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 import { StarRating } from "./star-rating";
 import { Button } from "@/components/ui";
+import { maskName } from "@/lib/mask-name";
 import {
   CheckBadgeIcon,
   ChatBubbleLeftRightIcon,
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
-
-function maskName(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((part) => `${part[0]?.toLocaleUpperCase("tr-TR")}**`)
-    .join(" ");
-}
 
 function formatDate(timestamp: number) {
   try {

@@ -12,7 +12,9 @@ import {
 import { formatMoney } from "@/lib/format-money";
 import { getOrderCode } from "@/lib/orders";
 import { formatDate } from "@/lib/format-date";
-import { Button, Card, CardContent } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { OrderReorderButton } from "@/components/orders/order-reorder-button";
 import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
@@ -135,6 +137,7 @@ export default function AccountOrdersPage() {
                   customerName={order.customerName}
                 />
               )}
+              <OrderReorderButton items={order.items} size="sm" variant="outline" />
               <Button
                 asChild
                 variant="outline"

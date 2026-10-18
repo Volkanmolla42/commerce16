@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
@@ -6,7 +7,6 @@ import { toCsv } from "@/lib/admin/csv";
 import { orderStatusLabels, orderPaymentStatusLabels, getOrderCode, getOrderPaymentMethodTitle } from "@/lib/orders";
 import { kurusToLira } from "@/lib/format-money";
 import { formatDate, formatDateTime } from "@/lib/format-date";
-import { getProductPriceRange } from "@/lib/catalog/variants";
 import { NextRequest, NextResponse } from "next/server";
 
 type ExportOrder = Doc<"orders">;
@@ -15,13 +15,24 @@ type ExportProduct = {
   slug: string;
   title: string;
   categorySlug?: string;
+  description?: string;
   availableForSale: boolean;
+  options: Array<{
+    id: string;
+    name: string;
+    values: string[];
+  }>;
   variants: Array<{
     id: string;
     title: string;
+    sku?: string;
+    barcode?: string;
     price: string;
+    compareAtPrice?: string;
     stockQuantity: number;
+    selectedOptions: Array<{ name: string; value: string }>;
   }>;
+  imageUrls: string[];
   updatedAt: string;
 };
 
@@ -48,6 +59,16 @@ function csvResponse(filename: string, body: string) {
   });
 }
 
+function xlsxResponse(filename: string, buffer: Buffer) {
+  return new NextResponse(new Uint8Array(buffer), {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   const secFetchSite = request.headers.get("sec-fetch-site");
   if (secFetchSite === "cross-site") {
@@ -59,6 +80,7 @@ export async function GET(request: NextRequest) {
   }
 
   const type = request.nextUrl.searchParams.get("type");
+  const format = request.nextUrl.searchParams.get("format");
 
   try {
     const { client, adminSecret } = getAdminBackend();
@@ -90,6 +112,27 @@ export async function GET(request: NextRequest) {
         cursor = result.isDone ? null : result.continueCursor;
       } while (cursor && allOrders.length < 10000);
 
+      const headers = [
+        "Sipariş No",
+        "Tarih",
+        "Lojistik Durumu",
+        "Ödeme Durumu",
+        "Ödeme Yöntemi",
+        "Müşteri",
+        "E-posta",
+        "Telefon",
+        "Ürün adedi",
+        "Tutar (TL)",
+        "Kupon",
+        "İndirim (TL)",
+        "Kargo (TL)",
+        "Teslimat adresi",
+        "Fatura Türü",
+        "Firma Unvanı",
+        "Vergi No / TCKN",
+        "Vergi Dairesi",
+        "Fatura Adresi",
+      ];
       const rows = allOrders.map((order) => [
         getOrderCode(order, true),
         formatDateTime(order._creationTime, { dateStyle: "short", timeStyle: "short" }),
@@ -105,14 +148,22 @@ export async function GET(request: NextRequest) {
         order.couponDiscountKurus ? kurusToLira(order.couponDiscountKurus) : "",
         order.shippingFee !== undefined && order.shippingFee !== null ? String(order.shippingFee) : "0",
         order.shippingAddress ?? "",
+        order.billingType === "corporate" ? "Kurumsal" : "Bireysel",
+        order.companyName ?? "",
+        order.taxNumber ?? "",
+        order.taxOffice ?? "",
+        order.billingAddress ?? order.shippingAddress ?? "",
       ]);
-      return csvResponse(
-        "siparisler.csv",
-        toCsv(
-          ["Sipariş No", "Tarih", "Lojistik Durumu", "Ödeme Durumu", "Ödeme Yöntemi", "Müşteri", "E-posta", "Telefon", "Ürün adedi", "Tutar (TL)", "Kupon", "İndirim (TL)", "Kargo (TL)", "Teslimat adresi"],
-          rows,
-        ),
-      );
+
+      if (format === "xlsx") {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Siparişler");
+        const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+        return xlsxResponse("siparisler.xlsx", buf);
+      }
+
+      return csvResponse("siparisler.csv", toCsv(headers, rows));
     }
 
     if (type === "products") {
@@ -131,26 +182,87 @@ export async function GET(request: NextRequest) {
         cursor = result.isDone ? null : result.continueCursor;
       } while (cursor && allProducts.length < 10000);
 
-      const rows = allProducts.map((product) => {
-        const range = getProductPriceRange({ variants: product.variants });
-        return [
-          product.slug,
-          product.title,
-          product.categorySlug ?? "",
-          product.availableForSale ? "Evet" : "Hayır",
-          range.min === range.max ? range.min : `${range.min} - ${range.max}`,
-          product.variants.length,
-          product.variants.reduce((sum: number, variant: { stockQuantity: number }) => sum + variant.stockQuantity, 0),
-          product.updatedAt,
-        ];
-      });
-      return csvResponse(
-        "urunler.csv",
-        toCsv(
-          ["Adres", "Başlık", "Kategori", "Satışta", "Fiyat (TL)", "Varyant sayısı", "Toplam stok", "Güncelleme"],
-          rows,
-        ),
-      );
+      const headers = [
+        "Ürün Adresi",
+        "Başlık",
+        "Kategori",
+        "Açıklama",
+        "Satışta",
+        "Varyant Başlığı",
+        "SKU",
+        "Barkod",
+        "Fiyat (TL)",
+        "Liste Fiyatı (TL)",
+        "Stok",
+        "Seçenek 1 Adı",
+        "Seçenek 1 Değeri",
+        "Seçenek 2 Adı",
+        "Seçenek 2 Değeri",
+        "Görseller",
+      ];
+
+      const rows: Array<Array<string | number>> = [];
+      for (const product of allProducts) {
+        const opt1Name = product.options[0]?.name ?? "";
+        const opt2Name = product.options[1]?.name ?? "";
+        const imagesStr = product.imageUrls.join(", ");
+
+        if (product.variants.length === 0) {
+          rows.push([
+            product.slug,
+            product.title,
+            product.categorySlug ?? "",
+            product.description ?? "",
+            product.availableForSale ? "Evet" : "Hayır",
+            "Standart",
+            "",
+            "",
+            "0",
+            "",
+            0,
+            "",
+            "",
+            "",
+            "",
+            imagesStr,
+          ]);
+        } else {
+          for (let i = 0; i < product.variants.length; i++) {
+            const v = product.variants[i];
+            const opt1Val = v.selectedOptions.find((so) => so.name === opt1Name)?.value ?? "";
+            const opt2Val = v.selectedOptions.find((so) => so.name === opt2Name)?.value ?? "";
+
+            rows.push([
+              product.slug,
+              i === 0 ? product.title : "",
+              i === 0 ? (product.categorySlug ?? "") : "",
+              i === 0 ? (product.description ?? "") : "",
+              product.availableForSale ? "Evet" : "Hayır",
+              v.title,
+              v.sku ?? "",
+              v.barcode ?? "",
+              v.price,
+              v.compareAtPrice ?? "",
+              v.stockQuantity,
+              opt1Name,
+              opt1Val,
+              opt2Name,
+              opt2Val,
+              i === 0 ? imagesStr : "",
+            ]);
+          }
+        }
+      }
+
+      if (format === "xlsx") {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Ürünler");
+        const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+        return xlsxResponse("urunler.xlsx", buf);
+      }
+
+      return csvResponse("urunler.csv", toCsv(headers, rows));
     }
 
     if (type === "customers") {

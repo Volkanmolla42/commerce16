@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import { ArrowsPointingOutIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { api } from "@/convex/_generated/api";
 import { DeliveryInfo } from "./delivery-info";
+import { ProductQuestions } from "./product-questions";
 import type { Product } from "@/lib/catalog/types";
 
 const DescriptionImageLightbox = dynamic(() => import("./description-image-lightbox"), {
@@ -22,6 +23,7 @@ const tabs: { id: InfoTab; label: string }[] = [
 
 export function ProductInfoTabs({ product }: { product: Product }) {
   const [tab, setTab] = useState<InfoTab>("product");
+  const [questionsMounted, setQuestionsMounted] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [activeDescriptionImage, setActiveDescriptionImage] = useState(0);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -62,7 +64,10 @@ export function ProductInfoTabs({ product }: { product: Product }) {
             type="button"
             role="tab"
             aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
+            onClick={() => {
+              setTab(item.id);
+              if (item.id === "questions") setQuestionsMounted(true);
+            }}
             className={`-mb-px border-b-2 py-3 text-sm font-semibold transition-colors ${
               tab === item.id
                 ? "border-primary text-foreground"
@@ -172,11 +177,13 @@ export function ProductInfoTabs({ product }: { product: Product }) {
             </section>
           ) : null}
         </div>
-      ) : (
-        <div className="pt-5 sm:pt-6">
-          <p className="text-sm text-muted-foreground">Henüz soru bulunmuyor.</p>
+      ) : null}
+
+      {questionsMounted ? (
+        <div className={tab === "questions" ? "pt-5 sm:pt-6" : "hidden pt-5 sm:pt-6"}>
+          <ProductQuestions productId={product.id} />
         </div>
-      )}
+      ) : null}
 
       {previewIndex !== null ? (
         <DescriptionImageLightbox

@@ -24,14 +24,15 @@ import {
 import { formatDateTime } from "@/lib/format-date";
 import { formatMoney } from "@/lib/format-money";
 import { OrderPriceSummary } from "@/components/orders/order-price-summary";
+import { Button } from "@/components/ui/button";
 import {
-  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Separator,
-} from "@/components/ui";
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { OrderReorderButton } from "@/components/orders/order-reorder-button";
 import { OrderStatusBadge, OrderPaymentStatusBadge, ORDER_STATUS_ICONS } from "@/components/orders/order-badges";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
@@ -207,11 +208,12 @@ export default function AccountOrderDetailsClient({
     <div className="space-y-6">
       {/* 1. Sipariş Edilen Ürünler (En Üstte) */}
       <Card className="rounded-3xl border-border bg-card shadow-xs overflow-hidden">
-        <CardHeader className="border-b border-border bg-muted/20 px-6 py-4">
+        <CardHeader className="border-b border-border bg-muted/20 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
             <ShoppingBagIcon className="h-5 w-5 text-primary" />
             <span>Sipariş Edilen Ürünler ({order.items.length})</span>
           </CardTitle>
+          <OrderReorderButton items={order.items} />
         </CardHeader>
         <CardContent className="p-6">
           <div className="divide-y divide-border/60">
@@ -418,6 +420,29 @@ export default function AccountOrderDetailsClient({
               <span className="font-medium text-foreground leading-relaxed mt-0.5 block">
                 {order.shippingAddress || "Adres belirtilmedi"}
               </span>
+            </div>
+
+            <div>
+              <span className="text-muted-foreground block">
+                Fatura Bilgileri ({order.billingType === "corporate" ? "Kurumsal Fatura" : "Bireysel Fatura"}):
+              </span>
+              {order.billingType === "corporate" ? (
+                <div className="mt-1 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs space-y-1 text-foreground">
+                  <div className="font-semibold">{order.companyName}</div>
+                  <div className="text-muted-foreground">
+                    {order.taxOffice} Vergi Dairesi — Vergi No/TCKN: <span className="font-mono font-medium text-foreground">{order.taxNumber}</span>
+                  </div>
+                  {order.billingAddress && (
+                    <div className="text-muted-foreground pt-0.5">
+                      <span className="font-medium text-foreground">Fatura Adresi:</span> {order.billingAddress}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <span className="font-medium text-foreground leading-relaxed mt-0.5 block">
+                  {order.billingAddress || order.shippingAddress || "Teslimat adresiyle aynı"}
+                </span>
+              )}
             </div>
           </div>
         </Card>
