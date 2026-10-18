@@ -5,7 +5,8 @@ useMemo ve useCallback kullanımı YASAKTIR. Next.js ve Cache Components mimaris
 Barrel export (re-export) kullanımı YASAKTIR. Bileşenler ve modüller doğrudan tanımlandıkları özgün dosyalardan import edilmelidir.
 Test dosyası yazmak KESİNLİKLE YASAKTIR. Projede test dosyası (.test.ts, .spec.ts vb.) oluşturulmaz, test kütüphaneleri eklenmez ve test kodu yazılmaz.
 Kod yazmadan önce düşünme protokolü (Senior Mühendislik Standardı):
-- Kod yazmadan önce her zaman en cerrahi, minimal ve hatasız çözümü hedefle; aşırı mühendislikten (over-engineering), spekülatif soyutlamalardan ve gereksiz yardımcı kodlardan kaçın.
+- Her zaman en basit, doğrudan ve yalın çözümü tercih et; kompleks yapılara, lüzumsuz if/else dallanmalarına ve aşırı mühendisliğe (over-engineering) asla yer verme. Birkaç satırda doğrudan çözülebilecek mantıkları karmaşık mekanizmalara dönüştürme (KISS & YAGNI).
+- Kod yazmadan önce her zaman en cerrahi, minimal ve hatasız çözümü hedefle; spekülatif soyutlamalardan ve gereksiz yardımcı kodlardan kaçın.
 - Mevcut mimariyi, sözleşmeleri ve tip tanımlarını bozma; varsayım yapmak yerine ilgili dosyaları oku ve doğrula.
 - Açıklamayı sade tut, doğrudan amaca hizmet eden temiz koda odaklan.
 

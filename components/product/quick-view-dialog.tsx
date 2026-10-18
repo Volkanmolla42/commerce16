@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
@@ -19,7 +18,7 @@ import {
 import Price from "@/components/price";
 import { useCart } from "@/components/cart/cart-context";
 import { ProductBadges } from "./product-badges";
-import { getProductImages, getProductImagesForSelection } from "@/lib/catalog/product-images";
+import { Gallery } from "./gallery";
 import { getProductPriceRange, isVariantSellable } from "@/lib/catalog/variants";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 
@@ -59,15 +58,9 @@ function QuickViewContent({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialVariant?.selectedOptions.map(({ name, value }) => [name, value]) ?? [])
   );
-  const [activeImageUrl, setActiveImageUrl] = useState<string>();
-
   const activeVariant = variants.find((variant) =>
     variant.selectedOptions.every((option) => selectedOptions[option.name] === option.value)
   );
-  const matchingImages = getProductImagesForSelection(product.images, activeVariant?.selectedOptions ?? []);
-  const gallery = matchingImages.length > 0 ? matchingImages : getProductImages(product);
-  const variantImage = gallery.find((image) => image.selectedOptions?.length);
-  const activeImage = gallery.find((image) => image.url === activeImageUrl) ?? variantImage ?? gallery[0];
   const priceRange = getProductPriceRange(product);
   const displayPrice = activeVariant?.price.amount ?? priceRange.min;
   const maxPrice = activeVariant ? undefined : priceRange.max;
@@ -81,42 +74,19 @@ function QuickViewContent({
   return (
     <div className="grid sm:grid-cols-2">
       <div className="bg-muted/30 p-4 sm:p-5">
-        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-muted">
-          {activeImage?.url ? (
-            <Image
-              src={activeImage.url}
-              alt={product.title}
-              fill
-              sizes="(min-width: 640px) 45vw, 100vw"
-              loading="eager"
-              className="object-cover"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              Görsel yok
-            </div>
-          )}
-        </div>
-        {gallery.length > 1 ? (
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {gallery.map((image, index) => (
-              <button
-                key={image.url}
-                type="button"
-                aria-label={image.selectedOptions?.map(({ value }) => value).join(" / ") || `Ürün görseli ${index + 1}`}
-                aria-pressed={image.url === activeImage?.url}
-                onClick={() => setActiveImageUrl(image.url)}
-                className={`relative size-14 shrink-0 overflow-hidden rounded-lg border bg-muted transition ${
-                  image.url === activeImage?.url
-                    ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background"
-                    : "border-border/80 hover:border-primary/40"
-                }`}
-              >
-                <Image src={image.url} alt="" fill sizes="56px" className="object-cover" />
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <Gallery
+          product={product}
+          selectedVariant={activeVariant}
+          onSelectVariant={(variant) => {
+            setSelectedOptions(() => {
+              const next: Record<string, string> = {};
+              for (const opt of variant.selectedOptions) {
+                next[opt.name] = opt.value;
+              }
+              return next;
+            });
+          }}
+        />
       </div>
 
       <div className="flex flex-col gap-4 p-5 sm:p-6 sm:pt-12">
@@ -172,7 +142,6 @@ function QuickViewContent({
                         role="radio"
                         aria-checked={isSelected}
                         onClick={() => {
-                          setActiveImageUrl(undefined);
                           setSelectedOptions((current) => ({ ...current, [option.name]: value }));
                         }}
                         disabled={!isOptionSellable}

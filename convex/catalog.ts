@@ -7,7 +7,6 @@ import { getProductPriceRange } from "../lib/catalog/variants";
 import { catalogSearchQuery, createCatalogSearchMatcher, getProductSearchFields } from "../lib/catalog/smart-search";
 import { matchesCatalogFilters, matchesCategoryAttributeFilters, sortOptionValues } from "../lib/catalog/facets";
 import type { Product } from "../lib/catalog/types";
-import { getImagesForVariant } from "../lib/catalog/product-images";
 
 const filtersValidator = v.object({
   minPrice: v.string(),
@@ -46,7 +45,7 @@ const cardValidator = v.object({
 async function card(ctx: QueryCtx, product: Doc<"products">) {
   const priceRange = getProductPriceRange(product);
   const images = await Promise.all(
-    getImagesForVariant(product.images, []).slice(0, 2).map(async (image) => {
+    product.images.map(async (image) => {
       const url = await ctx.storage.getUrl(image.storageId);
       return url ? { url, ...(image.selectedOptions ? { selectedOptions: image.selectedOptions } : {}) } : null;
     }),

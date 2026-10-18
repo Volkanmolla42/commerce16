@@ -7,7 +7,7 @@ import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui";
 import { setQuickBuyItem } from "./quick-buy-store";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
-import { getVariantImages } from "@/lib/catalog/product-images";
+import { getImagesForVariant } from "@/lib/catalog/product-images";
 
 export function QuickBuyButton({ product, variant, buttonVariant = "default" }: { product: Product; variant?: ProductVariant; buttonVariant?: "default" | "outline" }) {
   const router = useRouter();
@@ -21,7 +21,7 @@ export function QuickBuyButton({ product, variant, buttonVariant = "default" }: 
 
     setQuickBuyItem({
       product: selectedVariant
-        ? { ...product, price: selectedVariant.price.amount, images: getVariantImages(product, selectedVariant), title: getProductVariantTitle(product.title, selectedVariant) }
+        ? { ...product, price: selectedVariant.price.amount, images: getImagesForVariant(product.images, selectedVariant.selectedOptions), title: getProductVariantTitle(product.title, selectedVariant) }
         : product,
       quantity: 1,
       variantId: selectedVariant?.id,

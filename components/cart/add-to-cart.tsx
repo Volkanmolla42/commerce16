@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ShoppingBagIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
-import { getVariantImages } from "@/lib/catalog/product-images";
+import { getImagesForVariant } from "@/lib/catalog/product-images";
 import { burstCartConfetti } from "./cart-confetti";
 import { RestockNotificationDialog } from "@/components/product/restock-notification-dialog";
 
@@ -37,7 +37,7 @@ export function AddToCart({
   const isMaxStockReached = cartQuantity >= stockLimit;
   const canAdd = isAvailable && !isMaxStockReached;
   const selectedProduct = selectedVariant
-    ? { ...product, price: selectedVariant.price.amount, images: getVariantImages(product, selectedVariant), title: getProductVariantTitle(product.title, selectedVariant) }
+    ? { ...product, price: selectedVariant.price.amount, images: getImagesForVariant(product.images, selectedVariant.selectedOptions), title: getProductVariantTitle(product.title, selectedVariant) }
     : product;
 
   const handleAdd = (origin?: HTMLElement) => {

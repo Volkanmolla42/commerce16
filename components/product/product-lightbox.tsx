@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { BoltIcon, ShoppingBagIcon } from "@heroicons/react/24/outline";
 import { useCart } from "@/components/cart/cart-context";
 import { setQuickBuyItem } from "@/components/cart/quick-buy-store";
-import { getVariantImages } from "@/lib/catalog/product-images";
+import { getImagesForVariant } from "@/lib/catalog/product-images";
 import {
   getProductVariantTitle,
   getVariantForImage,
@@ -79,7 +79,7 @@ export default function ProductLightbox({
           const selectedProduct: Product = {
             ...product,
             price: variant.price.amount,
-            images: getVariantImages(product, variant),
+            images: getImagesForVariant(product.images, variant.selectedOptions),
             title: getProductVariantTitle(product.title, variant),
           };
 

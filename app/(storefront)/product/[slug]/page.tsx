@@ -201,7 +201,7 @@ async function ProductContent({
       <div className={productPageClassName}>
         {/* Product Details Grid */}
         <div className={productGridClassName}>
-          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <div className="min-w-0 lg:sticky lg:top-24 lg:self-start lg:z-30">
             <Suspense fallback={<ProductGallerySkeleton />}>
               <Gallery key={product.id} product={product} defaultVariant={defaultVariant} />
             </Suspense>

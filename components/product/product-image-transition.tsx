@@ -57,7 +57,9 @@ export function ProductImageLink({
           },
         });
         if (cancelled || !link.current) return;
-        const image = link.current.querySelector("img");
+        const image =
+          link.current.querySelector<HTMLImageElement>("img:not(.opacity-0)") ??
+          link.current.querySelector<HTMLImageElement>("img");
         activeNavigation = {
           productId,
           name,

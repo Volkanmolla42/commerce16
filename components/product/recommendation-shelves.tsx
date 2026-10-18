@@ -17,7 +17,7 @@ import {
   recordRecentProduct,
 } from "@/lib/catalog/recommendations";
 import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
-import { getProductImages, getVariantImages } from "@/lib/catalog/product-images";
+import { getImagesForVariant } from "@/lib/catalog/product-images";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
 import { trackPixelViewContent } from "@/lib/analytics/meta-pixel";
 
@@ -72,12 +72,11 @@ function ShelfCartAction({
   );
 }
 
-export function Shelf({ title, products, showCartActions = false, upsellSources, layout = "scroll", bordered = true, headerAction }: {
+export function Shelf({ title, products, showCartActions = false, upsellSources, bordered = true, headerAction }: {
   title: string;
   products: Product[];
   showCartActions?: boolean;
   upsellSources?: Map<string, CartItem>;
-  layout?: "scroll" | "centered";
   bordered?: boolean;
   headerAction?: ReactNode;
 }) {
@@ -99,25 +98,20 @@ export function Shelf({ title, products, showCartActions = false, upsellSources,
       needsVariant: Boolean(product.variants?.length && !defaultVariant),
       href: params ? `/product/${product.slug}?${params.toString()}` : `/product/${product.slug}`,
       selectedProduct: defaultVariant
-        ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getVariantImages(product, defaultVariant) }
+        ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getImagesForVariant(product.images, defaultVariant.selectedOptions) }
         : product,
     };
   };
 
   return (
     <section className={`py-8 ${bordered ? "mt-12 border-t border-neutral-200 dark:border-neutral-800" : ""}`} aria-label={title}>
-      <div className={`${layout === "centered" ? "mx-auto max-w-5xl" : ""} mb-5 flex items-center justify-between gap-4`}>
+      <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">{title}</h2>
         {headerAction}
       </div>
       <ProductGrid
         products={products}
-        layout={layout === "centered" ? "grid" : "scroll"}
-        className={layout === "centered"
-          ? `mx-auto ${products.length === 1 ? "max-w-xs grid-cols-1" : products.length === 2 ? "max-w-2xl grid-cols-2" : "max-w-5xl grid-cols-2 sm:grid-cols-3"} gap-3 sm:gap-4`
-          : undefined}
-        imageSizes={layout === "centered" ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
-        prioritizeFirst={layout === "centered"}
+        layout="scroll"
         href={(product) => resolveProduct(product).href}
         action={showCartActions ? (product) => {
           const { defaultVariant, upsellSource, needsVariant, selectedProduct, href } = resolveProduct(product);
@@ -167,20 +161,26 @@ export function PersonalizedRecommendationShelf({ products }: { products: Produc
   ];
   const excluded = [...new Set([...items.map(({ product }) => product.slug), ...recentSlugs.slice(0, 2)])];
   const personalized = rankProductRecommendations(products, sources, excluded, 8);
-  const recommendations = personalized.length > 0
-    ? personalized
-    : products
-        .filter((product) => product.availableForSale)
-        .toSorted((a, b) => a.title.localeCompare(b.title, "tr"))
-        .slice(0, 8);
+  const recommendedIds = new Set(personalized.map((product) => product.id));
+  const recommendations = [
+    ...personalized,
+    ...products
+      .filter((product) => product.availableForSale && !recommendedIds.has(product.id))
+      .toSorted((a, b) => a.title.localeCompare(b.title, "tr")),
+  ].slice(0, 3);
 
-  const title = items.length > 0
-    ? "Sepetiniz için seçtiklerimiz"
-    : recentSlugs.length > 0
-      ? "Sizin için seçtiklerimiz"
-      : "Öne çıkan ürünler";
+  const title = items.length > 0 ? "Sepetiniz için seçtiklerimiz" : "Sizin için seçtiklerimiz";
 
-  return <Shelf title={title} products={recommendations.slice(0, 3)} layout="centered" />;
+  if (recommendations.length === 0) return null;
+
+  return (
+    <section className="py-7 sm:py-9" aria-label={title}>
+      <div className="mb-4 flex items-center justify-between gap-4 sm:mb-5">
+        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h2>
+      </div>
+      <ProductGrid products={recommendations} />
+    </section>
+  );
 }
 
 export function BoughtTogetherShelf({
@@ -217,11 +217,11 @@ export function BoughtTogetherShelf({
   const recommendations = purchasedTogether.length > 0
     ? purchasedTogether.slice(0, 8)
     : rankProductRecommendations(
-        products,
-        sources.map((product) => ({ product, weight: 1.5 })),
-        [...sourceSlugSet],
-        8,
-      );
+      products,
+      sources.map((product) => ({ product, weight: 1.5 })),
+      [...sourceSlugSet],
+      8,
+    );
 
   const hasPurchaseData = Boolean(purchasePairs?.some(({ productId }) => products.some((product) => product.id === productId)));
   return (
@@ -244,7 +244,7 @@ export function mapRecommendationProduct(product: NonNullable<ReturnType<typeof 
     soldCount: product.soldCount ?? 0,
     availableForSale: product.availableForSale,
     categorySlug: product.categorySlug,
-    images: getProductImages(product).slice(0, 2),
+    images: product.images.slice(0, 2),
     options: product.options,
     variants: product.variants.map(({ price, ...variant }) => ({
       ...variant,

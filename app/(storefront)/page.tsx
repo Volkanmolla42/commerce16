@@ -1,9 +1,10 @@
-import { CategoryShortcuts, HomeHero, HomeProductShelf, HomeValueProps } from "@/components/home/home-sections";
+import { CategoryShortcuts, HomeHero, HomeValueProps } from "@/components/home/home-sections";
+import Link from "next/link";
+import { ProductGrid } from "@/components/product/product-grid";
 import { baseUrl } from "@/lib/utils";
 import { getCategories, getRecommendationCatalog, getStoreSettings } from "@/lib/catalog";
 import { PersonalizedRecommendationShelf } from "@/components/product/recommendation-shelves";
 import type { Metadata } from "next";
-import { getProductImages } from "@/lib/catalog/product-images";
 
 export const prefetch = "partial";
 
@@ -100,11 +101,26 @@ export default async function HomePage() {
         <HomeHero
           storeName={storeName}
           slogan={slogan}
-          featuredProduct={availableProducts.find((product) => getProductImages(product).length > 0)}
+          featuredProduct={availableProducts.find((product) => product.images.length > 0)}
           hasCategories={categories.some((category) => category.slug !== "")}
         />
         <CategoryShortcuts categories={categories} />
-        <HomeProductShelf title="Öne Çıkan Ürünler" products={availableProducts.slice(0, 10)} />
+        {availableProducts.length > 0 ? (
+          <section className="py-7 sm:py-9" aria-label="Öne Çıkan Ürünler">
+            <div className="mb-4 flex items-center justify-between gap-4 sm:mb-5">
+              <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                Öne Çıkan Ürünler
+              </h2>
+              <Link
+                href="/search"
+                className="shrink-0 rounded-md border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                Tümünü Gör
+              </Link>
+            </div>
+            <ProductGrid products={availableProducts.slice(0, 10)} />
+          </section>
+        ) : null}
         <PersonalizedRecommendationShelf products={products} />
         <HomeValueProps freeShippingThreshold={freeShippingThreshold} />
       </div>

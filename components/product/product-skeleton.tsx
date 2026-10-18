@@ -37,7 +37,7 @@ export function ProductDescriptionSkeleton() {
       role="status"
       aria-label="Ürün bilgileri yükleniyor"
       aria-busy="true"
-      className="mx-auto w-full max-w-[640px]"
+      className="mx-auto w-full max-w-[640px] lg:mx-0"
     >
       <div aria-hidden="true" className="motion-safe:animate-pulse">
         <div className="border-b border-border pb-5">

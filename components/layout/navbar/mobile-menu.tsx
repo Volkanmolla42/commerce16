@@ -24,7 +24,6 @@ import { useConvexAuth } from "@convex-dev/auth/react";
 import { useFavorites } from "@/components/favorites/favorites-context";
 import { useCart } from "@/components/cart/cart-context";
 import StoreInitial from "@/components/store-initial";
-import { getProductImages } from "@/lib/catalog/product-images";
 import type { Category } from "@/lib/catalog/types";
 
 import { useQuery } from "convex/react";
@@ -313,7 +312,7 @@ function CategoryProducts({
   return (
     <ul className="grid grid-cols-2 gap-2.5">
       {products.map((product) => {
-        const imageUrl = getProductImages(product)[0]?.url;
+        const imageUrl = product.images[0]?.url;
         return (
           <li key={product._id}>
             <Link

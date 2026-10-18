@@ -88,7 +88,7 @@ export function ProductDescription({
     : undefined;
 
   return (
-    <section className="mx-auto w-full max-w-[640px]">
+    <section className="mx-auto w-full max-w-[640px] lg:mx-0">
       <header className="border-b border-border pb-5">
         <div className="flex items-start justify-between gap-3">
           <h1 className="min-w-0 flex-1 text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl xl:text-4xl">

@@ -1,50 +1,52 @@
 "use client";
 
-import clsx from "clsx";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Price from "@/components/price";
-import { getProductImages } from "@/lib/catalog/product-images";
 import { getProductPriceRange } from "@/lib/catalog/variants";
 import { ProductBadges } from "./product-badges";
 import { ProductCardActions } from "./product-card-actions";
 import type { Product } from "@/lib/catalog/types";
-
-const defaultImageSizes =
-  "(min-width: 1536px) 386px, (min-width: 1024px) calc(33.333vw - 126px), (min-width: 768px) calc(50vw - 181px), calc(50vw - 1.5rem)";
+import { cn } from "@/lib/utils";
 
 const scrollGridClassName =
   "grid-flow-col auto-cols-[minmax(11rem,72vw)] gap-3 overflow-x-auto pb-3 [scroll-snap-type:x_mandatory] [scrollbar-width:thin] [&>*]:[scroll-snap-align:start] sm:auto-cols-[14rem] sm:gap-4 lg:auto-cols-[16rem]";
 
-/** Ürünleri tek biçimde render eden liste. `layout="scroll"` yatay raf, varsayılan ızgara. */
+interface ProductGridProps {
+  products: Product[];
+  layout?: "grid" | "scroll";
+  className?: string;
+  href?: (product: Product) => string;
+  action?: (product: Product) => ReactNode;
+}
+
 export function ProductGrid({
   products,
   layout = "grid",
   className,
-  imageSizes = defaultImageSizes,
-  prioritizeFirst = true,
   href,
   action,
-}: {
-  products: Product[];
-  layout?: "grid" | "scroll";
-  className?: string;
-  imageSizes?: string;
-  prioritizeFirst?: boolean;
-  href?: (product: Product) => string;
-  action?: (product: Product) => ReactNode;
-}) {
+}: ProductGridProps) {
+  if (products.length === 0) return null;
+
   return (
-    <ul className={clsx("grid gap-4", layout === "scroll" && scrollGridClassName, className)}>
+    <ul
+      className={cn(
+        "grid gap-4",
+        layout === "scroll"
+          ? scrollGridClassName
+          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+        className
+      )}
+    >
       {products.map((product, index) => (
         <li key={product.slug} className="animate-fade-in">
           <ProductCard
             product={product}
             href={href?.(product)}
-            imageSizes={imageSizes}
-            priority={prioritizeFirst && index < 2}
+            priority={layout !== "scroll" && index < 2}
             action={action?.(product)}
           />
         </li>
@@ -56,52 +58,80 @@ export function ProductGrid({
 function ProductCard({
   product,
   href,
-  imageSizes,
   priority = false,
   action,
 }: {
   product: Product;
   href?: string;
-  imageSizes: string;
   priority?: boolean;
   action?: ReactNode;
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const images = product.images.slice(0, 4);
+  const hasMultipleImages = images.length > 1;
   const priceRange = getProductPriceRange(product);
-  const images = getProductImages(product);
-  const imageUrl = images[0]?.url;
-  const hoverImageUrl = images[1]?.url;
+  const imageSizes = "(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw";
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-blue-500/40 hover:shadow-lg">
+    <article
+      onMouseLeave={() => setActiveIndex(0)}
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-blue-500/40 hover:shadow-lg"
+    >
       <ProductImageLink
         productId={product.id}
         href={href ?? `/product/${product.slug}`}
         className="flex h-full flex-col"
       >
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-900">
-          {imageUrl ? (
+          {images.length > 0 ? (
             <ProductImageTransition>
-              <Image
-                src={imageUrl}
-                alt={product.title}
-                fill
-                sizes={imageSizes}
-                loading={priority ? "eager" : "lazy"}
-                fetchPriority={priority ? "high" : undefined}
-                className="object-cover"
-              />
+              {images.map((img, index) => (
+                <Image
+                  key={img.url}
+                  src={img.url}
+                  alt={product.title}
+                  fill
+                  sizes={imageSizes}
+                  loading={priority && index === 0 ? "eager" : "lazy"}
+                  fetchPriority={priority && index === 0 ? "high" : "low"}
+                  className={cn(
+                    "object-cover transition-opacity duration-300 ease-out",
+                    index === activeIndex
+                      ? "opacity-100"
+                      : "opacity-0 pointer-events-none"
+                  )}
+                />
+              ))}
             </ProductImageTransition>
           ) : null}
-          {hoverImageUrl && hoverImageUrl !== imageUrl ? (
-            <Image
-              src={hoverImageUrl}
-              alt=""
-              fill
-              sizes={imageSizes}
-              loading="lazy"
-              fetchPriority="low"
-              className="pointer-events-none absolute inset-0 z-[1] hidden object-cover opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100 motion-reduce:transition-none [@media(hover:hover)]:block"
-            />
+          {hasMultipleImages ? (
+            <div
+              className="absolute inset-0 z-[1] flex"
+              onMouseLeave={() => setActiveIndex(0)}
+            >
+              {images.map((_, index) => (
+                <span
+                  key={index}
+                  className="h-full flex-1"
+                  onMouseEnter={() => setActiveIndex(index)}
+                />
+              ))}
+            </div>
+          ) : null}
+          {hasMultipleImages ? (
+            <div className="pointer-events-none absolute bottom-2 inset-x-2 z-10 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+              {images.map((_, index) => (
+                <span
+                  key={index}
+                  className={cn(
+                    "h-0.5 flex-1 rounded-full transition-all duration-150",
+                    index === activeIndex
+                      ? "bg-white shadow-[0_1px_3px_rgba(0,0,0,0.6)]"
+                      : "bg-white/40 shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
+                  )}
+                />
+              ))}
+            </div>
           ) : null}
           <div className="pointer-events-none absolute left-2 top-2 z-10">
             <ProductBadges
@@ -114,9 +144,9 @@ function ProductCard({
           </div>
         </div>
         <div className="flex flex-1 flex-col justify-between space-y-1.5 p-3 sm:p-3.5">
-          <h2 className="line-clamp-2 text-xs font-medium leading-snug text-foreground sm:text-[13px]">
+          <h3 className="line-clamp-2 text-xs font-medium leading-snug text-foreground sm:text-[13px]">
             {product.title}
-          </h2>
+          </h3>
           <Price
             amount={priceRange.min}
             maxAmount={priceRange.max}

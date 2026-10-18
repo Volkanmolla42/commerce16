@@ -8,8 +8,6 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import type { Category, Product } from "@/lib/catalog/types";
-import { ProductGrid } from "@/components/product/product-grid";
-import { getProductImages } from "@/lib/catalog/product-images";
 import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 
 import { formatMoney } from "@/lib/format-money";
@@ -106,7 +104,7 @@ export function HomeHero({
   featuredProduct?: Product;
   hasCategories: boolean;
 }) {
-  const heroImage = featuredProduct ? getProductImages(featuredProduct)[0] : undefined;
+  const heroImage = featuredProduct?.images[0];
   const heading = slogan?.trim() || storeName;
 
   return (
@@ -166,44 +164,6 @@ export function HomeHero({
           </div>
         </ProductImageLink>
       ) : null}
-    </section>
-  );
-}
-
-export function HomeProductShelf({ title, products }: { title: string; products: Product[] }) {
-  if (products.length === 0) return null;
-  const fitsRow = products.length <= 4;
-  const compactColumns = products.length === 1
-    ? "grid-cols-1"
-    : products.length === 2
-      ? "grid-cols-2"
-      : products.length === 3
-        ? "grid-cols-2 lg:grid-cols-3"
-        : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
-  const shelfWidth = products.length === 1
-    ? "mx-auto max-w-sm"
-    : fitsRow ? "mx-auto max-w-5xl" : "";
-
-  return (
-    <section className="py-7 sm:py-9" aria-label={title}>
-      <div className={`${shelfWidth} mb-4 flex items-center justify-between gap-4 sm:mb-5`}>
-        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h2>
-        <Link
-          href="/search"
-          className="shrink-0 rounded-md border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          Tümünü Gör
-        </Link>
-      </div>
-      <ProductGrid
-        products={products}
-        layout={fitsRow ? "grid" : "scroll"}
-        className={fitsRow ? `${shelfWidth} ${compactColumns} gap-3 sm:gap-4` : undefined}
-        imageSizes={products.length === 1
-          ? "(min-width: 640px) 384px, calc(100vw - 2rem)"
-          : fitsRow ? "(min-width: 1024px) 320px, (min-width: 640px) 224px, 50vw" : "(min-width: 1024px) 256px, (min-width: 640px) 224px, 72vw"}
-        prioritizeFirst
-      />
     </section>
   );
 }

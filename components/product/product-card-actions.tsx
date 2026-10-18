@@ -11,7 +11,7 @@ import { notifyProductAddedToCart } from "@/components/cart/product-cart-feedbac
 import {
   getProductVariantTitle,
 } from "@/lib/catalog/variants";
-import { getVariantImages } from "@/lib/catalog/product-images";
+import { getImagesForVariant } from "@/lib/catalog/product-images";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 
 export function ProductCardActions({ product }: { product: Product }) {
@@ -27,7 +27,7 @@ export function ProductCardActions({ product }: { product: Product }) {
     const itemVariant = variant ?? singleVariant;
     if (!itemVariant) return { configuredProduct: product, itemVariant: undefined };
 
-    const variantImages = getVariantImages(product, itemVariant);
+    const variantImages = getImagesForVariant(product.images, itemVariant.selectedOptions);
     return {
       configuredProduct: {
         ...product,

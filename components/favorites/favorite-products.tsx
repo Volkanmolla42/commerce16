@@ -25,11 +25,7 @@ export function FavoriteProducts() {
   return (
     <section className="space-y-6">
       {favoriteProducts.length ? (
-        <ProductGrid
-          products={favoriteProducts}
-          className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-          imageSizes="(min-width: 1280px) 18vw, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, 50vw"
-        />
+        <ProductGrid products={favoriteProducts} />
       ) : (
         <Card className="rounded-3xl border-border bg-card p-12 text-center shadow-xs">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
