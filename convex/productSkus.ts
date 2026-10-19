@@ -28,9 +28,9 @@ export function normalizeVariantSkus<T extends ProductWithSkus>(product: T): T {
   return normalized;
 }
 
-export async function syncProductSkus(
+export async function validateProductSkus(
   ctx: MutationCtx,
-  productId: Id<"products">,
+  productId: Id<"products"> | null,
   product: ProductWithSkus,
 ) {
   const entries = (product.variants ?? []).flatMap((variant) => {
@@ -49,6 +49,16 @@ export async function syncProductSkus(
       throw new Error(`${entry.sku} SKU kodu başka bir üründe kullanılıyor.`);
     }
   }
+
+  return entries;
+}
+
+export async function syncProductSkus(
+  ctx: MutationCtx,
+  productId: Id<"products">,
+  product: ProductWithSkus,
+) {
+  const entries = await validateProductSkus(ctx, productId, product);
 
   const existing = await ctx.db.query("productSkus")
     .withIndex("by_product", (q) => q.eq("productId", productId))

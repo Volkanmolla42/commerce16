@@ -20,7 +20,6 @@ import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { ExportMenu } from "../_components/export-button";
-import { ProductImportDialog } from "./_components/product-import-dialog";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -50,7 +49,6 @@ export default function AdminProductsPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "active" | "inactive">("all");
-  const [importOpen, setImportOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -103,15 +101,11 @@ export default function AdminProductsPage() {
     <>
       <AdminHeaderAction route={adminPath("products")}>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 cursor-pointer"
-            onClick={() => setImportOpen(true)}
-          >
-            <ArrowUpTrayIcon className="size-4" />
-            <span>İçe Aktar</span>
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 cursor-pointer">
+            <Link href={adminPath("products/import")}>
+              <ArrowUpTrayIcon className="size-4" />
+              <span>İçe Aktar</span>
+            </Link>
           </Button>
           <Button asChild size="sm" className="h-9 gap-1.5 cursor-pointer">
             <Link href={adminPath("products/add")}>
@@ -385,12 +379,6 @@ export default function AdminProductsPage() {
           </nav>
         )}
       </Card>
-
-      <ProductImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onSuccess={refresh}
-      />
     </>
   );
 }

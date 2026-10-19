@@ -261,7 +261,9 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
   const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const [theme, setTheme] = useState(initialTheme);
   const pathname = usePathname();
-  const pageTitle = allNavItems.find((item) => isActive(pathname, item.href))?.label ?? "Yönetim paneli";
+  const pageTitle = pathname === adminPath("products/import")
+    ? "İçe Aktar"
+    : allNavItems.find((item) => isActive(pathname, item.href))?.label ?? "Yönetim paneli";
   const storeSettings = useQuery(api.settings.getStoreSettings, {});
   const storeName = storeSettings?.storeName || "Mağaza";
   const logoUrl = storeSettings?.logoUrl || "";

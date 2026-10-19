@@ -14,6 +14,7 @@ import {
   normalizeVariantSkus,
   normalizeSku,
   syncProductSkus,
+  validateProductSkus,
 } from "./productSkus";
 import { resolveDescriptionImages, resolvePublicImages } from "./productMedia";
 import {
@@ -339,6 +340,24 @@ export const getByIdAdmin = query({
   },
 });
 
+export const existingSlugsAdmin = query({
+  args: { adminSecret: v.string(), slugs: v.array(v.string()) },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+    if (args.slugs.length > 100) throw new Error("En fazla 100 ürün adresi kontrol edilebilir.");
+    const unique = [...new Set(args.slugs)];
+    const found = await Promise.all(unique.map(async (slug) => {
+      const product = await ctx.db
+        .query("products")
+        .withIndex("by_slug", (q) => q.eq("slug", slug))
+        .first();
+      return product ? slug : null;
+    }));
+    return found.filter((slug): slug is string => slug !== null);
+  },
+});
+
 export const list = query({
   args: {
     limit: v.optional(v.number()),
@@ -462,6 +481,10 @@ const importProductInputValidator = v.object({
   categorySlug: v.optional(v.string()),
   description: v.optional(v.string()),
   availableForSale: v.boolean(),
+  attributes: v.optional(v.array(v.object({
+    key: v.string(),
+    value: v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+  }))),
   options: v.array(v.object({
     id: v.string(),
     name: v.string(),
@@ -507,8 +530,16 @@ export const importBatchAdmin = mutation({
 
     for (const item of args.products) {
       try {
+        const existing = await ctx.db
+          .query("products")
+          .withIndex("by_slug", (q) => q.eq("slug", item.slug))
+          .first();
+
         const productData = {
           ...item,
+          ...(item.attributes === undefined && existing?.attributes
+            ? { attributes: existing.attributes }
+            : {}),
           images: item.images ?? [],
           variants: item.variants.map((v) => ({
             ...v,
@@ -516,13 +547,9 @@ export const importBatchAdmin = mutation({
           })),
         };
         const normalized = normalizeVariantSkus(productData);
+        await validateProductSkus(ctx, existing?._id ?? null, normalized);
         validateProductVariantsAndOptions(normalized);
         await validateProductAttributes(ctx, normalized);
-
-        const existing = await ctx.db
-          .query("products")
-          .withIndex("by_slug", (q) => q.eq("slug", normalized.slug))
-          .first();
 
         const updatedAt = new Date().toISOString();
 
