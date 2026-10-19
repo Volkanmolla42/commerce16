@@ -148,6 +148,7 @@ export function OrdersKanban({
                                 {...dragProvided.draggableProps}
                                 {...dragProvided.dragHandleProps}
                                 style={dragProvided.draggableProps.style}
+                                role="button"
                                 onClick={() => onOpenOrder(order)}
                                 className={`group rounded-lg border border-border bg-card p-3 space-y-2 select-none transition-all cursor-grab active:cursor-grabbing hover:border-foreground/30 hover:shadow-xs ${
                                   dragSnapshot.isDragging
@@ -173,8 +174,8 @@ export function OrdersKanban({
 
                                 {/* 2. Sipariş İçeriği: Kartın Odak Noktası */}
                                 <div className="space-y-1 py-0.5">
-                                  {order.items.slice(0, 2).map((item, idx) => (
-                                    <div key={idx} className="flex items-start gap-1.5 text-xs leading-snug">
+                                  {order.items.slice(0, 2).map((item) => (
+                                    <div key={`${item.productId}-${item.variantId ?? ""}`} className="flex items-start gap-1.5 text-xs leading-snug">
                                       <span className="font-mono font-semibold text-foreground/80 shrink-0">
                                         {item.quantity}×
                                       </span>
@@ -225,7 +226,15 @@ export function OrdersKanban({
                 {col.orders.map((order) => (
                   <div
                     key={order._id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onOpenOrder(order)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onOpenOrder(order);
+                      }
+                    }}
                     className="rounded-lg border border-border bg-card p-3 space-y-2 cursor-pointer"
                   >
                     <div className="flex items-center justify-between gap-1.5">
@@ -243,8 +252,8 @@ export function OrdersKanban({
                       </div>
                     </div>
                     <div className="space-y-1 py-0.5">
-                      {order.items.slice(0, 2).map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-1.5 text-xs leading-snug">
+                      {order.items.slice(0, 2).map((item) => (
+                        <div key={`${item.productId}-${item.variantId ?? ""}`} className="flex items-start gap-1.5 text-xs leading-snug">
                           <span className="font-mono font-semibold text-foreground/80 shrink-0">
                             {item.quantity}×
                           </span>

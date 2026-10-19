@@ -224,11 +224,11 @@ export default function OrderSuccessClient({ orderId, token, quickBuy }: { order
 
             <CardContent className="p-6">
               <div className="space-y-4">
-                {order.items.map((item, idx) => {
+                {order.items.map((item) => {
                   const lineTotal = Number(item.price || 0) * item.quantity;
                   return (
                     <div
-                      key={`${item.productId}:${item.variantId ?? ""}:${idx}`}
+                      key={`${item.productId}:${item.variantId ?? ""}`}
                       className="flex items-center justify-between gap-4 border-b border-border/50 pb-4 last:border-b-0 last:pb-0"
                     >
                       <div className="flex items-center gap-3.5 min-w-0 flex-1">

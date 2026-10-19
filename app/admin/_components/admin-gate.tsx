@@ -77,7 +77,6 @@ export function AdminGate() {
               maxLength={6}
               placeholder="••••••"
               required
-              autoFocus
               value={pin}
               onChange={(event) => {
                 setPin(event.target.value.replace(/\D/g, "").slice(0, 6));

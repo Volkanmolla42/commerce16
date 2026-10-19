@@ -94,7 +94,7 @@ export function CategoryAttributeOptionsInput({
         <div role="list" aria-label="Eklenen seçenekler" className="flex flex-wrap items-center gap-1.5">
           {options.map((option, index) => (
             <span
-              key={`${option}-${index}`}
+              key={option}
               role="listitem"
               className="inline-flex items-center gap-1 rounded-lg bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
             >

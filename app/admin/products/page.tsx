@@ -24,7 +24,7 @@ import { ProductImportDialog } from "./_components/product-import-dialog";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
-import { type Category } from "./_components/product-editor";
+import { type Category } from "./_components/product-editor-helpers";
 
 type Product = {
   _id: string;

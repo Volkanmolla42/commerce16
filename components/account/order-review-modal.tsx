@@ -235,6 +235,7 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
                       </div>
 
                       <textarea
+                        aria-label={`${item.title} için ürün yorumu`}
                         placeholder="Bu ürün hakkında ne düşünüyorsunuz? Kalite, kumaş, ebat veya kullanım deneyiminizi paylaşın..."
                         rows={2}
                         value={currentComment}
@@ -265,10 +266,10 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Mağaza & Paketleme Puanı */}
                 <div className="space-y-1.5 bg-background/80 p-3 rounded-xl border border-border">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <BuildingStorefrontIcon className="h-4 w-4 text-primary" />
                     <span>Paketleme & Hizmet Kalitesi</span>
-                  </label>
+                  </span>
                   <div className="flex items-center gap-2">
                     <StarRating
                       rating={storeRating}
@@ -283,10 +284,10 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
 
                 {/* Kargo & Teslimat Puanı */}
                 <div className="space-y-1.5 bg-background/80 p-3 rounded-xl border border-border">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <TruckIcon className="h-4 w-4 text-primary" />
                     <span>Kargo Hızı & Teslimat Süreci</span>
-                  </label>
+                  </span>
                   <div className="flex items-center gap-2">
                     <StarRating
                       rating={deliveryRating}
@@ -302,10 +303,11 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
 
               {/* Mağazaya Özel Geri Bildirim */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
+                <label htmlFor="store-feedback" className="text-xs font-medium text-muted-foreground">
                   Mağazaya iletmek istediğiniz özel görüş veya öneriniz (opsiyonel):
                 </label>
                 <textarea
+                  id="store-feedback"
                   placeholder="Kargo süreci, paketleme veya mağaza hizmetimiz hakkında geri bildiriminizi yazabilirsiniz..."
                   rows={2}
                   value={storeComment}

@@ -217,9 +217,9 @@ export default function AccountOrderDetailsClient({
         </CardHeader>
         <CardContent className="p-6">
           <div className="divide-y divide-border/60">
-            {order.items.map((item, idx) => (
+            {order.items.map((item) => (
               <div
-                key={`${item.productId}-${item.variantId ?? idx}`}
+                key={`${item.productId}-${item.variantId ?? ""}`}
                 className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"
               >
                 <div className="flex items-center gap-4 min-w-0">

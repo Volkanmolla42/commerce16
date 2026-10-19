@@ -12,8 +12,8 @@ type ResourceState<T> = {
 
 async function adminRequest<T>(url: string, options: RequestInit, fallback: string): Promise<T> {
   const response = await fetch(url, options);
-  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
     const message =
       payload && typeof payload === "object" && "error" in payload &&
       typeof payload.error === "string"
@@ -21,6 +21,7 @@ async function adminRequest<T>(url: string, options: RequestInit, fallback: stri
         : fallback;
     throw new Error(message || fallback);
   }
+  const payload: unknown = await response.json().catch(() => null);
   if (payload === null) throw new Error(fallback);
   return payload as T;
 }

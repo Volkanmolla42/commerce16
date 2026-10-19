@@ -50,7 +50,7 @@ export function CategoryEditor({
   const [title, setTitle] = useState(category?.title || "");
   const [description, setDescription] = useState(category?.description || "");
   const [attributes, setAttributes] = useState<CategoryAttributeDefinition[]>(category?.attributes ?? []);
-  const [imageStorageId, setImageStorageId] = useState<Id<"_storage"> | null>(category?.imageStorageId ?? null);
+  const imageStorageIdRef = useRef<Id<"_storage"> | null>(category?.imageStorageId ?? null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(category?.imageUrl ?? null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export function CategoryEditor({
     previewUrlRef.current = previewUrl;
     setImagePreviewUrl(previewUrl);
     setPendingImage(file);
-    setImageStorageId(null);
+    imageStorageIdRef.current = null;
     setError(null);
   };
 
@@ -92,7 +92,7 @@ export function CategoryEditor({
     previewUrlRef.current = null;
     setImagePreviewUrl(null);
     setPendingImage(null);
-    setImageStorageId(null);
+    imageStorageIdRef.current = null;
   };
 
   const addAttribute = () => {
@@ -183,7 +183,7 @@ export function CategoryEditor({
     try {
       const nextImageStorageId = pendingImage
         ? (uploadedImageId = await uploadCategoryImage(pendingImage))
-        : imageStorageId;
+        : imageStorageIdRef.current;
       await runAdminAction(category ? "category.update" : "category.create", {
         ...input,
         imageStorageId: nextImageStorageId,

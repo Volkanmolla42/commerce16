@@ -58,7 +58,7 @@ function AdminSettingsContent() {
   const { data, error, loading, refresh } =
     useAdminResource<StoreSettings>("settings");
   const [edits, setEdits] = useState<SettingsEdits>({});
-  const [logoEdit, setLogoEdit] = useState<string | null | undefined>(undefined);
+  const logoEditRef = useRef<string | null | undefined>(undefined);
   const [pendingLogo, setPendingLogo] = useState<{ blob: Blob; previewUrl: string } | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const previewUrl = useRef<string | null>(null);
@@ -69,8 +69,6 @@ function AdminSettingsContent() {
   useEffect(() => () => {
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
   }, []);
-
-  const logoStorageId = logoEdit !== undefined ? logoEdit : (data?.logoStorageId ?? null);
 
   const text = (key: TextSettingKey) => edits[key] ?? data?.[key] ?? "";
   const isOpen = edits.isOpen ?? data?.isOpen ?? true;
@@ -108,7 +106,7 @@ function AdminSettingsContent() {
     setActionError(null);
 
     try {
-      let nextLogoId = logoStorageId;
+      let nextLogoId = logoEditRef.current !== undefined ? logoEditRef.current : (data?.logoStorageId ?? null);
       if (pendingLogo) {
         setUploadingLogo(true);
         let logoError = false;
@@ -162,7 +160,7 @@ function AdminSettingsContent() {
       });
       setEdits({});
       setPendingLogo(null);
-      setLogoEdit(nextLogoId);
+      logoEditRef.current = nextLogoId;
       setMessage("Mağaza ayarları kaydedildi.");
       await refresh();
     } catch (cause) {
@@ -256,7 +254,7 @@ function AdminSettingsContent() {
                     disabled={saving}
                     onClick={() => {
                       setPendingLogo(null);
-                      setLogoEdit(null);
+                      logoEditRef.current = null;
                     }}
                     className="text-xs text-destructive hover:text-destructive"
                   >

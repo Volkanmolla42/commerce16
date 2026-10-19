@@ -58,9 +58,9 @@ export function CartStockAlertModal({
         </DialogHeader>
 
         <div className="divide-y divide-border/60 max-h-64 overflow-y-auto my-2">
-          {items.map((item, idx) => (
+          {items.map((item) => (
             <div
-              key={`${item.id}:${item.variantId ?? ""}:${idx}`}
+              key={`${item.id}:${item.variantId ?? ""}`}
               className="flex items-center gap-3 py-3 first:pt-1 last:pb-1"
             >
               <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">

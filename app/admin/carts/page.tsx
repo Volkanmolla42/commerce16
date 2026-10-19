@@ -233,8 +233,8 @@ function CartDetailModal({
             </div>
 
             <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">
-              {cart.items.map((item, index) => (
-                <div key={`${item.productId}-${item.variantId ?? index}`} className="flex items-center gap-3.5 p-3.5">
+              {cart.items.map((item) => (
+                <div key={`${item.productId}-${item.variantId ?? ""}`} className="flex items-center gap-3.5 p-3.5">
                   <div className="relative size-12 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
                     {item.image ? (
                       <Image

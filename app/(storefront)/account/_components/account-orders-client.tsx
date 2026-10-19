@@ -154,9 +154,9 @@ export default function AccountOrdersPage() {
           {/* Sipariş Ürünleri Önizleme */}
           <CardContent className="p-6">
             <div className="space-y-3">
-              {order.items.map((item, idx) => (
+              {order.items.map((item) => (
                 <div
-                  key={`${item.productId}-${item.variantId ?? idx}`}
+                  key={`${item.productId}-${item.variantId ?? ""}`}
                   className="flex items-center justify-between gap-4 border-b border-border/50 pb-3 last:border-b-0 last:pb-0"
                 >
                   <div className="flex items-center gap-3 min-w-0">

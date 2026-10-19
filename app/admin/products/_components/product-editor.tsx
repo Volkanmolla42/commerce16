@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,328 +9,41 @@ import { AdminLoading, AdminNotice } from "../../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
 import { adminPath } from "@/lib/admin/routes";
-import { type CategoryAttributeDefinition, type ProductAttribute } from "@/lib/catalog/attributes";
+import { type ProductAttribute } from "@/lib/catalog/attributes";
 import {
-  AdjustmentsHorizontalIcon,
-  ArrowPathIcon,
   CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   DocumentArrowDownIcon,
   GlobeAltIcon,
-  PlusCircleIcon,
   PlusIcon,
-  TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
-  AttributeBooleanToggle,
-  AttributeMultiSelect,
-  AttributeNumberInput,
-  AttributeSingleSelect,
-} from "./attribute-field-inputs";
-import { VariantOptionValuesInput } from "./variant-option-values-input";
-
-type StoredImage = NonNullable<Doc<"products">["images"]>[number] & {
-  url: string | null;
-};
-export type Product = Omit<Doc<"products">, "priceValue" | "images"> & {
-  images: StoredImage[];
-  descriptionImages: { storageId: string; url: string | null }[];
-};
-export type Category = Doc<"categories">;
-type ResolvedPendingImage = { storageId: string; fileName: string; kind: "gallery" | "description"; selectedOptions?: { name: string; value: string }[] };
-type PendingImage = {
-  id: string;
-  blob: Blob;
-  fileName: string;
-  previewUrl: string;
-  kind: "gallery" | "description";
-  status: "uploading" | "uploaded" | "error";
-  storageId?: string;
-  uploadPromise?: Promise<string | null>;
-  selectedOptions?: { name: string; value: string }[];
-};
-type ExitState = {
-  isExisting: boolean;
-  saved: boolean;
-  title: string;
-  slug: string;
-  categorySlug: string;
-  description: string;
-  descriptionImageStorageIds: string[];
-  attributeValues: Record<string, string | string[]>;
-  categoryAttributes: CategoryAttributeDefinition[];
-  variantOptions: { id: string; name: string; values: string[] }[];
-  variantRows: VariantDraft[];
-  pendingImages: PendingImage[];
-};
-type VariantOptionDraft = { id: string; name: string; values: string[] };
-type VariantDraft = {
-  id?: string;
-  selectedOptions: { name: string; value: string }[];
-  sku: string;
-  barcode?: string;
-  price: string;
-  compareAtPrice: string;
-  stockQuantity: string;
-  availableForSale: boolean;
-};
-
-async function convertImageToWebp(file: File) {
-  if (!file.type.startsWith("image/")) throw new Error("Yalnızca görsel dosyaları yüklenebilir.");
-
-  const sourceUrl = URL.createObjectURL(file);
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const element = new window.Image();
-      element.onload = () => resolve(element);
-      element.onerror = () => reject(new Error("Görsel açılamadı."));
-      element.src = sourceUrl;
-    });
-    if (image.naturalWidth * image.naturalHeight > 40_000_000) {
-      throw new Error("Görsel çözünürlüğü çok yüksek.");
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Görsel dönüştürücü başlatılamadı.");
-    context.drawImage(image, 0, 0);
-
-    const webp = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (result) => result ? resolve(result) : reject(new Error("Görsel WebP'ye çevrilemedi.")),
-        "image/webp",
-        0.86,
-      );
-    });
-    if (webp.type !== "image/webp") {
-      throw new Error("Bu tarayıcı WebP dönüşümünü desteklemiyor.");
-    }
-    return webp;
-  } finally {
-    URL.revokeObjectURL(sourceUrl);
-  }
-}
-
-function productImageFileName(productTitle: string, index: number) {
-  return `${slugify(productTitle) || "urun"}-${index + 1}.webp`;
-}
-
-async function uploadWebpToStorage(uploadUrl: string, blob: Blob) {
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: { "Content-Type": "image/webp" },
-    body: blob,
-  });
-  if (!response.ok) throw new Error("WebP görsel Convex Storage'a yüklenemedi.");
-  const uploaded: unknown = await response.json();
-  if (
-    typeof uploaded !== "object" || uploaded === null ||
-    !("storageId" in uploaded) || typeof uploaded.storageId !== "string"
-  ) {
-    throw new Error("Yüklenen görselin kimliği alınamadı.");
-  }
-  return uploaded.storageId;
-}
-
-async function resolveUploadedImages(pendingImages: PendingImage[]): Promise<ResolvedPendingImage[]> {
-  return Promise.all(pendingImages.map(async (image) => {
-    const storageId = image.storageId ?? (image.uploadPromise ? await image.uploadPromise : null);
-    if (!storageId) throw new Error("Bazı görseller yüklenemedi. Sorunlu görselleri kaldırıp tekrar deneyin.");
-    return toResolvedPendingImage({ ...image, storageId });
-  }));
-}
-
-function toResolvedPendingImage(image: PendingImage): ResolvedPendingImage {
-  return {
-    storageId: image.storageId!,
-    fileName: image.fileName,
-    kind: image.kind,
-    ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
-  };
-}
-
-function imagesPayload(images: { storageId: string; fileName: string; selectedOptions?: { name: string; value: string }[] }[]) {
-  return images.map((image) => ({
-    storageId: image.storageId,
-    fileName: image.fileName,
-    ...(image.selectedOptions?.length ? { selectedOptions: image.selectedOptions } : {}),
-  }));
-}
-
-function draftAttributes(
-  categoryAttributes: CategoryAttributeDefinition[],
-  attributeValues: Record<string, string | string[]>,
-): ProductAttribute[] {
-  const attributes: ProductAttribute[] = [];
-  for (const definition of categoryAttributes) {
-    const raw = attributeValues[definition.key];
-    if (definition.type === "multiselect") {
-      const list = Array.isArray(raw) ? raw.filter(Boolean) : [];
-      if (list.length > 0) attributes.push({ key: definition.key, value: list });
-    } else if (definition.type === "number") {
-      const str = typeof raw === "string" ? raw.trim() : "";
-      if (str && Number.isFinite(Number(str))) attributes.push({ key: definition.key, value: Number(str) });
-    } else if (definition.type === "boolean") {
-      const str = typeof raw === "string" ? raw.trim() : "";
-      if (str) attributes.push({ key: definition.key, value: str === "true" });
-    } else {
-      const str = typeof raw === "string" ? raw.trim() : "";
-      if (str) attributes.push({ key: definition.key, value: str });
-    }
-  }
-  return attributes;
-}
-
-function minimalDraftPayload(uploaded: ResolvedPendingImage[], descriptionImageStorageIds: string[]) {
-  const slug = `taslak-${Date.now()}`;
-  return {
-    title: "Taslak",
-    slug,
-    categorySlug: "",
-    attributes: [] as ProductAttribute[],
-    images: imagesPayload(uploaded.filter((image) => image.kind === "gallery")),
-    ...(descriptionImageStorageIds.length > 0 ? { descriptionImageStorageIds } : {}),
-    availableForSale: false,
-    options: [],
-    variants: [{
-      id: createEditorId(),
-      selectedOptions: [],
-      title: "Ürünün kendisi",
-      price: "0",
-      stockQuantity: 0,
-      availableForSale: false,
-      sku: generatedVariantSku(slug, []),
-    }],
-  };
-}
-
-function draftSaveAttempts(state: ExitState, uploaded: ResolvedPendingImage[]) {
-  const slug = state.slug.trim() || `taslak-${Date.now()}`;
-  const descriptionImageStorageIds = [
-    ...state.descriptionImageStorageIds,
-    ...uploaded.filter((image) => image.kind === "description").map((image) => image.storageId),
-  ];
-  const full = {
-    title: state.title.trim() || "Taslak",
-    slug,
-    categorySlug: state.categorySlug,
-    description: state.description.trim(),
-    ...(descriptionImageStorageIds.length > 0 ? { descriptionImageStorageIds } : {}),
-    attributes: draftAttributes(state.categoryAttributes, state.attributeValues),
-    images: imagesPayload(uploaded.filter((image) => image.kind === "gallery")),
-    availableForSale: false,
-    options: state.variantOptions
-      .map((option) => ({ id: option.id, name: option.name.trim(), values: option.values.map((value) => value.trim()).filter(Boolean) }))
-      .filter((option) => option.name && option.values.length > 0),
-    variants: state.variantRows.map((variant) => {
-      const selectedOptions = variant.selectedOptions;
-      const price = /^\d+([.,]\d{1,2})?$/.test(variant.price.trim()) ? variant.price.trim().replace(",", ".") : "0";
-      const compareAtPrice = /^\d+([.,]\d{1,2})?$/.test(variant.compareAtPrice.trim())
-        ? variant.compareAtPrice.trim().replace(",", ".")
-        : null;
-      return {
-        id: variant.id || createEditorId(),
-        sku: variant.sku.trim() || generatedVariantSku(slug, selectedOptions),
-        ...(variant.barcode?.trim() ? { barcode: variant.barcode.trim() } : {}),
-        title: selectedOptions.map(({ value }) => value).join(" / ") || "Ürünün kendisi",
-        selectedOptions,
-        price,
-        ...(compareAtPrice && Number(compareAtPrice) > Number(price) ? { compareAtPrice } : {}),
-        stockQuantity: Number(variant.stockQuantity) || 0,
-        availableForSale: false,
-      };
-    }),
-  };
-  return [full, minimalDraftPayload(uploaded, descriptionImageStorageIds)];
-}
-
-async function postAdminAction(action: string, input: unknown) {
-  return fetch("/api/admin", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, input }),
-    keepalive: true,
-  });
-}
-
-async function resolveStatePendingImages(state: ExitState): Promise<ResolvedPendingImage[]> {
-  const uploaded: ResolvedPendingImage[] = [];
-  for (const image of state.pendingImages) {
-    const storageId = image.storageId ?? (image.uploadPromise ? await image.uploadPromise : null);
-    if (storageId) {
-      uploaded.push(toResolvedPendingImage({ ...image, storageId }));
-    }
-  }
-  return uploaded;
-}
-
-// true: yapılacak iş yoktu ya da başarıyla tamamlandı; false: taslak denemeleri başarısız oldu (tekrar denenebilir).
-async function flushExitState(state: ExitState): Promise<boolean> {
-  const uploaded = await resolveStatePendingImages(state);
-  if (uploaded.length === 0) return true;
-  if (state.isExisting) {
-    for (const image of uploaded) {
-      void postAdminAction("product.image-discard", { storageId: image.storageId }).catch(() => {});
-    }
-    return true;
-  }
-  for (const input of draftSaveAttempts(state, uploaded)) {
-    try {
-      const response = await postAdminAction("product.create", input);
-      if (response.ok) return true;
-    } catch {
-      // sonraki deneme
-    }
-  }
-  return false;
-}
-
-function createEditorId() {
-  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function normalizeOptionKey(str: string) {
-  return str.trim().toLocaleLowerCase("tr-TR");
-}
-
-function selectionKey(selectedOptions: { name: string; value: string }[]) {
-  return JSON.stringify(
-    [...selectedOptions]
-      .map((opt) => ({ name: normalizeOptionKey(opt.name), value: opt.value.trim() }))
-      .sort((a, b) => a.name.localeCompare(b.name, "tr-TR"))
-  );
-}
-
-function variantOptionSignature(options: { name: string; values: string[] }[]) {
-  return JSON.stringify(
-    options.map((option) => [
-      normalizeOptionKey(option.name),
-      [...option.values.map((v) => v.trim()).filter(Boolean)],
-    ])
-  );
-}
-
-function getVariantCombinations(options: { name: string; values: string[] }[]) {
-  return options.reduce<{ name: string; value: string }[][]>(
-    (combinations, option) => combinations.flatMap((combination) =>
-      option.values.map((value) => [...combination, { name: option.name, value }]),
-    ),
-    [[]],
-  );
-}
-
-function generatedVariantSku(slug: string, selectedOptions: { name: string; value: string }[]) {
-  const source = `${slug}:${selectionKey(selectedOptions)}`.toLocaleUpperCase("en-US");
-  let hash = 2166136261;
-  for (let index = 0; index < source.length; index += 1) {
-    hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
-  }
-  return `SKU-${(hash >>> 0).toString(36).toUpperCase().padStart(7, "0")}`;
-}
+  convertImageToWebp,
+  createEditorId,
+  flushExitState,
+  generatedVariantSku,
+  getVariantCombinations,
+  imagesPayload,
+  minimalDraftPayload,
+  normalizeOptionKey,
+  productImageFileName,
+  resolveUploadedImages,
+  selectionKey,
+  toResolvedPendingImage,
+  uploadWebpToStorage,
+  variantOptionSignature,
+  type Category,
+  type ExitState,
+  type PendingImage,
+  type Product,
+  type StoredImage,
+  type VariantDraft,
+  type VariantOptionDraft,
+} from "./product-editor-helpers";
+import { ProductAttributesSection } from "./product-attributes-section";
+import { ProductDescriptionSection } from "./product-description-section";
+import { ProductImagesSection } from "./product-images-section";
+import { ProductVariantsSection } from "./product-variants-section";
 
 function ProductEditor({
   product,
@@ -346,13 +57,14 @@ function ProductEditor({
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(product?.title || "");
-  const [slug, setSlug] = useState(product?.slug || "");
+  const slugRef = useRef(product?.slug || "");
   const [variantOptions, setVariantOptions] = useState<VariantOptionDraft[]>(() =>
     (product?.options ?? []).map((option) => ({ ...option, values: option.values })),
   );
-  const [generatedOptionSignature, setGeneratedOptionSignature] = useState(() =>
-    variantOptionSignature(product?.options ?? []),
-  );
+  const generatedOptionSignature = useRef<string | null>(null);
+  useEffect(() => {
+    generatedOptionSignature.current = variantOptionSignature(product?.options ?? []);
+  }, [product]);
   const [categorySlug, setCategorySlug] = useState(product?.categorySlug || "");
   const [attributeValues, setAttributeValues] = useState<Record<string, string | string[]>>(() => {
     const map: Record<string, string | string[]> = {};
@@ -433,7 +145,7 @@ function ProductEditor({
       isExisting: Boolean(product),
       saved: savedRef.current,
       title,
-      slug,
+      slug: slugRef.current,
       categorySlug,
       description,
       descriptionImageStorageIds: [
@@ -562,7 +274,7 @@ function ProductEditor({
       const key = selectionKey(comb);
       const exact = existingExactMap.get(key);
       if (exact) {
-        const sku = ensureUniqueSku(exact.sku, slug, comb);
+        const sku = ensureUniqueSku(exact.sku, slugRef.current, comb);
         return {
           ...exact,
           selectedOptions: comb,
@@ -627,10 +339,10 @@ function ProductEditor({
             candidateSku = `${bestMatch.sku}-${claimCount + 1}`;
           }
         } else {
-          candidateSku = generatedVariantSku(slug, comb);
+          candidateSku = generatedVariantSku(slugRef.current, comb);
         }
 
-        const sku = ensureUniqueSku(candidateSku, slug, comb);
+        const sku = ensureUniqueSku(candidateSku, slugRef.current, comb);
 
         return {
           id: claimCount === 0 && bestMatch.id ? bestMatch.id : createEditorId(),
@@ -648,11 +360,11 @@ function ProductEditor({
         return {
           ...defaultRow,
           selectedOptions: comb,
-          sku: ensureUniqueSku(defaultRow.sku, slug, comb),
+          sku: ensureUniqueSku(defaultRow.sku, slugRef.current, comb),
         };
       }
 
-      const sku = ensureUniqueSku(generatedVariantSku(slug, comb), slug, comb);
+      const sku = ensureUniqueSku(generatedVariantSku(slugRef.current, comb), slugRef.current, comb);
       return {
         id: createEditorId(),
         selectedOptions: comb,
@@ -678,7 +390,7 @@ function ProductEditor({
       );
       return { ...image, selectedOptions: selectedOptions?.length ? selectedOptions : undefined };
     }));
-    setGeneratedOptionSignature(variantOptionSignature(options));
+    generatedOptionSignature.current = variantOptionSignature(options);
     setError(null);
   };
 
@@ -697,7 +409,7 @@ function ProductEditor({
     const firstVariant = variantRows[0];
     if (firstVariant) setVariantRows([{ ...firstVariant, selectedOptions: [] }]);
     setVariantOptions([]);
-    setGeneratedOptionSignature(variantOptionSignature([]));
+    generatedOptionSignature.current = variantOptionSignature([]);
     setImages((current) => current.map((image) => ({ ...image, selectedOptions: undefined })));
     setPendingImages((current) => current.map((image) => ({ ...image, selectedOptions: undefined })));
     setError(null);
@@ -737,7 +449,7 @@ function ProductEditor({
       });
       const nextImages: PendingImage[] = blobs.map((blob, index) => {
         const id = createEditorId();
-        const fileName = productImageFileName(title || slug || "urun", startIndex + index);
+        const fileName = productImageFileName(title || slugRef.current || "urun", startIndex + index);
         const previewUrl = URL.createObjectURL(blob);
         previewUrls.current.push(previewUrl);
         const uploadPromise = (async () => {
@@ -806,7 +518,7 @@ function ProductEditor({
       name: option.name.trim(),
       values: option.values.map((v) => v.trim()).filter(Boolean),
     }));
-    if (!slug.trim()) {
+    if (!slugRef.current.trim()) {
       setError("Ürün adı geçerli bir mağaza adresi oluşturmalı.");
       return;
     }
@@ -876,7 +588,7 @@ function ProductEditor({
       setError("Her seçenek için bir ad ve en az bir değer gir.");
       return;
     }
-    if (variantOptionSignature(activeOptions) !== generatedOptionSignature) {
+    if (variantOptionSignature(activeOptions) !== generatedOptionSignature.current) {
       setError("Seçenekleri değiştirdin. Tabloyu güncellemek için 'Kombinasyonları oluştur' butonuna tıkla.");
       return;
     }
@@ -941,7 +653,7 @@ function ProductEditor({
     const input = {
       ...(product ? { id: product._id } : {}),
       title: title.trim(),
-      slug: slug.trim(),
+      slug: slugRef.current.trim(),
       categorySlug,
       description: description.trim(),
       descriptionImageStorageIds: descriptionImages.map((image) => image.storageId),
@@ -989,178 +701,23 @@ function ProductEditor({
     <div className="scheme-dark w-full text-foreground">
       <form onSubmit={save} className="space-y-5">
         <div className="space-y-5">
-          <section aria-label="Görseller" className="space-y-4 rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-foreground">Görseller</h2>
-                {uploadingCount + failedCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground" role="status">
-                    <ArrowPathIcon className={`size-3 ${uploadingCount > 0 ? "animate-spin" : ""}`} aria-hidden="true" />
-                    {uploadedCount}/{galleryPendingImages.length} yüklendi
-                  </span>
-                )}
-              </div>
-              <label htmlFor="product-image-upload" className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:bg-muted ${processingImages || saving ? "pointer-events-none opacity-60" : ""}`}>
-                <PlusCircleIcon className="size-4" />
-                <span>{processingImages ? "Hazırlanıyor…" : "Görsel ekle"}</span>
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{images.length + galleryPendingImages.length}/20</span>
-              </label>
-            </div>
-            <input id="product-image-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || processingImages} onChange={(event) => void handleImageSelection(event, "gallery")} className="sr-only" />
-            {(images.length > 0 || galleryPendingImages.length > 0) ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {images.map((image, index) => (
-                <div key={image.storageId} className="group overflow-hidden rounded-xl border border-border bg-background">
-                  <div className="relative aspect-[4/5] overflow-hidden bg-card">
-                    {image.url ? <Image src={image.url} alt={title} width={400} height={500} unoptimized className="size-full object-cover" /> : null}
-                    {index === 0 && (
-                      <span className="absolute left-2 top-2 rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
-                        Kapak
-                      </span>
-                    )}
-                    {index > 0 && (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="secondary"
-                        aria-label="Sola taşı"
-                        title="Sola taşı"
-                        disabled={saving}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 size-8 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                        onClick={() => moveImage(index, -1)}
-                      >
-                        <ChevronLeftIcon className="size-4" />
-                      </Button>
-                    )}
-                    {index < images.length - 1 && (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="secondary"
-                        aria-label="Sağa taşı"
-                        title="Sağa taşı"
-                        disabled={saving}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 size-8 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                        onClick={() => moveImage(index, 1)}
-                      >
-                        <ChevronRightIcon className="size-4" />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="secondary"
-                      aria-label={`Görseli kaldır: ${image.fileName}`}
-                      title="Görseli kaldır"
-                      disabled={saving}
-                      className="absolute right-2 top-2 size-8 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                      onClick={() => setImages((current) => current.filter((item) => item.storageId !== image.storageId))}
-                    >
-                      <TrashIcon className="size-4" />
-                    </Button>
-                  </div>
-                  {variantOptions.length > 0 && (
-                    <select
-                      aria-label={`${image.fileName} görsel kapsamı`}
-                      disabled={saving}
-                      value={JSON.stringify(image.selectedOptions ?? [])}
-                      onChange={(event) => {
-                        const selectedOptions: { name: string; value: string }[] = JSON.parse(event.target.value) as { name: string; value: string }[];
-                        setImages((current) => current.map((item) => item.storageId === image.storageId
-                          ? { ...item, selectedOptions: selectedOptions.length ? selectedOptions : undefined }
-                          : item));
-                      }}
-                      className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none focus-visible:border-border"
-                    >
-                      <option value="[]">Tüm varyantlarda</option>
-                      {variantOptions.flatMap((option) => option.values.map((value) => {
-                        const scope = [{ name: option.name, value }];
-                        return <option key={`${option.id}:${value}`} value={JSON.stringify(scope)}>{option.name}: {value}</option>;
-                      }))}
-                    </select>
-                  )}
-                </div>
-              ))}
-              {galleryPendingImages.map((image, index) => (
-                <div key={image.id} className="group overflow-hidden rounded-xl border border-border bg-background">
-                  <div className="relative aspect-[4/5] overflow-hidden bg-card">
-                    <Image src={image.previewUrl} alt={title} width={400} height={500} unoptimized className="size-full object-cover" />
-                    {image.status === "uploading" && (
-                      <div className="absolute inset-0 grid place-items-center bg-background/60">
-                        <ArrowPathIcon className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
-                      </div>
-                    )}
-                    {image.status === "error" && (
-                      <div className="absolute inset-x-0 bottom-0 bg-destructive px-2 py-1 text-center text-[10px] font-medium text-white">Yüklenemedi</div>
-                    )}
-                    {images.length === 0 && index === 0 && (
-                      <span className="absolute left-2 top-2 rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
-                        Kapak
-                      </span>
-                    )}
-                    {index > 0 && (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="secondary"
-                        aria-label="Sola taşı"
-                        title="Sola taşı"
-                        disabled={saving}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 size-8 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                        onClick={() => movePendingImage(index, -1)}
-                      >
-                        <ChevronLeftIcon className="size-4" />
-                      </Button>
-                    )}
-                    {index < galleryPendingImages.length - 1 && (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="secondary"
-                        aria-label="Sağa taşı"
-                        title="Sağa taşı"
-                        disabled={saving}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 size-8 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                        onClick={() => movePendingImage(index, 1)}
-                      >
-                        <ChevronRightIcon className="size-4" />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="secondary"
-                      aria-label={`Görseli kaldır: ${image.fileName}`}
-                      title="Görseli kaldır"
-                      disabled={saving}
-                      className="absolute right-2 top-2 size-8 rounded-full border border-white/10 bg-background/90 text-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                      onClick={() => removePendingImage(image)}>
-                      <TrashIcon className="size-4" />
-                    </Button>
-                  </div>
-                  {variantOptions.length > 0 && (
-                    <select
-                      aria-label={`${image.fileName} görsel kapsamı`}
-                      disabled={saving}
-                      value={JSON.stringify(image.selectedOptions ?? [])}
-                      onChange={(event) => {
-                        const selectedOptions: { name: string; value: string }[] = JSON.parse(event.target.value) as { name: string; value: string }[];
-                        setPendingImages((current) => current.map((item) => item.id === image.id
-                          ? { ...item, selectedOptions: selectedOptions.length ? selectedOptions : undefined }
-                          : item));
-                      }}
-                      className="mx-2 mb-2 mt-2 h-10 w-[calc(100%-1rem)] rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none focus-visible:border-border"
-                    >
-                      <option value="[]">Tüm varyantlarda</option>
-                      {variantOptions.flatMap((option) => option.values.map((value) => {
-                        const scope = [{ name: option.name, value }];
-                        return <option key={`${option.id}:${value}`} value={JSON.stringify(scope)}>{option.name}: {value}</option>;
-                      }))}
-                    </select>
-                  )}
-                </div>
-              ))}
-            </div> : <div className="rounded-xl border border-dashed border-border bg-background/50 px-4 py-5 text-center text-xs text-muted-foreground">Henüz görsel eklenmedi</div>}
-          </section>
+          <ProductImagesSection
+            images={images}
+            title={title}
+            saving={saving}
+            processingImages={processingImages}
+            uploadingCount={uploadingCount}
+            uploadedCount={uploadedCount}
+            failedCount={failedCount}
+            galleryPendingImages={galleryPendingImages}
+            variantOptions={variantOptions}
+            moveImage={moveImage}
+            movePendingImage={movePendingImage}
+            removePendingImage={removePendingImage}
+            handleImageSelection={handleImageSelection}
+            setImages={setImages}
+            setPendingImages={setPendingImages}
+          />
           <section aria-label="Ürün Bilgileri" className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
             <div className="space-y-5">
               <h2 className="text-sm font-semibold text-foreground">Ürün Bilgileri</h2>
@@ -1170,7 +727,7 @@ function ProductEditor({
                   <Input id="product-title" name="title" autoComplete="off" required minLength={2} maxLength={140} placeholder="Ürün adı" value={title} onChange={(event) => {
                     const nextTitle = event.target.value;
                     setTitle(nextTitle);
-                    setSlug(slugify(nextTitle));
+                    slugRef.current = slugify(nextTitle);
                   }} className="h-12 rounded-xl border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-ring" />
                 </div>
               </div>
@@ -1185,114 +742,12 @@ function ProductEditor({
                 </div>
               </div>
 
-              {categoryAttributes.length > 0 ? (
-                <section aria-labelledby="product-category-attributes-heading" className="space-y-4 rounded-xl border border-border bg-background/40 p-4 sm:p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-                    <h3 id="product-category-attributes-heading" className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                      <AdjustmentsHorizontalIcon className="size-4 text-muted-foreground" />
-                      Teknik Özellikler
-                    </h3>
-                    <span className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
-                      {categoryAttributes.length} özellik
-                    </span>
-                  </div>
-
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    {categoryAttributes.map((attribute: CategoryAttributeDefinition) => {
-                      const inputId = `product-attribute-${attribute.key}`;
-                      const rawValue = attributeValues[attribute.key];
-
-                      return (
-                        <div key={attribute.key} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor={inputId} className="text-xs font-medium text-foreground">
-                              {attribute.label}
-                              {attribute.unit ? ` (${attribute.unit})` : ""}
-                              {attribute.required ? <span className="text-destructive"> *</span> : null}
-                            </Label>
-                            <span className="text-[10px] text-muted-foreground bg-card px-1.5 py-0.5 rounded border border-border">
-                              {attribute.type === "multiselect"
-                                ? "Çoklu Seçim"
-                                : attribute.type === "select"
-                                  ? "Tekli Seçim"
-                                  : attribute.type === "boolean"
-                                    ? "Evet / Hayır"
-                                    : attribute.type === "number"
-                                      ? "Sayı"
-                                      : "Metin"}
-                            </span>
-                          </div>
-
-                          {attribute.type === "multiselect" ? (
-                            <AttributeMultiSelect
-                              attribute={attribute}
-                              value={Array.isArray(rawValue) ? rawValue : []}
-                              onChange={(next) =>
-                                setAttributeValues((current) => ({
-                                  ...current,
-                                  [attribute.key]: next,
-                                }))
-                              }
-                            />
-                          ) : attribute.type === "select" ? (
-                            <AttributeSingleSelect
-                              attribute={attribute}
-                              value={typeof rawValue === "string" ? rawValue : ""}
-                              onChange={(next) =>
-                                setAttributeValues((current) => ({
-                                  ...current,
-                                  [attribute.key]: next,
-                                }))
-                              }
-                            />
-                          ) : attribute.type === "boolean" ? (
-                            <AttributeBooleanToggle
-                              attribute={attribute}
-                              value={typeof rawValue === "string" ? rawValue : ""}
-                              onChange={(next) =>
-                                setAttributeValues((current) => ({
-                                  ...current,
-                                  [attribute.key]: next,
-                                }))
-                              }
-                            />
-                          ) : attribute.type === "number" ? (
-                            <AttributeNumberInput
-                              attribute={attribute}
-                              value={typeof rawValue === "string" ? rawValue : ""}
-                              onChange={(next) =>
-                                setAttributeValues((current) => ({
-                                  ...current,
-                                  [attribute.key]: next,
-                                }))
-                              }
-                            />
-                          ) : (
-                            <Input
-                              id={inputId}
-                              type="text"
-                              required={attribute.required}
-                              value={typeof rawValue === "string" ? rawValue : ""}
-                              onChange={(event) =>
-                                setAttributeValues((current) => ({
-                                  ...current,
-                                  [attribute.key]: event.target.value,
-                                }))
-                              }
-                              placeholder={attribute.label}
-                              className="h-11 rounded-lg border-border bg-card text-sm text-foreground placeholder:text-muted-foreground"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ) : categorySlug ? (
-                <div className="rounded-xl border border-dashed border-border bg-background/30 p-4 text-xs text-muted-foreground">
-                  Bu kategori için özellik tanımlanmamış.
-                </div>
-              ) : null}
+          <ProductAttributesSection
+            categoryAttributes={categoryAttributes}
+            attributeValues={attributeValues}
+            setAttributeValues={setAttributeValues}
+            categorySlug={categorySlug}
+          />
 
               {product ? (
                 <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-border pt-4">
@@ -1309,198 +764,30 @@ function ProductEditor({
             </div>
           </section>
 
-          <section aria-label="Varyantlar" className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-foreground">Varyantlar</h2>
-              </div>
-                  <section aria-label="Varyant seçenekleri" className="mb-4 space-y-3 rounded-xl border border-border bg-background/70 p-3 sm:p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h4 className="text-xs font-semibold text-foreground">Varyant seçenekleri</h4>
-                      <Button type="button" variant="outline" className="min-h-9 rounded-lg border-border bg-background px-3 text-xs text-foreground hover:bg-muted" disabled={variantOptions.length >= 3} onClick={addVariantOption}>
-                        <PlusCircleIcon className="mr-2 size-4" /> Seçenek ekle
-                      </Button>
-                    </div>
-                    {variantOptions.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                        Seçenek eklemeden ürün tek kombinasyon olarak kaydedilir.
-                      </div>
-                    ) : (
-                      variantOptions.map((option, index) => (
-                        <div key={option.id} className="grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
-                          <div className="space-y-1.5">
-                            <Label htmlFor={`variant-option-name-${index}`} className="text-xs text-muted-foreground">Seçenek adı</Label>
-                            <Input id={`variant-option-name-${index}`} maxLength={40} value={option.name} onChange={(event) => setVariantOptions((current) => current.map((item) => item.id === option.id ? { ...item, name: event.target.value } : item))} placeholder="Örn. Beden" className="h-10 rounded-lg border-border bg-background text-sm text-foreground" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Değerler</Label>
-                            <VariantOptionValuesInput
-                              values={option.values}
-                              onChange={(nextValues) =>
-                                setVariantOptions((current) =>
-                                  current.map((item) => (item.id === option.id ? { ...item, values: nextValues } : item))
-                                )
-                              }
-                            />
-                          </div>
-                          <Button type="button" variant="ghost" className="min-h-10 px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`${option.name || `Seçenek ${index + 1}`} seçeneğini kaldır`} onClick={() => removeVariantOption(option.id)}>
-                            <TrashIcon className="size-4" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                    {variantOptions.length > 0 && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-3">
-                      <Button type="button" variant="secondary" className="min-h-9 rounded-lg px-3 text-xs" onClick={generateVariantRows}>
-                        <ArrowPathIcon className="mr-1.5 size-3.5" />
-                        Kombinasyonları oluştur
-                      </Button>
-                    </div>}
-                  </section>
+          <ProductVariantsSection
+            variantOptions={variantOptions}
+            setVariantOptions={setVariantOptions}
+            addVariantOption={addVariantOption}
+            removeVariantOption={removeVariantOption}
+            generateVariantRows={generateVariantRows}
+            variantRows={variantRows}
+            updateVariant={updateVariant}
+            removeVariant={removeVariant}
+            selectionKey={selectionKey}
+          />
 
-                  <div className="hidden overflow-x-auto rounded-xl border border-border md:block">
-                      <table className="w-full min-w-[880px] border-collapse text-left text-xs">
-                        <thead className="bg-background text-muted-foreground">
-                          <tr>
-                            <th scope="col" className="px-3 py-3 font-medium">Satışta</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Kombinasyon</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Fiyat (TL) <span className="text-destructive">*</span></th>
-                            <th scope="col" className="px-3 py-3 font-medium">Liste fiyatı (TL)</th>
-                            <th scope="col" className="px-3 py-3 font-medium">Stok</th>
-                            <th scope="col" className="px-3 py-3 font-medium">SKU <span className="text-destructive">*</span></th>
-                            <th scope="col" className="px-3 py-3 font-medium">Barkod</th>
-                            <th scope="col" className="px-3 py-3 font-medium"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {variantRows.map((variant, index) => <tr key={variant.id ?? selectionKey(variant.selectedOptions)} className="transition-colors hover:bg-muted/40">
-                            <td className="px-3 py-3"><input aria-label={`Kombinasyon ${index + 1} satışta`} type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" /></td>
-                            <td className="min-w-36 whitespace-nowrap px-3 py-3 font-medium text-foreground">{variant.selectedOptions.map(({ value }) => value).join(" / ") || "Tek ürün"}</td>
-                            <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
-                            <td className="w-28 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} liste fiyatı`} type="number" inputMode="decimal" min="0" step="0.01" placeholder="Opsiyonel" value={variant.compareAtPrice} onChange={(event) => updateVariant(index, { compareAtPrice: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
-                            <td className="w-24 px-2 py-3"><Input aria-label={`Kombinasyon ${index + 1} stok adedi`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-background text-xs text-foreground" /></td>
-                            <td className="min-w-36 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} SKU`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
-                            <td className="min-w-32 px-3 py-3"><Input aria-label={`Kombinasyon ${index + 1} Barkod`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-background font-mono text-xs text-foreground" /></td>
-                            <td className="px-2 py-3"><Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-9 px-2 text-muted-foreground hover:bg-muted hover:text-foreground" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button></td>
-                          </tr>)}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="space-y-3 md:hidden">
-                      {variantRows.map((variant, index) => <section key={variant.id ?? selectionKey(variant.selectedOptions)} aria-label={`Kombinasyon ${index + 1}`} className="space-y-3 rounded-xl border border-border bg-background/70 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-wrap gap-1.5">{variant.selectedOptions.length > 0 ? variant.selectedOptions.map((selected) => <span key={selected.name} className="rounded-md bg-muted px-2 py-1 text-xs text-foreground">{selected.name}: {selected.value}</span>) : <span className="text-xs text-muted-foreground">Tek ürün</span>}</div>
-                          <Button type="button" variant="ghost" aria-label={`Kombinasyon ${index + 1} seçeneğini kaldır`} className="min-h-8 px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground" disabled={variantRows.length <= 1} onClick={() => removeVariant(index)}><TrashIcon className="size-4" /></Button>
-                        </div>
-                        <label className="flex min-h-9 items-center gap-2 text-xs font-medium text-foreground"><input type="checkbox" checked={variant.availableForSale} onChange={(event) => updateVariant(index, { availableForSale: event.target.checked })} className="size-4 accent-foreground" />Satışta</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1.5"><Label htmlFor={`mobile-variant-price-${index}`} className="text-xs text-muted-foreground">Fiyat (TL) <span className="text-destructive">*</span></Label><Input id={`mobile-variant-price-${index}`} type="number" inputMode="decimal" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
-                          <div className="space-y-1.5"><Label htmlFor={`mobile-variant-stock-${index}`} className="text-xs text-muted-foreground">Stok adedi</Label><Input id={`mobile-variant-stock-${index}`} type="number" inputMode="numeric" min="0" step="1" value={variant.stockQuantity} onChange={(event) => updateVariant(index, { stockQuantity: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
-                        </div>
-                        <div className="space-y-1.5"><Label htmlFor={`mobile-variant-compare-at-${index}`} className="text-xs text-muted-foreground">Liste fiyatı (TL)</Label><Input id={`mobile-variant-compare-at-${index}`} type="number" inputMode="decimal" min="0" step="0.01" placeholder="Opsiyonel" value={variant.compareAtPrice} onChange={(event) => updateVariant(index, { compareAtPrice: event.target.value })} className="h-10 rounded-lg border-border bg-card text-xs text-foreground" /></div>
-                        <div className="space-y-1.5"><Label htmlFor={`mobile-variant-sku-${index}`} className="text-xs text-muted-foreground">SKU <span className="text-destructive">*</span></Label><Input id={`mobile-variant-sku-${index}`} maxLength={64} value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>
-                        <div className="space-y-1.5"><Label htmlFor={`mobile-variant-barcode-${index}`} className="text-xs text-muted-foreground">Barkod</Label><Input id={`mobile-variant-barcode-${index}`} placeholder="Barkod / GTIN" maxLength={64} value={variant.barcode ?? ""} onChange={(event) => updateVariant(index, { barcode: event.target.value })} className="h-10 rounded-lg border-border bg-card font-mono text-xs text-foreground" /></div>
-                      </section>)}
-                  </div>
-            </div>
-          </section>
-
-          <section aria-label="Açıklama" className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
-            <div className="space-y-5">
-              <h2 className="text-sm font-semibold text-foreground">Açıklama</h2>
-              <div className="space-y-1.5">
-                <Label htmlFor="product-description">Ürün açıklaması</Label>
-                <textarea
-                  id="product-description"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  maxLength={4000}
-                  rows={6}
-                  placeholder="Kumaş, kalıp, bakım ve kullanım bilgileri..."
-                  className="min-h-32 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-                <p className="text-[11px] text-muted-foreground leading-normal">
-                  Paragraflar için alt satır kullanın. En fazla 4000 karakter.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-xs font-semibold text-foreground">Açıklama görselleri</h3>
-                    <p className="text-[11px] text-muted-foreground leading-normal">
-                      Ürün galerisinden bağımsızdır; yalnızca açıklama bölümünde gösterilir. En fazla 12 görsel.
-                    </p>
-                  </div>
-                  <label
-                    htmlFor="product-description-image-upload"
-                    className={`inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted ${
-                      processingImages || saving || descriptionImageLimitReached ? "pointer-events-none opacity-60" : ""
-                    }`}
-                  >
-                    <PlusCircleIcon className="size-4" />
-                    <span>{processingImages ? "Yükleniyor…" : "Görsel ekle"}</span>
-                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {descriptionImages.length + descriptionPendingImages.length}/12
-                    </span>
-                  </label>
-                </div>
-                <input
-                  id="product-description-image-upload"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  disabled={saving || processingImages || descriptionImageLimitReached}
-                  onChange={(event) => void handleImageSelection(event, "description")}
-                  className="sr-only"
-                />
-                {descriptionImages.length > 0 || descriptionPendingImages.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                    {descriptionImages.map((image) => (
-                      <div key={image.storageId} className="group relative aspect-[4/5] overflow-hidden rounded-xl border border-border bg-background">
-                        {image.url ? (
-                          <Image src={image.url} alt="" width={200} height={250} unoptimized className="size-full object-cover" />
-                        ) : (
-                          <span className="grid size-full place-items-center bg-muted text-[10px] text-muted-foreground">Görsel yok</span>
-                        )}
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="secondary"
-                          aria-label="Açıklama görselini kaldır"
-                          title="Görseli kaldır"
-                          disabled={saving}
-                          className="absolute right-1.5 top-1.5 size-8 rounded-full border border-white/10 bg-background/90 text-foreground hover:bg-muted hover:text-foreground"
-                          onClick={() => removeDescriptionImage(image.storageId)}
-                        >
-                          <TrashIcon className="size-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                    {descriptionPendingImages.map((image) => (
-                      <div key={image.id} className="group relative aspect-[4/5] overflow-hidden rounded-xl border border-border bg-background">
-                        <Image src={image.previewUrl} alt="" width={200} height={250} unoptimized className="size-full object-cover" />
-                        {image.status === "uploading" && <div className="absolute inset-0 grid place-items-center bg-background/60"><ArrowPathIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" /></div>}
-                        {image.status === "error" && <div className="absolute inset-x-0 bottom-0 bg-destructive px-1 py-0.5 text-center text-[9px] font-medium text-white">Yüklenemedi</div>}
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="secondary"
-                          aria-label="Açıklama görselini kaldır"
-                          title="Görseli kaldır"
-                          disabled={saving}
-                          className="absolute right-1.5 top-1.5 size-8 rounded-full border border-white/10 bg-background/90 text-foreground hover:bg-muted hover:text-foreground"
-                          onClick={() => removePendingImage(image)}
-                        >
-                          <TrashIcon className="size-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </section>
+          <ProductDescriptionSection
+            description={description}
+            setDescription={setDescription}
+            processingImages={processingImages}
+            saving={saving}
+            descriptionImageLimitReached={descriptionImageLimitReached}
+            descriptionImages={descriptionImages}
+            descriptionPendingImages={descriptionPendingImages}
+            handleImageSelection={handleImageSelection}
+            removeDescriptionImage={removeDescriptionImage}
+            removePendingImage={removePendingImage}
+          />
         </div>
 
         {error && <AdminNotice kind="error">{error}</AdminNotice>}

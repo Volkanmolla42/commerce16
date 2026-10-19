@@ -54,26 +54,42 @@ export default function Search() {
   useEffect(() => {
     if (!shouldLoadSuggestions) return;
     const controller = new AbortController();
-    fetch(`/api/catalog/search?q=${encodeURIComponent(debouncedQuery)}`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Arama yüklenemedi");
+    let ignore = false;
+
+    async function load() {
+      try {
+        const response = await fetch(`/api/catalog/search?q=${encodeURIComponent(debouncedQuery)}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          if (!ignore) {
+            setOptions([]);
+            setSuggestionError(true);
+            setCompletedQuery(debouncedQuery);
+          }
+          return;
+        }
         const result: SearchOption[] = await response.json();
-        if (!controller.signal.aborted) {
+        if (!ignore) {
           setOptions(result);
           setSuggestionError(false);
           setCompletedQuery(debouncedQuery);
         }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
+      } catch {
+        if (!ignore) {
           setOptions([]);
           setSuggestionError(true);
           setCompletedQuery(debouncedQuery);
         }
-      });
-    return () => controller.abort();
+      }
+    }
+
+    void load();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
   }, [shouldLoadSuggestions, debouncedQuery]);
 
   useEffect(() => {

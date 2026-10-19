@@ -72,7 +72,7 @@ export function VariantOptionValuesInput({
       <div role="list" aria-label="Eklenen değerler" className="flex flex-wrap items-center gap-1.5">
         {values.map((val, index) => (
           <span
-            key={`${val}-${index}`}
+            key={val}
             role="listitem"
             className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
           >
