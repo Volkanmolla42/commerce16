@@ -104,6 +104,7 @@ export function Gallery({
           >
             <ProductImageTransition productId={product.id}>
               <Image
+                data-product-gallery-image
                 src={activeImage.url}
                 alt={product.title}
                 fill
