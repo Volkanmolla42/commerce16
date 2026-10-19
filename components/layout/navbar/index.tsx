@@ -57,12 +57,12 @@ export async function Navbar() {
           {categories.length ? (
             <nav className="hidden lg:flex lg:items-center lg:gap-6">
               <AllCategoriesMenu categories={categories} />
-              {categories.map((item) => (
+              {categories.slice(0, 5).map((item) => (
                 <Link
-                  key={item.title}
+                  key={item.path}
                   href={item.path}
                   prefetch={true}
-                  className="text-sm font-medium text-neutral-600 transition hover:text-black dark:text-neutral-400 dark:hover:text-white"
+                  className="text-sm font-medium text-neutral-600 transition hover:text-black dark:text-neutral-400 dark:hover:text-white whitespace-nowrap"
                 >
                   {item.title}
                 </Link>

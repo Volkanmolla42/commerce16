@@ -101,13 +101,25 @@ export default async function Footer() {
             </h3>
             <ul className="mt-4 flex flex-col gap-3 text-sm text-neutral-600 dark:text-neutral-400">
               {menu.length > 0 ? (
-                menu.map((item: Menu) => (
-                  <li key={item.title}>
-                    <Link href={item.path} className="transition-colors hover:text-black dark:hover:text-white">
-                      {item.title}
-                    </Link>
-                  </li>
-                ))
+                <>
+                  {menu.slice(0, 8).map((item: Menu) => (
+                    <li key={item.path}>
+                      <Link href={item.path} className="transition-colors hover:text-black dark:hover:text-white">
+                        {item.title}
+                      </Link>
+                    </li>
+                  ))}
+                  {menu.length > 8 && (
+                    <li className="pt-1">
+                      <Link
+                        href="/search"
+                        className="text-xs font-medium text-neutral-500 underline underline-offset-4 transition-colors hover:text-black dark:hover:text-white"
+                      >
+                        Tüm Kategoriler ({menu.length}) →
+                      </Link>
+                    </li>
+                  )}
+                </>
               ) : (
                 <li className="text-neutral-400 dark:text-neutral-500">Henüz kategori eklenmemiş.</li>
               )}
