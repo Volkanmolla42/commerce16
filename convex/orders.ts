@@ -6,7 +6,7 @@ import schema from "./schema";
 import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertAdminApiSecret } from "./adminAuth";
-import { getImagesForVariant } from "../lib/catalog/product-images";
+import { resolveVariantImageUrl } from "./productMedia";
 import { components, internal } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import type { Id, Doc } from "./_generated/dataModel";
@@ -16,23 +16,25 @@ import { patchCatalogProduct } from "./catalogModel";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
 import { isRevenueOrder, isValidTaxNumber, type OrderStatusUpdate } from "../lib/orders";
+import { getProductVariantTitle } from "../lib/catalog/variants";
 import { quotePromotions } from "../lib/promotions";
+import { getShippingQuote } from "../lib/shipping";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
   orderByAccount: { kind: "fixed window", rate: 6, period: 60 * 60 * 1000 },
-  orderByIp: { kind: "fixed window", rate: 10, period: 60 * 60 * 1000 },
 });
 
 const orderValidator = schema.doc("orders");
-const customerOrderValidator = orderValidator;
 const orderItemValidator = orderValidator.fields.items.element;
 const orderStatusValidator = orderValidator.fields.status;
 const orderPaymentStatusValidator = orderValidator.fields.paymentStatus;
 
+import { randomHex } from "./random";
+
 export const getMyOrders = query({
   args: {},
-  returns: v.array(customerOrderValidator),
+  returns: v.array(orderValidator),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
@@ -100,7 +102,7 @@ export const getRecentPurchaseActivity = query({
       latestPurchaseByBuyer.set(buyer, Math.max(latestPurchaseByBuyer.get(buyer) ?? 0, order._creationTime));
     }
 
-    const expirations = [...latestPurchaseByBuyer.values()].map((createdAt) => createdAt + day);
+    const expirations = [...latestPurchaseByBuyer.values()].map((_creationTime) => _creationTime + day);
     return {
       buyerCount: latestPurchaseByBuyer.size,
       limited: recentOrders.length === 250,
@@ -138,15 +140,20 @@ export const listForExportAdmin = query({
 
 export const getOrderById = query({
   args: {
-    id: v.id("orders"),
+    id: v.string(),
+    token: v.optional(v.string()),
   },
-  returns: v.union(customerOrderValidator, v.null()),
+  returns: v.union(orderValidator, v.null()),
   handler: async (ctx, args) => {
-    const order = await ctx.db.get(args.id);
+    const orderId = ctx.db.normalizeId("orders", args.id);
+    if (!orderId) return null;
+    const order = await ctx.db.get(orderId);
     if (!order) return null;
 
     const userId = await getAuthUserId(ctx);
-    if (order.userId && (!userId || order.userId !== userId)) {
+    if (order.userId) {
+      if (!userId || order.userId !== userId) return null;
+    } else if (!args.token || order.accessToken !== args.token) {
       return null;
     }
 
@@ -188,14 +195,14 @@ export const createOrder = mutation({
       )
     ),
   },
-  returns: v.id("orders"),
+  returns: v.object({ orderId: v.id("orders"), accessToken: v.string() }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const province = getProvinceById(args.provinceId);
     const district = getDistrictById(args.provinceId, args.districtId);
     if (!province || !district) throw new Error("Türkiye il ve ilçe listesinden geçerli bir adres seçin.");
     const customerName = args.customerName.trim();
-    const customerEmail = args.customerEmail.trim();
+    const customerEmail = args.customerEmail.trim().toLowerCase();
     if (!customerName || customerName.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || customerEmail.length > 120) {
       throw new Error("Geçerli bir ad (en fazla 100 karakter) ve e-posta (en fazla 120 karakter) gereklidir.");
     }
@@ -287,14 +294,11 @@ export const createOrder = mutation({
       if (Number(item.price) !== Number(price)) throw new Error("Sepet fiyatı değişti. Ürünleri yeniden sepete ekleyin.");
       totalCents += cents * item.quantity;
       promotionLines.push({ productId: product._id, unitPriceKurus: cents, quantity: item.quantity, categorySlug: product.categorySlug });
-      const imageRecord = getImagesForVariant(product.images, variant!.selectedOptions)[0];
-      const image = imageRecord ? await ctx.storage.getUrl(imageRecord.storageId) : null;
+      const image = await resolveVariantImageUrl(ctx, product, variant!.selectedOptions);
       items.push({
         productId: product._id,
         variantId: variant?.id,
-        title: variant?.selectedOptions.length
-          ? `${product.title} — ${variant.selectedOptions.map(({ value }) => value).join(" / ")}`
-          : product.title,
+        title: getProductVariantTitle(product.title, variant),
         quantity: item.quantity,
         price: (cents / 100).toFixed(2),
         sku: variant?.sku,
@@ -312,6 +316,7 @@ export const createOrder = mutation({
         id: rule._id,
         title: rule.title,
         type: rule.type,
+        productId: rule.productId,
         categorySlug: rule.categorySlug,
         percentage: rule.percentage,
         buyQuantity: rule.buyQuantity,
@@ -354,9 +359,13 @@ export const createOrder = mutation({
       }
     }
 
-    const freeShippingThreshold = storeSettings.freeShippingThreshold ?? 0;
-    const isFreeShipping = promotion.freeShipping || freeShippingThreshold <= 0 || (totalCents / 100) >= freeShippingThreshold;
-    const shippingFee = isFreeShipping ? 0 : (storeSettings.shippingFee ?? 0);
+    const shipping = getShippingQuote({
+      subtotal: totalCents / 100,
+      freeShippingThreshold: storeSettings.freeShippingThreshold ?? 0,
+      shippingFee: storeSettings.shippingFee ?? 0,
+      promotionFreeShipping: promotion.freeShipping,
+    });
+    const shippingFee = shipping.shippingFee;
     const shippingFeeCents = Math.round(shippingFee * 100);
 
     const finalPayableCents = payableCents + additionalFeeCents + shippingFeeCents;
@@ -400,9 +409,11 @@ export const createOrder = mutation({
     // 3. Siparişi oluştur
     // Tüm siparişler "Sipariş Alındı" ("received") ve "Ödeme Bekliyor" ("pending") olarak açılır.
     // "paid" yalnızca yönetici ödeme onayıyla yazılır; PayTR demo akışı da gerçek tahsilat yapmaz.
+    const accessToken = randomHex(32);
     const orderId = await ctx.db.insert("orders", {
       userId: userId ?? undefined,
-      customerEmail: args.customerEmail.trim(),
+      customerEmail,
+      accessToken,
       customerName: args.customerName.trim(),
       customerPhone: args.customerPhone?.trim(),
       items,
@@ -443,7 +454,6 @@ export const createOrder = mutation({
     await adjustInventoryForOrder(ctx, createdOrder, -1);
     // Kupon kullanım hakkı da sipariş anında düşülür; iptalde geri iade edilir.
     if (coupon?.valid) await reserveCouponForOrder(ctx, createdOrder);
-    await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId });
     await ctx.scheduler.runAfter(0, internal.abandonedCartRecovery.markConvertedForOrder, { orderId });
 
     // Müşteriye sipariş alındı e-postası (havale/EFT veya kapıda ödeme beklenen siparişler dahil)
@@ -451,7 +461,7 @@ export const createOrder = mutation({
     // Yöneticiye yeni sipariş bildirimi
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId, event: "admin_order_alert" });
 
-    return orderId;
+    return { orderId, accessToken };
   },
 });
 
@@ -544,9 +554,19 @@ async function changeOrderStatus(
     await releaseCouponReservation(ctx, order);
     // Stok sipariş oluşturulurken rezerve edilmişti; her iptalde geri yüklenir.
     await adjustInventoryForOrder(ctx, order, 1);
+    for (const item of order.items) {
+      const productId = ctx.db.normalizeId("products", item.productId);
+      if (productId) {
+        await ctx.scheduler.runAfter(0, internal.restock.triggerRestockCheck, {
+          productId,
+          variantId: item.variantId,
+        });
+      }
+    }
   } else if (unCanceling) {
-    // İptal edilen sipariş tekrar aktif duruma alınırsa stok yeniden düşülür.
+    // İptal edilen sipariş tekrar aktif duruma alınırsa stok ve kupon yeniden rezerve edilir.
     await adjustInventoryForOrder(ctx, order, -1);
+    await reserveCouponForOrder(ctx, order);
   }
 
   if (!canceling && ((targetStatus !== "received" && targetStatus !== "cancelled") || targetPaymentStatus === "paid")) {
@@ -574,10 +594,6 @@ async function changeOrderStatus(
   }
 
   if (statusChanged || paymentStatusChanged) {
-    await ctx.scheduler.runAfter(0, internal.analytics.syncOrderAttribution, { orderId: id });
-  }
-
-  if (paymentStatusChanged && targetPaymentStatus === "paid") {
     await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmed" });
   }
   if (statusChanged && targetStatus === "shipped") {
@@ -615,19 +631,18 @@ export const updateStatus = mutation({
   },
 });
 
-// Ödemesi bu süre içinde tamamlanmayan ödeme bekleyen siparişler otomatik iptal edilir; rezerve edilen stok geri yüklenir.
-const UNPAID_ORDER_TTL_MS = 2 * 60 * 60 * 1000;
+// Yalnızca online ön ödeme bekleyen PayTR siparişleri zaman aşımına uğrar.
+// Kapıda ödeme teslimde tahsil edilir; havale/EFT ise yönetici onayı bekler.
+const PAYTR_UNPAID_ORDER_TTL_MS = 2 * 60 * 60 * 1000;
 
 export const cancelStaleUnpaid = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const cutoff = Date.now() - UNPAID_ORDER_TTL_MS;
-    // Yalnızca "sipariş alındı + ödeme bekliyor + süresi geçmiş" kayıtlar taranır;
-    // iptal edilince kayıt bu index aralığından çıkar, böylece kuyruk tıkanmaz.
+    const cutoff = Date.now() - PAYTR_UNPAID_ORDER_TTL_MS;
     const stale = await ctx.db.query("orders")
-      .withIndex("by_status_and_payment_status", (q) =>
-        q.eq("status", "received").eq("paymentStatus", "pending").lt("_creationTime", cutoff)
+      .withIndex("by_status_and_payment_status_and_paymentMethod", (q) =>
+        q.eq("status", "received").eq("paymentStatus", "pending").eq("paymentMethod", "paytr").lt("_creationTime", cutoff)
       )
       .take(100);
     for (const order of stale) {

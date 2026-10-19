@@ -9,8 +9,13 @@ import {
   PencilSquareIcon,
   ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Card, Input, Label } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
+import { ExportMenu } from "../_components/export-button";
 import { useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 
@@ -149,8 +154,9 @@ export default function InventoryPage() {
           </div>
 
           {/* Eşik Bilgisi */}
-          <div className="flex items-center justify-end text-xs text-muted-foreground font-mono">
-            <span>Eşik: ≤ {threshold} adet</span>
+          <div className="flex items-center justify-end gap-3">
+            <span className="text-xs text-muted-foreground font-mono">Eşik: ≤ {threshold} adet</span>
+            <ExportMenu type="inventory" />
           </div>
         </div>
 

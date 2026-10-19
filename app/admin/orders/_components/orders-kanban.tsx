@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -43,11 +43,11 @@ export function OrdersKanban({
   onOpenShippingDialog,
   updatingId,
 }: OrdersKanbanProps) {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;

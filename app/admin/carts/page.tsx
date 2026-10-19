@@ -12,16 +12,11 @@ import {
   ShoppingCartIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import {
-  Badge,
-  Button,
-  Card,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  Input,
-} from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
@@ -48,7 +43,6 @@ type AbandonedCart = {
   status: "active" | "sending" | "sent" | "converted" | "unsubscribed" | "failed" | "expired" | string;
   orderId?: string;
   restoreToken: string;
-  reminderScheduled: boolean;
   lastActivityAt: number;
   expiresAt: number;
   emailSentAt?: number;

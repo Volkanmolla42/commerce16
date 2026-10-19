@@ -5,7 +5,6 @@ import { assertAdminApiSecret } from "./adminAuth";
 
 const reviewItemValidator = v.object({
   _id: v.id("reviews"),
-  _creationTime: v.number(),
   productId: v.id("products"),
   userId: v.optional(v.id("users")),
   orderId: v.optional(v.id("orders")),
@@ -15,20 +14,7 @@ const reviewItemValidator = v.object({
   content: v.string(),
   isVerifiedPurchase: v.boolean(),
   status: v.union(v.literal("approved"), v.literal("pending"), v.literal("rejected")),
-  createdAt: v.number(),
-});
-
-const orderFeedbackItemValidator = v.object({
-  _id: v.id("orderFeedback"),
   _creationTime: v.number(),
-  orderId: v.id("orders"),
-  userId: v.id("users"),
-  customerName: v.string(),
-  customerEmail: v.string(),
-  storeRating: v.number(),
-  deliveryRating: v.optional(v.number()),
-  comment: v.optional(v.string()),
-  createdAt: v.number(),
 });
 
 /** Bir ürünün onaylanmış yorumlarını ve özet puan istatistiklerini getirir. */
@@ -282,7 +268,6 @@ export const submitOrderReview = mutation({
           rating,
           title: item.title?.trim() || undefined,
           content: trimmedContent,
-          createdAt: Date.now(),
         });
       } else {
         // Yeni ekle
@@ -296,7 +281,6 @@ export const submitOrderReview = mutation({
           content: trimmedContent,
           isVerifiedPurchase: true,
           status: "approved",
-          createdAt: Date.now(),
         });
       }
       savedReviewsCount++;
@@ -321,7 +305,6 @@ export const submitOrderReview = mutation({
           storeRating,
           deliveryRating,
           comment,
-          createdAt: Date.now(),
         });
       } else {
         await ctx.db.insert("orderFeedback", {
@@ -332,7 +315,6 @@ export const submitOrderReview = mutation({
           storeRating,
           deliveryRating,
           comment,
-          createdAt: Date.now(),
         });
       }
       savedStoreFeedback = true;
@@ -343,24 +325,6 @@ export const submitOrderReview = mutation({
       savedReviewsCount,
       savedStoreFeedback,
     };
-  },
-});
-
-/** Admin: Mağaza Alışveriş Deneyimi Geri Bildirimlerini Listele (Sadece Admin İçin) */
-export const listAdminOrderFeedback = query({
-  args: {
-    adminSecret: v.string(),
-    limit: v.optional(v.number()),
-  },
-  returns: v.array(orderFeedbackItemValidator),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
-
-    return await ctx.db
-      .query("orderFeedback")
-      .order("desc")
-      .take(limit);
   },
 });
 

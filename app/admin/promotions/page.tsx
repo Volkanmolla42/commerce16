@@ -5,7 +5,11 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { NoSymbolIcon, PlusIcon } from "@heroicons/react/24/outline";
-import { Badge, Button, Card, Input, Label } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
@@ -52,7 +56,7 @@ export default function AdminPromotionsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const categoryTitle = (slug?: string) => categories?.find((category) => category.slug === slug)?.title;
-  const productTitle = (id?: string) => products?.find((product) => product._id === id)?.title;
+  const productTitle = (id?: string) => products?.find((product) => product.id === id)?.title;
 
   const changeType = (next: PromotionType) => {
     setType(next);
@@ -228,7 +232,7 @@ export default function AdminPromotionsPage() {
                 >
                   <option value="">Ürün seçin</option>
                   {(products ?? []).map((product) => (
-                    <option key={product._id} value={product._id}>{product.title}</option>
+                    <option key={product.id} value={product.id}>{product.title}</option>
                   ))}
                 </select>
               </div>

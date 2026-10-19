@@ -122,12 +122,12 @@ export async function reserveCouponForOrder(ctx: MutationCtx, order: Doc<"orders
 }
 
 export async function releaseCouponReservation(ctx: MutationCtx, order: Doc<"orders">) {
-  if (!order.couponCode || order.couponReserved !== true) return;
+  if (!order.couponCode || (order.couponReserved !== true && order.couponRedeemed !== true)) return;
   const coupon = order.couponId
     ? await ctx.db.get(order.couponId)
     : await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", order.couponCode!)).unique();
   if (coupon) await ctx.db.patch(coupon._id, { usedCount: Math.max(0, coupon.usedCount - 1) });
-  await ctx.db.patch(order._id, { couponReserved: false });
+  await ctx.db.patch(order._id, { couponReserved: false, couponRedeemed: false });
 }
 
 export async function commitCouponReservation(ctx: MutationCtx, order: Doc<"orders">) {

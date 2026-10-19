@@ -18,7 +18,6 @@ import { OrderReorderButton } from "@/components/orders/order-reorder-button";
 import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { AccountLoginCard } from "./account-gate";
 import { Sk, SkLine, SkField } from "./skeleton";
-import { ArrowRight01Icon, ShoppingBag01Icon } from "hugeicons-react";
 import { OrderReviewModal } from "@/components/account/order-review-modal";
 
 export function AccountOrdersSkeleton() {
@@ -146,7 +145,7 @@ export default function AccountOrdersPage() {
               >
                 <Link href={`/account/orders/${order._id}`}>
                   <span>Sipariş Detayı</span>
-                  <ArrowRight01Icon className="ml-1 h-3.5 w-3.5" />
+                  <ArrowRightIcon className="ml-1 h-3.5 w-3.5" />
                 </Link>
               </Button>
             </div>
@@ -173,7 +172,7 @@ export default function AccountOrdersPage() {
                       </div>
                     ) : (
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
-                        <ShoppingBag01Icon className="h-5 w-5" />
+                        <ShoppingBagIcon className="h-5 w-5" />
                       </div>
                     )}
                     <div className="min-w-0">

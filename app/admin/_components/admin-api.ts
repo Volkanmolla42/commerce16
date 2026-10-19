@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanAdminErrorMessage } from "@/lib/admin/error-message";
 
 type ResourceState<T> = {
   data: T | null;
@@ -9,15 +10,6 @@ type ResourceState<T> = {
   refresh: () => Promise<void>;
 };
 
-function cleanErrorMessage(raw: string): string {
-  return raw
-    .replace(/^\[Request ID:[^\]]+\]\s*/i, "")
-    .replace(/^Server Error\s*/i, "")
-    .replace(/^Uncaught (?:Convex)?Error:\s*/i, "")
-    .replace(/^Error:\s*/i, "")
-    .trim();
-}
-
 async function adminRequest<T>(url: string, options: RequestInit, fallback: string): Promise<T> {
   const response = await fetch(url, options);
   const payload: unknown = await response.json().catch(() => null);
@@ -25,7 +17,7 @@ async function adminRequest<T>(url: string, options: RequestInit, fallback: stri
     const message =
       payload && typeof payload === "object" && "error" in payload &&
       typeof payload.error === "string"
-        ? cleanErrorMessage(payload.error)
+        ? cleanAdminErrorMessage(payload.error)
         : fallback;
     throw new Error(message || fallback);
   }

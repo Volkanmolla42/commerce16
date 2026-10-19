@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { mapRecommendationProduct, Shelf } from "./recommendation-shelves";
+import { Shelf } from "./recommendation-shelves";
 import { getRecentProductSlugs, RECENT_PRODUCTS_EVENT } from "@/lib/catalog/recommendations";
 
 export function RecentlyViewedShelf({ excludeProductId }: { excludeProductId: string }) {
@@ -22,7 +22,6 @@ export function RecentlyViewedShelf({ excludeProductId }: { excludeProductId: st
 
   const data = useQuery(api.products.getBySlugs, slugs.length > 0 ? { slugs } : "skip");
   const products = (data ?? [])
-    .map(mapRecommendationProduct)
     .filter((product) => product.id !== excludeProductId)
     .slice(0, 5);
 

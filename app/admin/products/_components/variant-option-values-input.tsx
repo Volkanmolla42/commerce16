@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 export function VariantOptionValuesInput({

@@ -13,7 +13,9 @@ import {
   PlusIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Card, Badge } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { AdminEmpty, AdminLoading, AdminNotice } from "./_components/admin-primitives";
 import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { useAdminResource } from "./_components/admin-api";

@@ -100,20 +100,15 @@ export function formatOrderCode(orderId?: string | null, prefix = false): string
 }
 
 /**
- * Sipariş nesnesinden veya kimliğinden sipariş kodunu döner.
- * Eğer siparişte özel `orderNumber` alanı varsa onu kullanır, yoksa ID'den formatlar.
+ * Sipariş ID'sinden görüntülenecek sipariş kodunu üretir.
  */
 export function getOrderCode(
-  order?: { _id: string; orderNumber?: string | number } | string | null,
+  order?: { _id: string } | string | null,
   prefix = false
 ): string {
   if (!order) return "";
   if (typeof order === "string") {
     return formatOrderCode(order, prefix);
-  }
-  if ("orderNumber" in order && order.orderNumber) {
-    const num = String(order.orderNumber).trim();
-    return prefix ? `#${num}` : num;
   }
   return formatOrderCode(order._id, prefix);
 }

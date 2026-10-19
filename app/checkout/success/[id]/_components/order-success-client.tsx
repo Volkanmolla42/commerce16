@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useConvexAuth } from "@convex-dev/auth/react";
-import type { Id } from "@/convex/_generated/dataModel";
 import { trackPixelPurchase } from "@/lib/analytics/meta-pixel";
 import {
   CheckBadgeIcon,
@@ -22,7 +21,8 @@ import {
   CreditCardIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatMoney } from "@/lib/format-money";
 import { OrderStatusBadge } from "@/components/orders/order-badges";
 import { useCart } from "@/components/cart/cart-context";
@@ -34,34 +34,51 @@ import { formatDateTime } from "@/lib/format-date";
 import { formatIban } from "@/lib/iban";
 import { OrderPriceSummary } from "@/components/orders/order-price-summary";
 
-export default function OrderSuccessClient({ orderId }: { orderId: string }) {
+export default function OrderSuccessClient({ orderId, token, quickBuy }: { orderId: string; token?: string; quickBuy: boolean }) {
   const { clearCart } = useCart();
   const { isAuthenticated } = useConvexAuth();
   const [copied, setCopied] = useState(false);
   const [copiedIban, setCopiedIban] = useState<string | null>(null);
+  const clearedRef = useRef(false);
 
-  // Sayfa açıldığında sepet ve taslakları temizle
+  const order = useQuery(
+    api.orders.getOrderById,
+    orderId ? { id: orderId, ...(token ? { token } : {}) } : "skip"
+  );
+  const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
+
+  // Sepet yalnızca sipariş gerçekten yüklendiğinde temizlenir; geçersiz/eski URL sepeti silmez.
   useEffect(() => {
-    clearCart();
-    clearQuickBuyItem();
+    if (!order || clearedRef.current) return;
+    clearedRef.current = true;
+    if (quickBuy) {
+      clearQuickBuyItem();
+    } else {
+      clearCart();
+    }
     try {
       clearCartRecoverySessionKey();
     } catch {
       // Ignored
     }
-  }, [clearCart]);
-
-  const order = useQuery(
-    api.orders.getOrderById,
-    orderId ? { id: orderId as Id<"orders"> } : "skip"
-  );
-  const paymentSettings = useQuery(api.payments.getPaymentSettings, {});
+  }, [order, quickBuy, clearCart]);
 
   const hasTrackedPixelRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!order || hasTrackedPixelRef.current === order._id) return;
+    if (!order || order.paymentStatus !== "paid" || hasTrackedPixelRef.current === order._id) return;
+    const storageKey = `meta-purchase:${order._id}`;
+    try {
+      if (window.localStorage.getItem(storageKey)) return;
+    } catch {
+      // Storage kapalıysa yalnız bu oturumda bir kez gönderilir.
+    }
     hasTrackedPixelRef.current = order._id;
+    try {
+      window.localStorage.setItem(storageKey, "1");
+    } catch {
+      // Ignored
+    }
 
     const totalNum = Number(order.total);
     trackPixelPurchase({

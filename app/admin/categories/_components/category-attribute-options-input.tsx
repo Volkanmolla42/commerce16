@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { ATTRIBUTE_OPTION_LIMIT, normalizeAttributeLabel } from "@/lib/catalog/attributes";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 

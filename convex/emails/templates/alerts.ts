@@ -19,12 +19,12 @@ export interface ContactEmailData {
   senderPhone: string | null;
   messageSubject: string;
   message: string;
-  createdAt: number;
+  _creationTime: number;
 }
 
 export function renderContactEmail(data: ContactEmailData): EmailContent {
   const subject = `Yeni İletişim Mesajı: ${data.messageSubject} (${data.senderName}) | ${data.storeName}`;
-  const dateText = formatDateTime(data.createdAt, { dateStyle: "full", timeStyle: "short" });
+  const dateText = formatDateTime(data._creationTime, { dateStyle: "full", timeStyle: "short" });
 
   const senderRows = [
     field("Ad Soyad", `<strong>${escapeHtml(data.senderName)}</strong>`),
@@ -123,14 +123,14 @@ export interface ProductQuestionEmailData {
   productUrl: string;
   user: { name: string; email: string | null };
   question: string;
-  createdAt: number;
+  _creationTime: number;
   adminQuestionsUrl: string;
 }
 
 export function renderProductQuestionEmail(data: ProductQuestionEmailData): EmailContent {
   const productTitle = data.productTitle ?? "Ürün silinmiş";
   const subject = `Yeni Ürün Sorusu: ${productTitle} (${data.user.name}) | ${data.storeName}`;
-  const dateText = formatDateTime(data.createdAt, { dateStyle: "full", timeStyle: "short" });
+  const dateText = formatDateTime(data._creationTime, { dateStyle: "full", timeStyle: "short" });
 
   const rows = [
     field("Ürün", `<strong>${escapeHtml(productTitle)}</strong>`),

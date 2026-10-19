@@ -1,5 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
+import { cleanAdminErrorMessage } from "./error-message";
 
 export function getAdminBackend() {
   const adminSecret = process.env.ADMIN_API_SECRET;
@@ -16,15 +17,7 @@ export function getAdminErrorMessage(error: unknown) {
 
   const rawMessage = error.message.trim();
   const stackStart = rawMessage.search(/\s+at\s+[^()\r\n]+\([^\r\n)]*:\d+:\d+\)?/);
-  let message = (stackStart >= 0 ? rawMessage.slice(0, stackStart) : rawMessage.split(/\r?\n\s*at\s+/)[0]).trim();
-
-  // Convex Request ID, Server Error ve Uncaught Error öneklerini temizle
-  message = message
-    .replace(/^\[Request ID:[^\]]+\]\s*/i, "")
-    .replace(/^Server Error\s*/i, "")
-    .replace(/^Uncaught (?:Convex)?Error:\s*/i, "")
-    .replace(/^Error:\s*/i, "")
-    .trim();
+  const message = cleanAdminErrorMessage(stackStart >= 0 ? rawMessage.slice(0, stackStart) : rawMessage.split(/\r?\n\s*at\s+/)[0]);
 
   return message || "İşlem tamamlanamadı.";
 }

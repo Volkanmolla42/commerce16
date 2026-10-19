@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui";
+import { Input } from "@/components/ui/input";
 import { type CategoryAttributeDefinition } from "@/lib/catalog/attributes";
 import { ChevronUpDownIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 

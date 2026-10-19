@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Card } from "@/components/ui";
+import { Card } from "@/components/ui/card";
 import { AccountNav, AccountNavFallback } from "./account-nav";
 import { SidebarProfile } from "./sidebar-profile";
 

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { Button, Input, Label } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminLoading, AdminNotice } from "../../_components/admin-primitives";
 import { runAdminAction, useAdminResource } from "../../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";
@@ -398,7 +400,7 @@ function ProductEditor({
     return existingVariants.length ? existingVariants : [{
       id: createEditorId(),
       selectedOptions: [],
-      sku: generatedVariantSku(product?.slug || "", []),
+      sku: generatedVariantSku(product?.slug || createEditorId(), []),
       barcode: "",
       price: "",
       compareAtPrice: "",

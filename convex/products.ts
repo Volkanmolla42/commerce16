@@ -4,50 +4,53 @@ import { paginationOptsValidator, paginationResultValidator } from "convex/serve
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import schema from "./schema";
+import schema, { productsTable } from "./schema";
 import { insertCatalogProduct, patchCatalogProduct, deleteCatalogProduct, withoutCatalogMetadata } from "./catalogModel";
 import { assertAdminApiSecret } from "./adminAuth";
 import { resolveLowStockThreshold } from "./settings";
-import { getProductPriceRange, isVariantSellable } from "../lib/catalog/variants";
+import { isVariantSellable } from "../lib/catalog/variants";
 import { catalogSearchQuery } from "../lib/catalog/smart-search";
 import {
   normalizeVariantSkus,
   normalizeSku,
   syncProductSkus,
 } from "./productSkus";
+import { resolveDescriptionImages, resolvePublicImages } from "./productMedia";
+import {
+  productImageValidator,
+  productOptionValidator,
+  productVariantValidator,
+  toProductBase,
+} from "./productShape";
 
 // Varyant stoğu ürün dokümanı içinde olduğu için indekslenemez; uyarı listesi sınırlı tarama ile üretilir.
 const LOW_STOCK_SCAN_LIMIT = 500;
 
 const productDocumentValidator = schema.doc("products");
-const productInputValidator = productDocumentValidator.omit(
-  "_id", "_creationTime", "updatedAt", "priceValue",
+const productInputValidator = productsTable.validator.omit(
+  "updatedAt", "priceValue",
 );
 const adminStoredImageValidator = v.object({
   storageId: v.id("_storage"), fileName: v.string(), url: v.union(v.string(), v.null()),
   selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
 });
-const publicImageValidator = v.object({
-  url: v.string(), selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
-});
-const publicVariantValidator = v.object({
+const productValidator = v.object({
   id: v.string(),
+  slug: v.string(),
   title: v.string(),
+  price: v.string(),
   availableForSale: v.boolean(),
-  selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
-  price: v.string(),
-  compareAtPrice: v.optional(v.string()),
-  sku: v.optional(v.string()),
-  barcode: v.optional(v.string()),
-  stockQuantity: v.optional(v.number()),
-});
-const productValidator = productDocumentValidator.omit(
-  "images", "variants", "priceValue",
-).extend({
-  price: v.string(),
-  images: v.array(publicImageValidator),
-  variants: v.array(publicVariantValidator),
+  attributes: productDocumentValidator.fields.attributes,
+  categorySlug: v.optional(v.string()),
+  description: v.optional(v.string()),
   descriptionImages: v.optional(v.array(v.object({ url: v.string() }))),
+  images: v.array(productImageValidator),
+  options: v.optional(v.array(productOptionValidator)),
+  variants: v.array(productVariantValidator),
+  _creationTime: v.number(),
+  soldCount: v.number(),
+  inStock: v.boolean(),
+  updatedAt: v.string(),
 });
 const sitemapProductValidator = v.object({ slug: v.string(), updatedAt: v.string() });
 
@@ -116,8 +119,14 @@ function validateProductVariants(
 
   const skus = new Set<string>();
   const combinations = new Set<string>();
+  const variantIds = new Set<string>();
 
   for (const variant of variants) {
+    const variantId = variant.id.trim();
+    if (!variantId) throw new Error("Her varyantın benzersiz bir kimliği olmalı.");
+    if (variantIds.has(variantId)) throw new Error("Aynı varyant kimliği birden fazla kullanılamaz.");
+    variantIds.add(variantId);
+
     if (!Number.isSafeInteger(variant.stockQuantity) || variant.stockQuantity < 0) {
       throw new Error("Her varyant için sıfır veya daha büyük tam sayı stok girin.");
     }
@@ -166,38 +175,17 @@ function validateProductVariantsAndOptions(product: Pick<Doc<"products">, "varia
   validateProductVariants(variants, options);
 }
 
-async function withPublicImageUrls(ctx: QueryCtx, product: Doc<"products">) {
-  const images = await Promise.all(product.images.map(async ({ storageId, selectedOptions }) => {
-    const url = await ctx.storage.getUrl(storageId);
-    return url ? { url, ...(selectedOptions ? { selectedOptions } : {}) } : null;
-  }));
-  const descriptionImages = await Promise.all((product.descriptionImageStorageIds ?? []).map(async (storageId) => {
-    const url = await ctx.storage.getUrl(storageId);
-    return url ? { url } : null;
-  }));
-  const variants = product.variants.map((variant) => ({
-    ...variant,
-    stockQuantity: Math.max(0, variant.stockQuantity),
-    availableForSale: isVariantSellable(variant),
-  }));
-  const hasInStockVariant = variants.some((variant) => variant.availableForSale);
+async function toStorefrontProduct(ctx: QueryCtx, product: Doc<"products">) {
+  const base = await toProductBase(ctx, product);
+  const descriptionImages = await resolveDescriptionImages(ctx, product.descriptionImageStorageIds);
+  const availableForSale = product.availableForSale && base.variants.some((variant) => variant.availableForSale);
   return {
-    _id: product._id,
-    _creationTime: product._creationTime,
-    slug: product.slug,
-    title: product.title,
-    price: getProductPriceRange(product).min,
-    soldCount: product.soldCount ?? 0,
-    publishedAt: product.publishedAt,
-    availableForSale: product.availableForSale && hasInStockVariant,
+    ...base,
+    availableForSale,
+    inStock: availableForSale,
     attributes: product.attributes,
-    categorySlug: product.categorySlug,
     description: product.description,
-    descriptionImages: descriptionImages.filter((image): image is NonNullable<typeof image> => Boolean(image)),
-    images: images.filter((image): image is NonNullable<typeof image> => Boolean(image)),
-    options: product.options,
-    variants,
-    updatedAt: product.updatedAt,
+    descriptionImages,
   };
 }
 
@@ -364,7 +352,7 @@ export const list = query({
       ? await ctx.db.query("products").withIndex("by_available", (q) => q.eq("availableForSale", true)).take(limit)
       : await ctx.db.query("products").withIndex("by_available_and_category", (q) =>
           q.eq("availableForSale", true).eq("categorySlug", args.categorySlug)).take(limit);
-    return await Promise.all(items.map((item) => withPublicImageUrls(ctx, item)));
+    return await Promise.all(items.map((item) => toStorefrontProduct(ctx, item)));
   },
 });
 
@@ -392,23 +380,11 @@ export const listForGoogleShoppingFeed = query({
       .withIndex("by_available", (q) => q.eq("availableForSale", true))
       .order("desc")
       .paginate(args.paginationOpts);
-    const page = await Promise.all(result.page.map((item) => withPublicImageUrls(ctx, item)));
+    const page = await Promise.all(result.page.map((item) => toStorefrontProduct(ctx, item)));
     return {
       ...result,
       page,
     };
-  },
-});
-
-export const listAllAdmin = query({
-  args: {
-    adminSecret: v.string(),
-  },
-  returns: v.array(adminProductValidator),
-  handler: async (ctx, args) => {
-    assertAdminApiSecret(args.adminSecret);
-    const items = await ctx.db.query("products").order("desc").take(100);
-    return await Promise.all(items.map((item) => withAdminMediaUrls(ctx, item)));
   },
 });
 
@@ -451,9 +427,7 @@ export const listForExportAdmin = query({
       .order("desc")
       .paginate({ numItems: Math.min(args.limit ?? 250, 500), cursor: args.cursor });
     const page = await Promise.all(result.page.map(async (item) => {
-      const imageUrls = (await Promise.all(
-        item.images.map((img) => ctx.storage.getUrl(img.storageId))
-      )).filter((url): url is string => Boolean(url));
+      const imageUrls = (await resolvePublicImages(ctx, item.images)).map((image) => image.url);
       return {
         slug: item.slug,
         title: item.title,
@@ -543,6 +517,7 @@ export const importBatchAdmin = mutation({
         };
         const normalized = normalizeVariantSkus(productData);
         validateProductVariantsAndOptions(normalized);
+        await validateProductAttributes(ctx, normalized);
 
         const existing = await ctx.db
           .query("products")
@@ -553,23 +528,20 @@ export const importBatchAdmin = mutation({
 
         if (existing) {
           const nextImages = item.images && item.images.length > 0 ? item.images : existing.images;
-          const publishedAt = !existing.availableForSale && normalized.availableForSale && existing.publishedAt === undefined
-            ? Date.now()
-            : existing.publishedAt;
+          await validateProductImages(ctx, nextImages, normalized.options, normalized.variants);
 
           await syncProductSkus(ctx, existing._id, normalized);
           await patchCatalogProduct(ctx, existing, {
             ...normalized,
             images: nextImages,
-            publishedAt,
             updatedAt,
           });
           updated++;
         } else {
+          await validateProductImages(ctx, normalized.images, normalized.options, normalized.variants);
           const productId = await insertCatalogProduct(ctx, {
             ...normalized,
             images: normalized.images,
-            publishedAt: normalized.availableForSale ? Date.now() : undefined,
             updatedAt,
           });
           await syncProductSkus(ctx, productId, normalized);
@@ -698,7 +670,7 @@ export const getBySlug = query({
       .query("products")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .first();
-    return product?.availableForSale ? await withPublicImageUrls(ctx, product) : null;
+    return product?.availableForSale ? await toStorefrontProduct(ctx, product) : null;
   },
 });
 
@@ -741,7 +713,7 @@ export const getBySlugs = query({
         .query("products")
         .withIndex("by_slug", (q) => q.eq("slug", slug))
         .first();
-      if (product?.availableForSale) products.push(await withPublicImageUrls(ctx, product));
+      if (product?.availableForSale) products.push(await toStorefrontProduct(ctx, product));
     }
     return products;
   },
@@ -757,7 +729,7 @@ export const getByIds = query({
       const id = ctx.db.normalizeId("products", rawId);
       if (!id) continue;
       const product = await ctx.db.get(id);
-      if (product?.availableForSale) products.push(await withPublicImageUrls(ctx, product));
+      if (product?.availableForSale) products.push(await toStorefrontProduct(ctx, product));
     }
     return products;
   },
@@ -845,7 +817,6 @@ export const create = mutation({
     const updatedAt = new Date().toISOString();
     const productId = await insertCatalogProduct(ctx, {
       ...normalizedProduct,
-      ...(normalizedProduct.availableForSale ? { publishedAt: Date.now() } : {}),
       ...(media.descriptionImageStorageIds !== undefined ? { descriptionImageStorageIds: media.descriptionImageStorageIds } : {}),
       updatedAt,
     });
@@ -876,9 +847,6 @@ export const update = mutation({
     const nextDescriptionImageStorageIds = rest.descriptionImageStorageIds ?? current.descriptionImageStorageIds ?? [];
     const removedDescriptionImageStorageIds = (current.descriptionImageStorageIds ?? [])
       .filter((storageId) => !nextDescriptionImageStorageIds.includes(storageId));
-    const publishedAt = !current.availableForSale && rest.availableForSale === true && current.publishedAt === undefined
-      ? Date.now()
-      : current.publishedAt;
 
     if (rest.slug && rest.slug !== current.slug) {
       const duplicate = await ctx.db
@@ -894,7 +862,6 @@ export const update = mutation({
       variants: next.variants,
       images: nextImages,
       ...(media.descriptionImageStorageIds !== undefined ? { descriptionImageStorageIds: media.descriptionImageStorageIds } : {}),
-      ...(publishedAt !== undefined ? { publishedAt } : {}),
       updatedAt: new Date().toISOString(),
     });
     await deleteUnreferencedStorage(ctx, removedDescriptionImageStorageIds);
@@ -936,11 +903,32 @@ export const remove = mutation({
         )
       : [];
     if (product) {
-      for (const image of product.images) {
-        if (await ctx.db.system.get("_storage", image.storageId)) {
-          await ctx.storage.delete(image.storageId);
-        }
-      }
+      // Sipariş geçmişindeki görsel URL'leri ürün silindikten sonra da çalışmalı; galeri blob'ları korunur.
+      const reviews = await ctx.db.query("reviews")
+        .withIndex("by_product", (q) => q.eq("productId", args.id))
+        .take(500);
+      for (const review of reviews) await ctx.db.delete(review._id);
+
+      const questions = await ctx.db.query("productQuestions")
+        .withIndex("by_product_and_status", (q) => q.eq("productId", args.id))
+        .take(500);
+      for (const question of questions) await ctx.db.delete(question._id);
+
+      const restockSubscriptions = await ctx.db.query("restockSubscriptions")
+        .withIndex("by_product_and_variant", (q) => q.eq("productId", args.id))
+        .take(500);
+      for (const subscription of restockSubscriptions) await ctx.db.delete(subscription._id);
+
+      const lowStockAlerts = await ctx.db.query("lowStockAlerts")
+        .withIndex("by_product_and_variant", (q) => q.eq("productId", args.id))
+        .take(500);
+      for (const alert of lowStockAlerts) await ctx.db.delete(alert._id);
+
+      const favorites = await ctx.db.query("favorites")
+        .withIndex("by_product_slug", (q) => q.eq("productSlug", product.slug))
+        .take(500);
+      for (const favorite of favorites) await ctx.db.delete(favorite._id);
+
       const registry = await ctx.db.query("productSkus")
         .withIndex("by_product", (q) => q.eq("productId", args.id))
         .take(101);

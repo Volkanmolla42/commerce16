@@ -4,7 +4,8 @@ import { components, internal } from "./_generated/api";
 import { internalAction, internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { assertAdminApiSecret } from "./adminAuth";
-import { getImagesForVariant } from "../lib/catalog/product-images";
+import { resolveFirstImageUrl } from "./productMedia";
+import { enrichCartItems } from "./cartAdmin";
 import { isEmailConfigured, siteLink } from "./emails/config";
 import { renderCartRecoveryEmail } from "./emails/templates/marketing";
 import { sendEmail } from "./emails/send";
@@ -13,7 +14,6 @@ import { readStoreSettings } from "./settings";
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   cartRecoveryConsent: { kind: "fixed window", rate: 5, period: 60 * 60 * 1000 },
 });
-const consentCopyVersion = "cart-reminder-v1";
 const reminderDelayMs = 60 * 60 * 1000;
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
 const itemInputValidator = v.object({
@@ -22,11 +22,7 @@ const itemInputValidator = v.object({
   quantity: v.number(),
 });
 
-function randomHex(byteLength: number) {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
+import { randomHex } from "./random";
 
 async function hash(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -68,15 +64,12 @@ export const capture = mutation({
 
     if (!args.emailConsent) {
       if (!existing) return null;
-      const now = Date.now();
       await ctx.db.patch(existing._id, {
         items: [],
         orderId: undefined,
         email: undefined,
         emailConsent: false,
-        emailOptedOutAt: existing.emailConsent ? now : existing.emailOptedOutAt,
         status: "unsubscribed",
-        reminderScheduled: false,
       });
       return existing._id;
     }
@@ -113,33 +106,28 @@ export const capture = mutation({
     }
 
     const now = Date.now();
-    const needsNewReminder = !existing ||
+    const sendingStale = existing?.status === "sending" && now - existing.lastActivityAt > 15 * 60 * 1000;
+    const needsNewReminder = sendingStale || !existing ||
       existing.status === "sent" || existing.status === "converted" || existing.status === "unsubscribed" ||
       existing.status === "failed" || existing.status === "expired" || newEmailConsent;
     const notificationId = needsNewReminder ? randomHex(16) : existing.notificationId;
     const restoreToken = needsNewReminder ? randomHex(32) : existing.restoreToken;
     const unsubscribeToken = needsNewReminder ? randomHex(32) : existing.unsubscribeToken;
-    const reminderScheduled = needsNewReminder ? true : existing.reminderScheduled;
     const status = existing?.status === "sending" && !needsNewReminder ? "sending" as const : "active" as const;
     const itemList = [...lines.values()];
     const emailConsentFields = args.emailConsent
       ? { emailConsentedAt: newEmailConsent ? now : existing?.emailConsentedAt ?? now }
-      : {
-          ...(existing?.emailConsentedAt !== undefined ? { emailConsentedAt: existing.emailConsentedAt } : {}),
-          ...(existing?.emailConsent ? { emailOptedOutAt: now } : existing?.emailOptedOutAt !== undefined ? { emailOptedOutAt: existing.emailOptedOutAt } : {}),
-        };
+      : existing?.emailConsentedAt !== undefined ? { emailConsentedAt: existing.emailConsentedAt } : {};
     const base = {
       items: itemList,
       email,
       emailConsent: args.emailConsent,
       ...emailConsentFields,
-      consentCopyVersion,
       status,
       ...(existing ? { orderId: needsNewReminder ? undefined : existing.orderId } : {}),
       unsubscribeToken,
       restoreToken,
       notificationId,
-      reminderScheduled,
       lastActivityAt: now,
       expiresAt: now + retentionMs,
       ...(existing && needsNewReminder ? { emailSentAt: undefined } : {}),
@@ -193,7 +181,6 @@ export const markConvertedForOrder = internalMutation({
         items: [],
         status: "converted",
         email: undefined,
-        reminderScheduled: false,
       });
     }
     return null;
@@ -209,15 +196,12 @@ export const unsubscribe = mutation({
       .withIndex("by_unsubscribe_token", (q) => q.eq("unsubscribeToken", token))
       .first();
     if (cart) {
-      const now = Date.now();
       await ctx.db.patch(cart._id, {
         items: [],
         orderId: undefined,
         email: undefined,
         emailConsent: false,
-        emailOptedOutAt: cart.emailConsent ? now : cart.emailOptedOutAt,
         status: "unsubscribed",
-        reminderScheduled: false,
       });
     }
     return null;
@@ -266,7 +250,7 @@ export const claimReminder = internalMutation({
     if (!cart || cart.notificationId !== notificationId || (cart.status !== "active" && !force)) return null;
     const now = Date.now();
     if (cart.expiresAt <= now && !force) {
-      await ctx.db.patch(cartId, { items: [], status: "expired", email: undefined, reminderScheduled: false });
+      await ctx.db.patch(cartId, { items: [], status: "expired", email: undefined });
       return null;
     }
     if (!force && cart.lastActivityAt + reminderDelayMs > now) {
@@ -279,7 +263,7 @@ export const claimReminder = internalMutation({
     if (cart.orderId) {
       const order = await ctx.db.get(cart.orderId);
       if (order && order.status !== "cancelled") {
-        await ctx.db.patch(cartId, { items: [], status: "converted", email: undefined, reminderScheduled: false });
+        await ctx.db.patch(cartId, { items: [], status: "converted", email: undefined });
         return null;
       }
     }
@@ -296,8 +280,7 @@ export const claimReminder = internalMutation({
       if (variantId && !variant) continue;
       if (variant && !variant.availableForSale) continue;
 
-      const firstImage = product.images?.[0];
-      const imageUrl = firstImage ? await ctx.storage.getUrl(firstImage.storageId) : null;
+      const imageUrl = await resolveFirstImageUrl(ctx, product);
       const price = variant?.price ?? product.variants?.[0]?.price ?? "0";
       const variantTitle = variant?.title && variant.title !== "Default Title" ? variant.title : undefined;
 
@@ -311,13 +294,13 @@ export const claimReminder = internalMutation({
       });
     }
     if (items.length === 0 || !cart.emailConsent) {
-      await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
+      await ctx.db.patch(cartId, { status: "failed", email: undefined });
       return null;
     }
 
     const email = cart.emailConsent && cart.email && isEmailConfigured() ? cart.email : null;
     if (!email) {
-      await ctx.db.patch(cartId, { status: "failed", email: undefined, reminderScheduled: false });
+      await ctx.db.patch(cartId, { status: "failed", email: undefined });
       return null;
     }
 
@@ -350,7 +333,6 @@ export const finishReminder = internalMutation({
       status: args.emailSent ? "sent" : "failed",
       email: undefined,
       emailSentAt: args.emailSent ? Date.now() : cart.emailSentAt,
-      reminderScheduled: false,
     });
     return null;
   },
@@ -363,35 +345,39 @@ export const processReminder = internalAction({
     const reminder = await ctx.runMutation(internal.abandonedCartRecovery.claimReminder, args);
     if (!reminder) return null;
 
-    const outcome = await sendEmail(ctx, {
-      to: reminder.email,
-      storeName: reminder.storeName,
-      templateKey: "abandoned_cart_recovery",
-      content: renderCartRecoveryEmail({
+    let emailSent = false;
+    try {
+      const outcome = await sendEmail(ctx, {
+        to: reminder.email,
         storeName: reminder.storeName,
-        items: reminder.items.map((item) => ({
-          title: item.title,
-          quantity: item.quantity,
-          price: item.price,
-          image: item.imageUrl,
-          meta: item.variantTitle,
-        })),
-        cartUrl: siteLink("/cart", { recover: reminder.restoreToken }),
-        unsubscribeUrl: siteLink("/cart-reminders/unsubscribe", { token: reminder.unsubscribeToken }),
-      }),
-      idempotencyKey: `cart-recovery/${reminder.notificationId}`,
-      metadata: {
+        templateKey: "abandoned_cart_recovery",
+        content: renderCartRecoveryEmail({
+          storeName: reminder.storeName,
+          items: reminder.items.map((item) => ({
+            title: item.title,
+            quantity: item.quantity,
+            price: item.price,
+            image: item.imageUrl,
+            meta: item.variantTitle,
+          })),
+          cartUrl: siteLink("/cart", { recover: reminder.restoreToken }),
+          unsubscribeUrl: siteLink("/cart-reminders/unsubscribe", { token: reminder.unsubscribeToken }),
+        }),
+        idempotencyKey: `cart-recovery/${reminder.notificationId}`,
+        metadata: {
+          cartId: args.cartId,
+          notificationId: args.notificationId,
+          itemCount: reminder.items.length,
+        },
+      });
+      emailSent = outcome === "sent";
+    } finally {
+      await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
         cartId: args.cartId,
         notificationId: args.notificationId,
-        itemCount: reminder.items.length,
-      },
-    });
-
-    await ctx.runMutation(internal.abandonedCartRecovery.finishReminder, {
-      cartId: args.cartId,
-      notificationId: args.notificationId,
-      emailSent: outcome === "sent",
-    });
+        emailSent,
+      });
+    }
     return null;
   },
 });
@@ -411,7 +397,6 @@ export const listAllAdmin = query({
       status: v.string(),
       orderId: v.optional(v.id("orders")),
       restoreToken: v.string(),
-      reminderScheduled: v.boolean(),
       lastActivityAt: v.number(),
       expiresAt: v.number(),
       emailSentAt: v.optional(v.number()),
@@ -435,30 +420,7 @@ export const listAllAdmin = query({
     const carts = await ctx.db.query("abandonedCarts").order("desc").take(100);
     const results = [];
     for (const cart of carts) {
-      let total = 0;
-      let count = 0;
-      const items = [];
-      for (const item of cart.items) {
-        count += item.quantity;
-        const productId = ctx.db.normalizeId("products", item.productId);
-        const product = productId ? await ctx.db.get(productId) : null;
-        const variants = product?.variants ?? [];
-        const variant = item.variantId ? variants.find((v) => v.id === item.variantId) : undefined;
-        const priceStr = variant?.price ?? "0.00";
-        const priceNum = parseFloat(priceStr) || 0;
-        total += priceNum * item.quantity;
-        const imageRecord = product ? getImagesForVariant(product.images, variant?.selectedOptions ?? [])[0] : undefined;
-        const image = imageRecord ? await ctx.storage.getUrl(imageRecord.storageId) : null;
-        items.push({
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity,
-          title: product?.title ?? "Silinmiş ürün",
-          variantTitle: variant?.title,
-          price: priceStr,
-          image: image ?? undefined,
-        });
-      }
+      const { items, itemCount, estimatedTotal } = await enrichCartItems(ctx, cart.items);
       results.push({
         _id: cart._id,
         _creationTime: cart._creationTime,
@@ -469,12 +431,11 @@ export const listAllAdmin = query({
         status: cart.status,
         orderId: cart.orderId,
         restoreToken: cart.restoreToken,
-        reminderScheduled: cart.reminderScheduled,
         lastActivityAt: cart.lastActivityAt,
         expiresAt: cart.expiresAt,
         emailSentAt: cart.emailSentAt,
-        itemCount: count,
-        estimatedTotal: total.toFixed(2),
+        itemCount,
+        estimatedTotal,
         items,
       });
     }

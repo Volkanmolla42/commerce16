@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 import { StarRating } from "./star-rating";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { maskName } from "@/lib/mask-name";
 import {
   CheckBadgeIcon,
@@ -104,7 +104,7 @@ export function ProductReviews({ productId }: { productId: string }) {
                   <div className="flex items-center justify-between gap-2">
                     <StarRating rating={review.rating} size="xs" showText={false} />
                     <time className="text-[10px] text-muted-foreground">
-                      {formatDate(review.createdAt)}
+                      {formatDate(review._creationTime)}
                     </time>
                   </div>
 

@@ -7,7 +7,7 @@ import { parseCategoryAttributes } from "../lib/catalog/attributes";
 import { patchCatalogProduct } from "./catalogModel";
 
 const categoryValidator = schema.doc("categories");
-const categoryInputValidator = categoryValidator.omit("_id", "_creationTime", "updatedAt");
+const categoryInputValidator = schema.tables.categories.validator.omit("updatedAt");
 const categoryWithImageValidator = categoryValidator.extend({
   imageUrl: v.union(v.string(), v.null()),
 });

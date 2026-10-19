@@ -19,13 +19,6 @@ function cleanText(value: unknown, maxLength: number) {
   return cleaned || null;
 }
 
-function cleanRoute(value: unknown) {
-  if (typeof value !== "string" || value.length > 200 || !value.startsWith("/") ||
-    value.startsWith("//") || value.includes("?") || value.includes("#")) return null;
-  if (/^\/(?:admin|account|api)(?:\/|$)/.test(value)) return null;
-  return value;
-}
-
 function response(status: number, body: Record<string, unknown>) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -54,7 +47,6 @@ export async function POST(request: NextRequest) {
     return response(400, { error: "Analitik olayı geçersiz." });
   }
 
-  const route = cleanRoute(body.route);
   const source = cleanText(body.source, 100);
   const medium = cleanText(body.medium, 100);
   const campaign = cleanText(body.campaign, 120);
@@ -70,7 +62,6 @@ export async function POST(request: NextRequest) {
       source,
       medium,
       ...(campaign ? { campaign } : {}),
-      ...(route ? { route } : {}),
     });
     return response(202, { accepted: true });
   } catch {

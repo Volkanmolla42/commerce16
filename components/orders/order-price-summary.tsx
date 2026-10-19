@@ -2,7 +2,7 @@
 
 import { getOrderPriceBreakdown, getOrderPaymentMethodTitle } from "@/lib/orders";
 import { formatMoney } from "@/lib/format-money";
-import { Separator } from "@/components/ui";
+import { Separator } from "@/components/ui/separator";
 
 export interface OrderPriceSummaryProps {
   order: {

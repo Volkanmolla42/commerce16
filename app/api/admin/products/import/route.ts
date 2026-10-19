@@ -150,6 +150,9 @@ export async function POST(request: NextRequest) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Lütfen bir Excel veya CSV dosyası yükleyin." }, { status: 400 });
     }
+    if (file.size > 20 * 1024 * 1024) {
+      return NextResponse.json({ error: "Dosya en fazla 20 MB olabilir." }, { status: 413 });
+    }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);

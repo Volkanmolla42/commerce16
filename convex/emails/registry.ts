@@ -122,7 +122,7 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
         senderPhone: "5321234567",
         messageSubject: "Kargo süresi",
         message: "Merhaba, siparişim kaç günde kargoya veriliyor?",
-        createdAt: 1_700_000_000_000,
+        _creationTime: 1_700_000_000_000,
       }),
   },
   {
@@ -137,7 +137,7 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
         productUrl: siteLink("/product/klasik-pamuk-gomlek"),
         user: { name: "Ayşe Demir", email: "ayse@example.com" },
         question: "Bu ürünün kumaşı yazın terletir mi? Beden olarak normal kalıp mı?",
-        createdAt: 1_700_000_000_000,
+        _creationTime: 1_700_000_000_000,
         adminQuestionsUrl: adminLink("questions"),
       }),
   },

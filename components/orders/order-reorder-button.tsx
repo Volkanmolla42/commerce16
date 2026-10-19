@@ -18,10 +18,8 @@ import {
 import { useCart } from "@/components/cart/cart-context";
 import {
   UNLIMITED_STOCK,
-  getProductPriceRange,
-  getProductVariantTitle,
+  getVariantProduct,
 } from "@/lib/catalog/variants";
-import { getImagesForVariant } from "@/lib/catalog/product-images";
 import type { Product } from "@/lib/catalog/types";
 
 export type ReorderItem = {
@@ -74,13 +72,13 @@ export function OrderReorderButton({
       const freshProducts = await convex.query(api.products.getByIds, {
         ids: productIds,
       });
-      const productMap = new Map(freshProducts.map((p) => [p._id, p]));
+      const productMap = new Map<string, Product>(freshProducts.map((product) => [product.id, product]));
 
       let addedCount = 0;
       const skipped: SkippedItem[] = [];
 
       for (const item of items) {
-        const product = productMap.get(item.productId as never);
+        const product = productMap.get(item.productId);
         if (!product || !product.availableForSale) {
           skipped.push({
             title: item.title,
@@ -128,34 +126,7 @@ export function OrderReorderButton({
           continue;
         }
 
-        const variantImages = matchedVariant
-          ? getImagesForVariant(product.images, matchedVariant.selectedOptions)
-          : [];
-
-        const cartVariant = matchedVariant
-          ? {
-              ...matchedVariant,
-              price: { amount: matchedVariant.price, currencyCode: "TRY" },
-            }
-          : undefined;
-
-        const cartProduct: Product = {
-          id: product._id,
-          slug: product.slug,
-          title: cartVariant
-            ? getProductVariantTitle(product.title, cartVariant)
-            : product.title,
-          price: matchedVariant?.price || getProductPriceRange(product).min,
-          availableForSale: product.availableForSale,
-          categorySlug: product.categorySlug,
-          images: variantImages.length > 0 ? variantImages : product.images,
-          options: product.options,
-          variants: variants.map(({ price, ...v }) => ({
-            ...v,
-            price: { amount: price, currencyCode: "TRY" },
-          })),
-          updatedAt: product.updatedAt,
-        };
+        const cartProduct: Product = matchedVariant ? getVariantProduct(product, matchedVariant) : product;
 
         const quantityToAdd = Math.min(item.quantity, stock);
         addItem(cartProduct, quantityToAdd, resolvedVariantId);

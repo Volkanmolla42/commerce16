@@ -1,7 +1,8 @@
 "use client";
 
 import { useId } from "react";
-import { Input, Label } from "@/components/ui";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ATTRIBUTE_TYPES, isChoiceAttribute, type CategoryAttributeTemplate, type CategoryAttributeType } from "@/lib/catalog/attributes";
 import { CategoryAttributeOptionsInput } from "./category-attribute-options-input";
 

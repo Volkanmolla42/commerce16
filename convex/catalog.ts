@@ -7,6 +7,12 @@ import { getProductPriceRange } from "../lib/catalog/variants";
 import { catalogSearchQuery, createCatalogSearchMatcher, getProductSearchFields } from "../lib/catalog/smart-search";
 import { matchesCatalogFilters, matchesCategoryAttributeFilters, sortOptionValues } from "../lib/catalog/facets";
 import type { Product } from "../lib/catalog/types";
+import {
+  productImageValidator,
+  productOptionValidator,
+  productVariantValidator,
+  toProductBase,
+} from "./productShape";
 
 const filtersValidator = v.object({
   minPrice: v.string(),
@@ -15,66 +21,25 @@ const filtersValidator = v.object({
 });
 const attributeFiltersValidator = v.record(v.string(), v.object({ values: v.array(v.string()), min: v.string(), max: v.string() }));
 const availabilityValidator = v.union(v.literal("all"), v.literal("active"), v.literal("inactive"));
-const imageValidator = v.object({
-  url: v.string(), selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
-});
-const cardOptionValidator = v.object({
-  id: v.string(), name: v.string(), values: v.array(v.string()),
-});
-const cardVariantValidator = v.object({
-  id: v.string(),
-  title: v.string(),
-  availableForSale: v.boolean(),
-  price: v.object({ amount: v.string(), currencyCode: v.string() }),
-  compareAtPrice: v.optional(v.string()),
-  selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
-  stockQuantity: v.optional(v.number()),
-  sku: v.optional(v.string()),
-  barcode: v.optional(v.string()),
-});
 const cardValidator = v.object({
   id: v.id("products"), title: v.string(), slug: v.string(), price: v.string(),
-  priceRange: v.object({ min: v.string(), max: v.string() }), images: v.array(imageValidator),
-  soldCount: v.number(), createdAt: v.number(), publishedAt: v.optional(v.number()),
+  priceRange: v.object({ min: v.string(), max: v.string() }), images: v.array(productImageValidator),
+  soldCount: v.number(), _creationTime: v.number(),
   availableForSale: v.boolean(),
+  inStock: v.boolean(),
   updatedAt: v.string(), categorySlug: v.optional(v.string()),
-  options: v.optional(v.array(cardOptionValidator)),
-  variants: v.optional(v.array(cardVariantValidator)),
+  options: v.optional(v.array(productOptionValidator)),
+  variants: v.optional(v.array(productVariantValidator)),
 });
 
 async function card(ctx: QueryCtx, product: Doc<"products">) {
   const priceRange = getProductPriceRange(product);
-  const images = await Promise.all(
-    product.images.map(async (image) => {
-      const url = await ctx.storage.getUrl(image.storageId);
-      return url ? { url, ...(image.selectedOptions ? { selectedOptions: image.selectedOptions } : {}) } : null;
-    }),
-  );
+  const base = await toProductBase(ctx, product, priceRange);
   return {
-    id: product._id,
-    title: product.title,
-    slug: product.slug,
-    price: priceRange.min,
+    ...base,
     priceRange,
-    soldCount: product.soldCount ?? 0,
-    createdAt: product._creationTime,
-    publishedAt: product.publishedAt,
-    images: images.filter((image): image is NonNullable<typeof image> => Boolean(image)),
     availableForSale: product.availableForSale,
-    updatedAt: product.updatedAt,
-    categorySlug: product.categorySlug,
-    options: product.options,
-    variants: product.variants?.map((v) => ({
-      id: v.id,
-      title: v.title,
-      availableForSale: v.availableForSale,
-      price: { amount: typeof v.price === "string" ? v.price : (v.price as { amount: string }).amount, currencyCode: "TRY" },
-      compareAtPrice: v.compareAtPrice,
-      selectedOptions: v.selectedOptions,
-      stockQuantity: v.stockQuantity,
-      sku: v.sku,
-      barcode: v.barcode,
-    })),
+    inStock: base.variants.some((variant) => variant.availableForSale),
   };
 }
 
@@ -135,14 +100,12 @@ export const page = query({
         title: product.title,
         slug: product.slug,
         price: getProductPriceRange(product).min,
+        _creationTime: product._creationTime,
         images: [],
         availableForSale: product.availableForSale,
         attributes: product.attributes,
         options: product.options,
-        variants: product.variants.map((v) => ({
-          ...v,
-          price: { amount: v.price, currencyCode: "TRY" },
-        })),
+        variants: product.variants,
         updatedAt: product.updatedAt,
       };
       return matchesCatalogFilters(target, args.filters) && matchesCategoryAttributeFilters(target, definitions, args.attributes);

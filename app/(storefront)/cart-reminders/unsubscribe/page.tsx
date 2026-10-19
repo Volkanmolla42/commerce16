@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Button, Card } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   BellSlashIcon,
   CheckCircleIcon,

@@ -8,6 +8,7 @@ import { adminAlertTo, adminLink, siteLink } from "./emails/config";
 import { sendEmail } from "./emails/send";
 import { renderProductQuestionEmail } from "./emails/templates/alerts";
 import { readStoreSettings } from "./settings";
+import { resolveFirstImageUrl } from "./productMedia";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   productQuestionAsk: { kind: "fixed window", rate: 3, period: 10 * MINUTE },
@@ -28,7 +29,7 @@ const publishedQuestionValidator = v.object({
   _id: v.id("productQuestions"),
   question: v.string(),
   answer: v.string(),
-  createdAt: v.number(),
+  _creationTime: v.number(),
   answeredAt: v.optional(v.number()),
 });
 
@@ -38,7 +39,6 @@ function displayName(user: { name?: string; email?: string } | null) {
 
 const adminQuestionValidator = v.object({
   _id: v.id("productQuestions"),
-  _creationTime: v.number(),
   productId: v.id("products"),
   productTitle: v.nullable(v.string()),
   productSlug: v.nullable(v.string()),
@@ -48,7 +48,7 @@ const adminQuestionValidator = v.object({
   answer: v.optional(v.string()),
   answeredAt: v.optional(v.number()),
   status: questionStatusValidator,
-  createdAt: v.number(),
+  _creationTime: v.number(),
 });
 
 /** PDP'de gösterilecek sorular: yalnızca yanıtlanıp yayınlanmış olanlar. */
@@ -72,7 +72,7 @@ export const getByProduct = query({
       _id: item._id,
       question: item.question,
       answer: item.answer ?? "",
-      createdAt: item._creationTime,
+      _creationTime: item._creationTime,
       answeredAt: item.answeredAt,
     }));
   },
@@ -146,14 +146,13 @@ export const listForAdmin = query({
           ctx.db.get(item.productId),
           ctx.db.get(item.userId),
         ]);
-        const firstImage = product?.images[0];
+        const productImage = await resolveFirstImageUrl(ctx, product);
         return {
           _id: item._id,
-          _creationTime: item._creationTime,
           productId: item.productId,
           productTitle: product?.title ?? null,
           productSlug: product?.slug ?? null,
-          productImage: firstImage ? await ctx.storage.getUrl(firstImage.storageId) : null,
+          productImage,
           user: user
             ? { name: displayName(user), email: user.email?.trim().toLowerCase() ?? null }
             : null,
@@ -161,7 +160,7 @@ export const listForAdmin = query({
           answer: item.answer,
           answeredAt: item.answeredAt,
           status: item.status,
-          createdAt: item._creationTime,
+          _creationTime: item._creationTime,
         };
       }),
     );
@@ -245,7 +244,7 @@ export const getQuestionAlertDetails = internalQuery({
       productSlug: v.nullable(v.string()),
       user: adminUserValidator,
       question: v.string(),
-      createdAt: v.number(),
+      _creationTime: v.number(),
     }),
     v.null()
   ),
@@ -267,7 +266,7 @@ export const getQuestionAlertDetails = internalQuery({
         ? { name: displayName(user), email: user.email?.trim().toLowerCase() ?? null }
         : null,
       question: item.question,
-      createdAt: item._creationTime,
+      _creationTime: item._creationTime,
     };
   },
 });
@@ -293,7 +292,7 @@ export const sendQuestionAlert = internalAction({
         productUrl: data.productSlug ? siteLink(`/product/${data.productSlug}`) : "",
         user: data.user ?? { name: "Müşteri", email: null },
         question: data.question,
-        createdAt: data.createdAt,
+        _creationTime: data._creationTime,
         adminQuestionsUrl: adminLink("questions"),
       }),
       replyTo: data.user?.email ?? undefined,

@@ -27,18 +27,13 @@ import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { OrdersKanban } from "./_components/orders-kanban";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { isRetryableOrderEvent } from "@/convex/emails/events";
-import {
-  Button,
-  Input,
-  Label,
-  Card,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
-import { CsvExportButton } from "../_components/export-button";
+import { ExportMenu } from "../_components/export-button";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import {
   orderStatusLabels,
@@ -933,9 +928,9 @@ function AdminOrdersContent() {
             })}
           </div>
 
-          {/* CSV İndir (Sağ Taraf) */}
+          {/* İndir (Sağ Taraf) */}
           <div className="shrink-0">
-            <CsvExportButton type="orders" label="CSV İndir" />
+            <ExportMenu type="orders" />
           </div>
         </div>
 

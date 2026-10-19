@@ -4,8 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ProductGrid } from "@/components/product/product-grid";
 import { useCart } from "@/components/cart/cart-context";
-import type { CartItem } from "@/components/cart/cart-context";
-import { Button } from "@/components/ui";
+import type { CartItem } from "@/components/cart/cart-store";
+import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import type { Product } from "@/lib/catalog/types";
@@ -16,8 +16,7 @@ import {
   RECENT_PRODUCTS_EVENT,
   recordRecentProduct,
 } from "@/lib/catalog/recommendations";
-import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
-import { getImagesForVariant } from "@/lib/catalog/product-images";
+import { getSelectedVariant, getVariantProduct } from "@/lib/catalog/variants";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
 import { trackPixelViewContent } from "@/lib/analytics/meta-pixel";
 
@@ -97,9 +96,7 @@ export function Shelf({ title, products, showCartActions = false, upsellSources,
       upsellSource,
       needsVariant: Boolean(product.variants?.length && !defaultVariant),
       href: params ? `/product/${product.slug}?${params.toString()}` : `/product/${product.slug}`,
-      selectedProduct: defaultVariant
-        ? { ...product, price: defaultVariant.price.amount, title: getProductVariantTitle(product.title, defaultVariant), images: getImagesForVariant(product.images, defaultVariant.selectedOptions) }
-        : product,
+      selectedProduct: defaultVariant ? getVariantProduct(product, defaultVariant) : product,
     };
   };
 
@@ -233,31 +230,10 @@ export function BoughtTogetherShelf({
   );
 }
 
-export function mapRecommendationProduct(product: NonNullable<ReturnType<typeof useQuery<typeof api.products.list>>>[number]): Product {
-  return {
-    id: product._id,
-    slug: product.slug,
-    title: product.title,
-    price: product.price,
-    createdAt: product._creationTime,
-    publishedAt: product.publishedAt,
-    soldCount: product.soldCount ?? 0,
-    availableForSale: product.availableForSale,
-    categorySlug: product.categorySlug,
-    images: product.images.slice(0, 2),
-    options: product.options,
-    variants: product.variants.map(({ price, ...variant }) => ({
-      ...variant,
-      price: { amount: price, currencyCode: "TRY" },
-    })),
-    updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
-  };
-}
-
 export function CartRecommendationShelf() {
   const { items } = useCart();
   const data = useQuery(api.products.list, items.length > 0 ? { limit: 100 } : "skip");
-  const products: Product[] = (data ?? []).map(mapRecommendationProduct);
+  const products = data ?? [];
   const cartProductSlugs = [...new Set(items.map((item) => item.product.slug))];
   const upsellSources = new Map<string, CartItem>();
   for (const sourceItem of items) {

@@ -28,9 +28,9 @@ export function AnalyticsProvider() {
     const ready = await ensureAnalyticsConsentCookie();
     if (!ready || !hasAnalyticsConsent()) return;
     lastTrackedPath.current = path;
-    void trackAnalyticsEvent("page_view", { route: path });
+    void trackAnalyticsEvent("page_view");
 
-    if (/^\/product\/[^/]+$/.test(path)) void trackAnalyticsEvent("product_view", { route: path });
+    if (/^\/product\/[^/]+$/.test(path)) void trackAnalyticsEvent("product_view");
   };
 
   useEffect(() => {

@@ -53,12 +53,13 @@ export async function sendEmail(
   });
 
   const outcome = outcomeOf(result);
+  const isOtp = args.templateKey === "password_reset_otp" || args.templateKey === "password_change_otp";
   await ctx.runMutation(internal.adminEmails.recordEmailLog, {
     templateKey: args.templateKey,
     recipient: args.to,
     subject: args.content.subject,
-    htmlBody: args.content.html,
-    textBody: args.content.text,
+    htmlBody: isOtp ? undefined : args.content.html,
+    textBody: isOtp ? undefined : args.content.text,
     status: outcome === "sent" ? "sent" : "failed",
     resendId: result.messageId,
     error: result.error,

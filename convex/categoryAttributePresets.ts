@@ -6,9 +6,7 @@ import { assertAdminApiSecret } from "./adminAuth";
 import { normalizeAttributeLabel, parseAttributeTemplate } from "../lib/catalog/attributes";
 
 const presetValidator = schema.doc("categoryAttributePresets");
-const templateValidator = schema.doc("categoryAttributePresets").omit(
-  "_id", "_creationTime", "normalizedLabel",
-);
+const templateValidator = schema.tables.categoryAttributePresets.validator.omit("normalizedLabel");
 
 export const listAdmin = query({
   args: { adminSecret: v.string(), search: v.string(), paginationOpts: paginationOptsValidator },

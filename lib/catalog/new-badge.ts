@@ -10,19 +10,15 @@ export function resolveNewBadgeDays(value?: number | null) {
 }
 
 export function isNewProduct({
-  createdAt,
-  publishedAt,
+  _creationTime,
   now,
   days,
 }: {
-  createdAt?: number;
-  publishedAt?: number;
+  _creationTime?: number;
   now?: number;
   days?: number | null;
 }) {
   const threshold = resolveNewBadgeDays(days);
-  if (threshold <= 0 || now === undefined) return false;
-  const since = publishedAt ?? createdAt;
-  if (since === undefined) return false;
-  return now - since <= threshold * DAY_MS;
+  if (threshold <= 0 || now === undefined || _creationTime === undefined) return false;
+  return now - _creationTime <= threshold * DAY_MS;
 }

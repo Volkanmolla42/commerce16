@@ -76,7 +76,7 @@ export function ProductQuestions({ productId }: { productId: string }) {
               <li key={item._id} className="rounded-xl border border-border/70 bg-card p-4">
                 <div className="flex justify-end">
                   <time className="text-[10px] text-muted-foreground">
-                    {formatDate(item.answeredAt ?? item.createdAt)}
+                    {formatDate(item.answeredAt ?? item._creationTime)}
                   </time>
                 </div>
                 <p className="mt-2 text-sm font-medium text-foreground">{item.question}</p>

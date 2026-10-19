@@ -21,7 +21,7 @@ export const recordEmailLog = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.db.insert("emailLogs", { ...args, createdAt: Date.now() });
+    await ctx.db.insert("emailLogs", { ...args });
     return null;
   },
 });
@@ -38,7 +38,6 @@ export const listSentEmailsAdmin = query({
 
     return await ctx.db
       .query("emailLogs")
-      .withIndex("by_created_at")
       .order("desc")
       .take(limit);
   },

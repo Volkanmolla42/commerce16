@@ -62,7 +62,7 @@ function QuickViewContent({
     variant.selectedOptions.every((option) => selectedOptions[option.name] === option.value)
   );
   const priceRange = getProductPriceRange(product);
-  const displayPrice = activeVariant?.price.amount ?? priceRange.min;
+  const displayPrice = activeVariant?.price ?? priceRange.min;
   const maxPrice = activeVariant ? undefined : priceRange.max;
   const isAvailable = product.availableForSale && Boolean(activeVariant && isVariantSellable(activeVariant));
   const cartQuantity = items.find(
@@ -93,8 +93,7 @@ function QuickViewContent({
         <DialogHeader className="space-y-2 text-left">
           <ProductBadges
             variants={variants}
-            createdAt={product.createdAt}
-            publishedAt={product.publishedAt}
+            _creationTime={product._creationTime}
             soldCount={product.soldCount}
             selectedVariantId={activeVariant?.id}
           />
@@ -108,7 +107,6 @@ function QuickViewContent({
             amount={displayPrice}
             maxAmount={maxPrice}
             compareAtAmount={activeVariant?.compareAtPrice}
-            currencyCode="TRY"
             className="text-xl font-semibold tracking-tight text-foreground"
           />
         </DialogHeader>

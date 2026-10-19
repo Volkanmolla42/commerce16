@@ -69,12 +69,6 @@ const navigation: NavEntry[] = [
     icon: Squares2X2Icon,
   },
   {
-    type: "link",
-    label: "Analitik",
-    href: adminPath("analytics"),
-    icon: ChartBarIcon,
-  },
-  {
     type: "group",
     id: "catalog",
     title: "Katalog",
@@ -116,15 +110,22 @@ const navigation: NavEntry[] = [
   },
   {
     type: "link",
-    label: "Mağaza Ayarları",
-    href: adminPath("settings"),
-    icon: Cog6ToothIcon,
+    label: "Analitik",
+    href: adminPath("analytics"),
+    icon: ChartBarIcon,
   },
 ];
 
-const allNavItems: NavLink[] = navigation.flatMap((entry) =>
-  entry.type === "link" ? [entry] : entry.items
-);
+const settingsLink: NavLink = {
+  label: "Mağaza Ayarları",
+  href: adminPath("settings"),
+  icon: Cog6ToothIcon,
+};
+
+const allNavItems: NavLink[] = [
+  ...navigation.flatMap((entry) => (entry.type === "link" ? [entry] : entry.items)),
+  settingsLink,
+];
 
 type AdminTheme = "light" | "dark";
 
@@ -224,6 +225,32 @@ function AdminNavLinks({
         );
       })}
     </nav>
+  );
+}
+
+function AdminSettingsLink({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const active = isActive(pathname, settingsLink.href);
+  const Icon = settingsLink.icon;
+
+  return (
+    <Link
+      href={settingsLink.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={`flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors ${active
+        ? "bg-accent text-accent-foreground font-semibold"
+        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        }`}
+    >
+      <Icon aria-hidden="true" className="size-4 shrink-0" />
+      <span>{settingsLink.label}</span>
+    </Link>
   );
 }
 
@@ -331,7 +358,8 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
           <div className="flex-1 overflow-y-auto pr-1 -mr-1">
             <AdminNavLinks pathname={pathname} />
           </div>
-          <div className="mt-auto border-t border-border pt-2.5">
+          <div className="mt-auto space-y-2.5 border-t border-border pt-2.5">
+            <AdminSettingsLink pathname={pathname} />
             {bottomBar}
           </div>
         </aside>
@@ -406,7 +434,8 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
                 </div>
                 <div className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
                   <AdminNavLinks pathname={pathname} onNavigate={() => setMenuOpen(false)} />
-                  <div className="mt-6 border-t border-border pt-2.5">
+                  <div className="mt-6 space-y-2.5 border-t border-border pt-2.5">
+                    <AdminSettingsLink pathname={pathname} onNavigate={() => setMenuOpen(false)} />
                     {bottomBar}
                   </div>
                 </div>

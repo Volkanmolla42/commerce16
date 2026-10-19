@@ -1,8 +1,10 @@
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getProductPriceRange } from "../lib/catalog/variants";
+import type { Infer } from "convex/values";
+import { productsTable } from "./schema";
 
-export type CatalogProductInput = Omit<Doc<"products">, "_id" | "_creationTime" | "priceValue">;
+export type CatalogProductInput = Omit<Infer<typeof productsTable.validator>, "priceValue">;
 
 export function catalogMetadata(product: CatalogProductInput) {
   if (product.variants.length === 0) throw new Error("Ürün en az bir fiyatlı varyant içermeli.");

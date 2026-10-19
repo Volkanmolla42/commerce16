@@ -1,4 +1,5 @@
 import type { Product, ProductImage, ProductVariant } from "./types";
+import { getImagesForVariant } from "./product-images";
 
 export const MAX_CART_QUANTITY = 999;
 // Tüm ürünlerin en az bir varyantı olmak zorunda; bu değer yalnızca stockQuantity taşımayan bayat önbellek sepetleri içindir.
@@ -27,7 +28,9 @@ type ProductPriceSource = {
   priceRange?: { min: string; max: string };
   options?: { name: string; values: string[] }[];
   variants?: {
-    price: string | { amount: string };
+    price: string;
+    availableForSale?: boolean;
+    stockQuantity?: number;
     selectedOptions?: { name: string; value: string }[];
   }[];
 };
@@ -49,8 +52,11 @@ export function getProductPriceRange(
       }))
     : optionVariants;
   const candidates = matchingVariants.length > 0 ? matchingVariants : optionVariants;
-  const prices = candidates
-    .map((variant) => typeof variant.price === "string" ? variant.price : variant.price.amount)
+  const sellable = candidates.filter((variant) =>
+    variant.availableForSale !== false && (variant.stockQuantity === undefined || variant.stockQuantity > 0));
+  const pricedCandidates = sellable.length > 0 ? sellable : candidates;
+  const prices = pricedCandidates
+    .map((variant) => variant.price)
     .map((amount) => ({ amount, value: Number(amount) }))
     .filter(({ value }) => Number.isFinite(value));
   if (prices.length === 0) {
@@ -92,13 +98,13 @@ export function getDefaultVariant(product: Product): ProductVariant | undefined 
   const available = variants.filter((variant) => variant.availableForSale);
   const candidates = sellable.length > 0 ? sellable : available.length > 0 ? available : variants;
   return candidates.reduce((cheapest, variant) =>
-    Number(variant.price.amount) < Number(cheapest.price.amount) ? variant : cheapest);
+    Number(variant.price) < Number(cheapest.price) ? variant : cheapest);
 }
 
 export function getProductUnitPrice(product: Product, variantId?: string): string {
   const variant = product.variants?.find((candidate) => candidate.id === variantId) ??
     (!variantId && product.variants?.length === 1 ? product.variants[0] : undefined);
-  return variant?.price.amount ?? product.price;
+  return variant?.price ?? product.price;
 }
 
 export function getProductVariantTitle(productTitle: string, variant?: ProductVariant): string {
@@ -106,19 +112,24 @@ export function getProductVariantTitle(productTitle: string, variant?: ProductVa
   return selections.length ? `${productTitle} — ${selections.join(" / ")}` : productTitle;
 }
 
-export function canSelectOption(product: Pick<Product, "options" | "variants">, params: Pick<URLSearchParams, "get">, name: string, value: string): boolean {
-  return product.variants?.some((variant) => variant.availableForSale &&
-    variant.selectedOptions.every((selected) => {
-      if (selected.name === name) return selected.value === value;
-      const chosen = params.get(optionQueryKey(selected.name));
-      const option = product.options?.find((option) => option.name === selected.name);
-      return !chosen || !option?.values.includes(chosen) || chosen === selected.value;
-    }),
-  ) ?? false;
+export function getVariantProduct(product: Product, variant: ProductVariant): Product {
+  return {
+    ...product,
+    price: variant.price,
+    images: getImagesForVariant(product.images, variant.selectedOptions),
+    title: getProductVariantTitle(product.title, variant),
+  };
 }
 
-export function hasVariantOptionCombination(product: Pick<Product, "options" | "variants">, params: Pick<URLSearchParams, "get">, name: string, value: string): boolean {
+export function matchesVariantOption(
+  product: Pick<Product, "options" | "variants">,
+  params: Pick<URLSearchParams, "get">,
+  name: string,
+  value: string,
+  requireAvailable = false,
+): boolean {
   return product.variants?.some((variant) =>
+    (!requireAvailable || variant.availableForSale) &&
     variant.selectedOptions.every((selected) => {
       if (selected.name === name) return selected.value === value;
       const chosen = params.get(optionQueryKey(selected.name));

@@ -1,11 +1,12 @@
 "use client";
 
-import { LockIcon } from "hugeicons-react";
+import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Button, Card, CardContent } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 export function AdminGate() {
   const storeSettings = useQuery(api.settings.getStoreSettings, {});
@@ -49,7 +50,7 @@ export function AdminGate() {
         <CardContent className="p-6 sm:p-8">
           <div className="mb-7 flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-md bg-primary text-primary-foreground">
-              <LockIcon className="size-4" />
+              <LockClosedIcon className="size-4" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">{storeSettings?.storeName || "Mağaza"}</p>

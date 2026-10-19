@@ -27,7 +27,7 @@ async function AdminChrome({ children }: { children: ReactNode }) {
   if (!isAuthenticated) {
     return (
       <>
-        {children}
+        <div inert aria-hidden="true">{children}</div>
         <AdminGate />
       </>
     );

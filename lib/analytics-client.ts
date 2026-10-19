@@ -155,10 +155,7 @@ export async function ensureAnalyticsConsentCookie() {
   return consentCookieSync;
 }
 
-export async function trackAnalyticsEvent(
-  eventType: AnalyticsEventType,
-  details: { route?: string } = {},
-) {
+export async function trackAnalyticsEvent(eventType: AnalyticsEventType) {
   const context = getContext();
   if (!context || !(await ensureAnalyticsConsentCookie()) || !hasAnalyticsConsent()) return false;
 
@@ -168,7 +165,7 @@ export async function trackAnalyticsEvent(
       credentials: "same-origin",
       keepalive: true,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...context, ...details, eventType }),
+      body: JSON.stringify({ ...context, eventType }),
     });
     return response.ok;
   } catch {

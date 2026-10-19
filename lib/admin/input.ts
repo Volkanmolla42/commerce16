@@ -29,12 +29,20 @@ function productAttributesValue(value: unknown) {
   if (!Array.isArray(value) || value.length > 30) throw new Error("Ürün özellikleri geçersiz.");
   const attributes = value.map((item) => {
     if (!isRecord(item) || typeof item.key !== "string") throw new Error("Ürün özelliği geçersiz.");
-    if (typeof item.value !== "string" && typeof item.value !== "number" && typeof item.value !== "boolean") {
+    const attributeValue = item.value;
+    const isStringArray = Array.isArray(attributeValue) &&
+      attributeValue.length <= 50 &&
+      attributeValue.every((entry) => typeof entry === "string");
+    if (!isStringArray && typeof attributeValue !== "string" && typeof attributeValue !== "number" && typeof attributeValue !== "boolean") {
       throw new Error("Ürün özelliğinin değeri geçersiz.");
     }
-    if (typeof item.value === "number" && !Number.isFinite(item.value)) throw new Error("Ürün özelliğinin sayısal değeri geçersiz.");
-    if (typeof item.value === "string" && item.value.length > 500) throw new Error("Ürün özelliği 500 karakteri aşamaz.");
-    return { key: stringValue(item.key, "Özellik anahtarı"), value: item.value };
+    if (typeof attributeValue === "number" && !Number.isFinite(attributeValue)) throw new Error("Ürün özelliğinin sayısal değeri geçersiz.");
+    if (typeof attributeValue === "string" && attributeValue.length > 500) throw new Error("Ürün özelliği 500 karakteri aşamaz.");
+    if (isStringArray && attributeValue.some((entry) => entry.length > 500)) throw new Error("Ürün özelliği 500 karakteri aşamaz.");
+    return {
+      key: stringValue(item.key, "Özellik anahtarı"),
+      value: attributeValue as string | number | boolean | string[],
+    };
   });
   if (new Set(attributes.map((attribute) => attribute.key)).size !== attributes.length) {
     throw new Error("Ürün özellikleri tekrarlanamaz.");

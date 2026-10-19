@@ -1,10 +1,10 @@
 import type { Category, Menu, Product } from "./types";
+import type { FunctionReturnType } from "convex/server";
 import { fetchQuery } from "convex/nextjs";
 import { cacheTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 import { getProductSearchFields, rankSearchItems } from "./smart-search";
 import { getSimilarProducts } from "./recommendations";
-import { formatProduct } from "./format-product";
 
 type ProductFilters = {
   category?: string;
@@ -42,12 +42,11 @@ export async function getProducts(filters: ProductFilters = {}): Promise<Product
   cacheTag("products");
   // ponytail: keep fuzzy matching inside the existing 100-product window; add indexed search if that limit grows.
   const items = await fetchQuery(api.products.list, { limit: 100, ...(filters.category ? { categorySlug: filters.category } : {}) });
-  const mapped = items.map(formatProduct);
 
   const query = filters.query?.trim();
   const result = query
-    ? rankSearchItems(mapped, query, getProductSearchFields)
-    : mapped;
+    ? rankSearchItems(items, query, getProductSearchFields)
+    : items;
 
   if (filters.sortKey === "PRICE") {
     result.sort((a, b) => Number(a.price) - Number(b.price));
@@ -85,17 +84,13 @@ export async function getGoogleShoppingProducts(): Promise<Product[]> {
   let isDone = false;
 
   while (!isDone) {
-    const result: {
-      page: Parameters<typeof formatProduct>[0][];
-      continueCursor: string;
-      isDone: boolean;
-    } = await fetchQuery(api.products.listForGoogleShoppingFeed, {
+    const result: FunctionReturnType<typeof api.products.listForGoogleShoppingFeed> = await fetchQuery(api.products.listForGoogleShoppingFeed, {
       paginationOpts: {
         numItems: 100,
         cursor,
       },
     });
-    products.push(...result.page.map(formatProduct));
+    products.push(...result.page);
     cursor = result.continueCursor;
     isDone = result.isDone;
   }
@@ -106,9 +101,7 @@ export async function getGoogleShoppingProducts(): Promise<Product[]> {
 export async function getProduct(slug: string): Promise<Product | undefined> {
   "use cache";
   cacheTag("products");
-  const item = await fetchQuery(api.products.getBySlug, { slug });
-  if (!item) return undefined;
-  return formatProduct(item);
+  return (await fetchQuery(api.products.getBySlug, { slug })) ?? undefined;
 }
 
 export async function getProductRecommendations(product: Product): Promise<Product[]> {

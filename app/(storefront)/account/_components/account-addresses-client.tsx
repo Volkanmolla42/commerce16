@@ -14,18 +14,12 @@ import {
   getProvinceByName,
   TURKEY_PROVINCES,
 } from "@/lib/turkey-provinces";
-import {
-  Button,
-  Card,
-  Badge,
-  Input,
-  Label,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatPhoneInput } from "@/lib/format-phone-input";
 

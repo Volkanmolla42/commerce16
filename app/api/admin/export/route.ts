@@ -265,6 +265,50 @@ export async function GET(request: NextRequest) {
       return csvResponse("urunler.csv", toCsv(headers, rows));
     }
 
+    if (type === "inventory") {
+      const { lowStockThreshold } = await client.query(api.settings.getStoreSettings, {});
+
+      const allProducts: Array<ExportProduct> = [];
+      let cursor: string | null = null;
+      do {
+        const result: { page: ExportProduct[]; isDone: boolean; continueCursor: string } = await client.query(
+          api.products.listForExportAdmin,
+          {
+            adminSecret,
+            cursor,
+            limit: 250,
+          },
+        );
+        allProducts.push(...result.page);
+        cursor = result.isDone ? null : result.continueCursor;
+      } while (cursor && allProducts.length < 10000);
+
+      const headers = ["Ürün", "Ürün Adresi", "Varyant", "SKU", "Kalan Stok", "Durum"];
+      const rows: Array<Array<string | number>> = [];
+      for (const product of allProducts) {
+        for (const variant of product.variants) {
+          rows.push([
+            product.title,
+            product.slug,
+            variant.title && variant.title !== "Default Title" ? variant.title : "Standart Seçenek",
+            variant.sku ?? "",
+            variant.stockQuantity,
+            variant.stockQuantity === 0 ? "Tükendi" : variant.stockQuantity <= lowStockThreshold ? "Azaldı" : "Yeterli",
+          ]);
+        }
+      }
+
+      if (format === "xlsx") {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Stok");
+        const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+        return xlsxResponse("stok.xlsx", buf);
+      }
+
+      return csvResponse("stok.csv", toCsv(headers, rows));
+    }
+
     if (type === "customers") {
       const allCustomers: Array<ExportCustomer> = [];
       let cursor: string | null = null;
@@ -282,6 +326,7 @@ export async function GET(request: NextRequest) {
         cursor = result.isDone ? null : result.continueCursor;
       } while (cursor && allCustomers.length < 10000);
 
+      const headers = ["Ad", "E-posta", "Telefon", "Kayıt tarihi", "Sipariş sayısı", "Toplam harcama (TL)", "Adres sayısı", "Son sipariş"];
       const rows = allCustomers.map((customer) => [
         customer.name,
         customer.email,
@@ -292,13 +337,16 @@ export async function GET(request: NextRequest) {
         customer.addressCount,
         formatDate(customer.lastOrderAt, { dateStyle: "short" }, ""),
       ]);
-      return csvResponse(
-        "musteriler.csv",
-        toCsv(
-          ["Ad", "E-posta", "Telefon", "Kayıt tarihi", "Sipariş sayısı", "Toplam harcama (TL)", "Adres sayısı", "Son sipariş"],
-          rows,
-        ),
-      );
+
+      if (format === "xlsx") {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Müşteriler");
+        const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+        return xlsxResponse("musteriler.xlsx", buf);
+      }
+
+      return csvResponse("musteriler.csv", toCsv(headers, rows));
     }
 
     return NextResponse.json({ error: "Bilinmeyen rapor türü." }, { status: 404 });

@@ -63,7 +63,7 @@ Bizim stack'te karşılığı: fiyat, stok, kampanya ve sipariş kuralları **Co
 
 - **Endüstri standardı:** Satış fiyatı ve liste fiyatı (compare-at) saklanır, indirim yüzdesi türetilir. "Yeni", "Çok Satan", "Tükeniyor" gibi etiketler oluşturma tarihi, stok ve satış hızından hesaplanır; ayrı bir "badge" tablosu tutulmaz.
 - **Shopify'da:** Varyantta native `compare_at_price` vardır; tema "Sale" rozetini bundan üretir. Otomatik indirimler **Discount Functions** ile sunucuda hesaplanır. "New/Bestseller" gibi özel etiketler metafield/tag + tema veya app ile eklenir.
-- **Bizim stack'te:** Varyantta `compareAtPrice`, üründe `createdAt` + `soldCount`; kurallar tek bir `lib/catalog/badges.ts` modülünde. Rozet bayrağı saklamıyoruz, her okumada türetiyoruz. `soldCount` yalnızca ödenmiş ve iptal edilmemiş siparişlerden beslenmeli.
+- **Bizim stack'te:** Varyantta `compareAtPrice`, üründe `_creationTime` + `soldCount`; kurallar tek bir `lib/catalog/badges.ts` modülünde. Rozet bayrağı saklamıyoruz, her okumada türetiyoruz. `soldCount` yalnızca ödenmiş ve iptal edilmemiş siparişlerden beslenmeli.
 
 ## 2. Kartta ikinci görsel
 

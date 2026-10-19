@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { createUrl } from "@/lib/utils";
 
 export function CatalogPagination({ continueCursor, isDone, count }: { continueCursor: string; isDone: boolean; count: number }) {

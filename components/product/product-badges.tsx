@@ -15,22 +15,18 @@ const labels = {
 
 export function ProductBadges({
   variants,
-  createdAt,
-  publishedAt,
+  _creationTime,
   soldCount,
   selectedVariantId,
   compact = false,
   size = "sm",
-  className,
 }: {
   variants?: ProductVariant[];
-  createdAt?: number;
-  publishedAt?: number;
+  _creationTime?: number;
   soldCount?: number;
   selectedVariantId?: string;
   compact?: boolean;
   size?: "sm" | "md";
-  className?: string;
 }) {
   const [now, setNow] = useState<number>();
   const settings = useQuery(api.settings.getBadgeSettings, {});
@@ -39,11 +35,11 @@ export function ProductBadges({
     return () => window.clearTimeout(timer);
   }, []);
 
-  const badges = getProductBadges({ variants, createdAt, publishedAt, soldCount, selectedVariantId, compact, newBadgeDays: settings?.newBadgeDays, now });
+  const badges = getProductBadges({ variants, _creationTime, soldCount, selectedVariantId, compact, newBadgeDays: settings?.newBadgeDays, lowStockThreshold: settings?.lowStockThreshold, now });
   if (badges.length === 0) return null;
 
   return (
-    <div className={clsx("flex flex-wrap items-center gap-1", className)}>
+    <div className="flex flex-wrap items-center gap-1">
       {badges.map((badge) => (
         <span
           key={badge.kind}

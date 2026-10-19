@@ -120,7 +120,6 @@ export const create = mutation({
       ...(payQuantity !== undefined ? { payQuantity } : {}),
       ...(minSubtotalKurus !== undefined ? { minSubtotalKurus } : {}),
       isActive: args.isActive,
-      createdAt: Date.now(),
     });
   },
 });

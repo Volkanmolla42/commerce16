@@ -3,10 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Button, Card, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { OrderStatusBadge, OrderPaymentStatusBadge } from "@/components/orders/order-badges";
-import { CsvExportButton } from "../_components/export-button";
+import { ExportMenu } from "../_components/export-button";
 import { useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
@@ -233,7 +237,7 @@ export default function AdminCustomersPage() {
           </div>
           <div className="flex items-center justify-between gap-3 sm:justify-end">
             {data ? <p className="text-sm text-muted-foreground">{data.totalCount} müşteri</p> : null}
-            <CsvExportButton type="customers" label="Müşterileri CSV olarak indir" />
+            <ExportMenu type="customers" />
           </div>
         </div>
 

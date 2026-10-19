@@ -157,6 +157,11 @@ export const updatePaymentSettings = mutation({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
 
+    // PayTR canlı tahsilat entegrasyonu (token + callback doğrulaması) hazır olmadan canlı mod açılamaz.
+    if (!args.paytr.testMode) {
+      throw new Error("PayTR canlı modu henüz hazır değil; test modunu kullanın.");
+    }
+
     // Temel doğrulamalar
     if (args.cashOnDelivery.fee < 0 || args.cashOnDelivery.fee > 10000) {
       throw new Error("Kapıda ödeme hizmet bedeli 0 ile 10.000 TL arasında olmalıdır.");

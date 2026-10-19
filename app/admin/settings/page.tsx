@@ -2,13 +2,10 @@
 
 import Image from "next/image";
 import { SyntheticEvent, ReactNode, useEffect, useRef, useState } from "react";
-import {
-  Button,
-  Card,
-  CardContent,
-  Input,
-  Label,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AdminEmpty,
   AdminLoading,

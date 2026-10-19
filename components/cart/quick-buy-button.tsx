@@ -4,10 +4,9 @@ import type { Product, ProductVariant } from "@/lib/catalog/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { setQuickBuyItem } from "./quick-buy-store";
-import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
-import { getImagesForVariant } from "@/lib/catalog/product-images";
+import { getSelectedVariant, getVariantProduct } from "@/lib/catalog/variants";
 
 export function QuickBuyButton({ product, variant, buttonVariant = "default" }: { product: Product; variant?: ProductVariant; buttonVariant?: "default" | "outline" }) {
   const router = useRouter();
@@ -20,9 +19,7 @@ export function QuickBuyButton({ product, variant, buttonVariant = "default" }: 
     if (!isAvailable || isNavigating) return;
 
     setQuickBuyItem({
-      product: selectedVariant
-        ? { ...product, price: selectedVariant.price.amount, images: getImagesForVariant(product.images, selectedVariant.selectedOptions), title: getProductVariantTitle(product.title, selectedVariant) }
-        : product,
+      product: selectedVariant ? getVariantProduct(product, selectedVariant) : product,
       quantity: 1,
       variantId: selectedVariant?.id,
     });

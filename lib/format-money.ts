@@ -1,6 +1,4 @@
-const STORE_CURRENCY = "TRY";
-
-export function formatMoney(amount: number | string, currency = STORE_CURRENCY) {
+export function formatMoney(amount: number | string) {
   const value = typeof amount === "number" ? amount : Number(amount);
   const safeValue = Number.isFinite(value) ? value : 0;
   // Kuruş yoksa ondalık gösterme ("888 TL"), varsa iki hane ("888,50 TL").
@@ -9,7 +7,7 @@ export function formatMoney(amount: number | string, currency = STORE_CURRENCY) 
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(safeValue);
-  return `${formatted} ${currency === "TRY" ? "TL" : currency}`;
+  return `${formatted} TL`;
 }
 
 /**

@@ -9,10 +9,9 @@ import { useRouter } from "next/navigation";
 import { BoltIcon, ShoppingBagIcon } from "@heroicons/react/24/outline";
 import { useCart } from "@/components/cart/cart-context";
 import { setQuickBuyItem } from "@/components/cart/quick-buy-store";
-import { getImagesForVariant } from "@/lib/catalog/product-images";
 import {
-  getProductVariantTitle,
   getVariantForImage,
+  getVariantProduct,
   isVariantSellable,
 } from "@/lib/catalog/variants";
 import "yet-another-react-lightbox/styles.css";
@@ -23,14 +22,12 @@ export default function ProductLightbox({
   product,
   title,
   index,
-  onSelectVariant,
   onClose,
 }: {
   images: ProductImage[];
   product: Product;
   title: string;
   index: number;
-  onSelectVariant?: (options: { name: string; value: string }[]) => void;
   onClose: (index: number) => void;
 }) {
   const activeIndex = useRef(index);
@@ -76,23 +73,16 @@ export default function ProductLightbox({
 
           const available = isVariantSellable(variant);
           const variantLabel = variant.selectedOptions.map(({ value }) => value).join(" / ") || variant.title;
-          const selectedProduct: Product = {
-            ...product,
-            price: variant.price.amount,
-            images: getImagesForVariant(product.images, variant.selectedOptions),
-            title: getProductVariantTitle(product.title, variant),
-          };
+          const selectedProduct = getVariantProduct(product, variant);
 
           const addToCart = () => {
             if (!available) return;
-            onSelectVariant?.(variant.selectedOptions);
             addItem(selectedProduct, 1, variant.id);
             onClose(currentIndex);
           };
 
           const quickBuy = () => {
             if (!available) return;
-            onSelectVariant?.(variant.selectedOptions);
             setQuickBuyItem({ product: selectedProduct, quantity: 1, variantId: variant.id });
             router.push("/checkout?mode=quick-buy");
           };

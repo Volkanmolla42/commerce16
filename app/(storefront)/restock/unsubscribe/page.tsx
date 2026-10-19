@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { CheckCircleIcon, ExclamationCircleIcon, BellSlashIcon } from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import ContentPageLayout from "@/components/layout/content-page-layout";
 
 function RestockUnsubscribeContent() {

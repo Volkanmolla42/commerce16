@@ -92,10 +92,10 @@ export const getStoreSettings = query({
 
 export const getBadgeSettings = query({
   args: {},
-  returns: v.object({ newBadgeDays: v.number() }),
+  returns: v.object({ newBadgeDays: v.number(), lowStockThreshold: v.number() }),
   handler: async (ctx) => {
     const settings = await readStoreSettings(ctx);
-    return { newBadgeDays: settings.newBadgeDays };
+    return { newBadgeDays: settings.newBadgeDays, lowStockThreshold: settings.lowStockThreshold };
   },
 });
 

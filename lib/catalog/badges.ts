@@ -3,8 +3,8 @@ import { DEFAULT_NEW_BADGE_DAYS, isNewProduct } from "./new-badge";
 import type { ProductVariant } from "./types";
 import { isVariantSellable } from "./variants";
 
-export const LOW_STOCK_THRESHOLD = DEFAULT_LOW_STOCK_THRESHOLD;
-export const BESTSELLER_SALES_THRESHOLD = 10;
+const LOW_STOCK_THRESHOLD = DEFAULT_LOW_STOCK_THRESHOLD;
+const BESTSELLER_SALES_THRESHOLD = 10;
 
 export type ProductBadge =
   | { kind: "discount"; percent: number }
@@ -23,21 +23,21 @@ function discountPercent(price: string, compareAtPrice?: string): number | null 
 
 export function getProductBadges({
   variants,
-  createdAt,
-  publishedAt,
+  _creationTime,
   soldCount,
   selectedVariantId,
   compact = false,
   newBadgeDays = DEFAULT_NEW_BADGE_DAYS,
+  lowStockThreshold = LOW_STOCK_THRESHOLD,
   now,
 }: {
   variants?: ProductVariant[];
-  createdAt?: number;
-  publishedAt?: number;
+  _creationTime?: number;
   soldCount?: number;
   selectedVariantId?: string;
   compact?: boolean;
   newBadgeDays?: number;
+  lowStockThreshold?: number;
   now?: number;
 }): ProductBadge[] {
   if (!variants?.length) return [];
@@ -48,14 +48,14 @@ export function getProductBadges({
     ? variants.find((variant) => variant.id === selectedVariantId)
     : undefined;
   const priceBasis = selected ?? sellable.reduce((cheapest, variant) =>
-    Number(variant.price.amount) < Number(cheapest.price.amount) ? variant : cheapest);
-  const discount = discountPercent(priceBasis.price.amount, priceBasis.compareAtPrice);
+    Number(variant.price) < Number(cheapest.price) ? variant : cheapest);
+  const discount = discountPercent(priceBasis.price, priceBasis.compareAtPrice);
 
   const stock = selected
     ? (selected.stockQuantity ?? 0)
     : sellable.reduce((total, variant) => total + (variant.stockQuantity ?? 0), 0);
-  const lowStock = stock > 0 && stock <= LOW_STOCK_THRESHOLD;
-  const isNew = isNewProduct({ createdAt, publishedAt, now, days: newBadgeDays });
+  const lowStock = stock > 0 && stock <= lowStockThreshold;
+  const isNew = isNewProduct({ _creationTime, now, days: newBadgeDays });
   const isBestseller = (soldCount ?? 0) >= BESTSELLER_SALES_THRESHOLD;
 
   const statuses: ProductBadge[] = [];

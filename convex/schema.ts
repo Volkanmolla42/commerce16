@@ -15,55 +15,56 @@ const orderStatusValidator = v.union(...ORDER_STATUS_KEYS.map((key) => v.literal
 const orderPaymentStatusValidator = v.union(...ORDER_PAYMENT_STATUS_KEYS.map((key) => v.literal(key)));
 const billingTypeValidator = v.union(...BILLING_TYPE_KEYS.map((key) => v.literal(key)));
 
+export const productsTable = defineTable({
+  slug: v.string(),
+  title: v.string(),
+  priceValue: v.number(),
+  soldCount: v.optional(v.number()),
+  availableForSale: v.boolean(),
+  attributes: v.optional(v.array(v.object({
+    key: v.string(),
+    value: v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+  }))),
+  categorySlug: v.optional(v.string()),
+  description: v.optional(v.string()),
+  descriptionImageStorageIds: v.optional(v.array(v.id("_storage"))),
+  images: v.array(v.object({
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))), // Empty means shared by all variants.
+  })),
+  options: v.array(v.object({
+    id: v.string(),
+    name: v.string(),
+    values: v.array(v.string()),
+  })),
+  variants: v.array(v.object({
+    id: v.string(),
+    title: v.string(),
+    availableForSale: v.boolean(),
+    selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
+    price: v.string(),
+    compareAtPrice: v.optional(v.string()),
+    stockQuantity: v.number(),
+    sku: v.optional(v.string()),
+    barcode: v.optional(v.string()),
+  })),
+  updatedAt: v.string(),
+})
+  .index("by_slug", ["slug"])
+  .index("by_available", ["availableForSale"])
+  .index("by_category", ["categorySlug"])
+  .index("by_available_and_category", ["availableForSale", "categorySlug"])
+  .index("by_priceValue", ["priceValue"])
+  .index("by_category_and_priceValue", ["categorySlug", "priceValue"])
+  .index("by_available_and_priceValue", ["availableForSale", "priceValue"])
+  .index("by_available_and_category_and_priceValue", ["availableForSale", "categorySlug", "priceValue"])
+  .searchIndex("search_catalog", { searchField: "title", filterFields: ["availableForSale", "categorySlug"] });
+
 export default defineSchema({
   ...authTables,
 
-  products: defineTable({
-    slug: v.string(),
-    title: v.string(),
-    priceValue: v.number(),
-    soldCount: v.optional(v.number()),
-    publishedAt: v.optional(v.number()),
-    availableForSale: v.boolean(),
-    attributes: v.optional(v.array(v.object({
-      key: v.string(),
-      value: v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
-    }))),
-    categorySlug: v.optional(v.string()),
-    description: v.optional(v.string()),
-    descriptionImageStorageIds: v.optional(v.array(v.id("_storage"))),
-    images: v.array(v.object({
-      storageId: v.id("_storage"),
-      fileName: v.string(),
-      selectedOptions: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))), // Empty means shared by all variants.
-    })),
-    options: v.array(v.object({
-      id: v.string(),
-      name: v.string(),
-      values: v.array(v.string()),
-    })),
-    variants: v.array(v.object({
-      id: v.string(),
-      title: v.string(),
-      availableForSale: v.boolean(),
-      selectedOptions: v.array(v.object({ name: v.string(), value: v.string() })),
-      price: v.string(),
-      compareAtPrice: v.optional(v.string()),
-      stockQuantity: v.number(),
-      sku: v.optional(v.string()),
-      barcode: v.optional(v.string()),
-    })),
-    updatedAt: v.string(),
-  })
-    .index("by_slug", ["slug"])
-    .index("by_available", ["availableForSale"])
-    .index("by_category", ["categorySlug"])
-    .index("by_available_and_category", ["availableForSale", "categorySlug"])
-    .index("by_priceValue", ["priceValue"])
-    .index("by_category_and_priceValue", ["categorySlug", "priceValue"])
-    .index("by_available_and_priceValue", ["availableForSale", "priceValue"])
-    .index("by_available_and_category_and_priceValue", ["availableForSale", "categorySlug", "priceValue"])
-    .searchIndex("search_catalog", { searchField: "title", filterFields: ["availableForSale", "categorySlug"] }),
+  products: productsTable,
 
   catalogStats: defineTable({
     key: v.string(), total: v.number(), active: v.number(),
@@ -122,7 +123,6 @@ export default defineSchema({
     payQuantity: v.optional(v.number()),
     minSubtotalKurus: v.optional(v.number()),
     isActive: v.boolean(),
-    createdAt: v.number(),
   }).index("by_active", ["isActive"]),
 
   orders: defineTable({
@@ -159,6 +159,7 @@ export default defineSchema({
     trackingNumber: v.optional(v.string()),
     trackingUrl: v.optional(v.string()),
     analyticsSessionId: v.optional(v.string()),
+    accessToken: v.optional(v.string()),
     shippingAddress: v.optional(v.string()),
     billingType: v.optional(billingTypeValidator),
     companyName: v.optional(v.string()),
@@ -190,6 +191,7 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_payment_status", ["paymentStatus"])
     .index("by_status_and_payment_status", ["status", "paymentStatus"])
+    .index("by_status_and_payment_status_and_paymentMethod", ["status", "paymentStatus", "paymentMethod"])
     .index("by_customerEmail", ["customerEmail"])
     .index("by_analytics_session_id", ["analyticsSessionId"]),
 
@@ -204,26 +206,10 @@ export default defineSchema({
     productViews: v.number(),
     addedToCart: v.boolean(),
     checkoutStarted: v.boolean(),
-    lastRoute: v.optional(v.string()),
   })
     .index("by_session_id", ["sessionId"])
     .index("by_visitor_id", ["visitorId"])
     .index("by_started_at", ["startedAt"]),
-
-  analyticsPurchases: defineTable({
-    orderId: v.id("orders"),
-    sessionId: v.string(),
-    visitorId: v.string(),
-    customerKey: v.string(),
-    source: v.string(),
-    medium: v.string(),
-    campaign: v.optional(v.string()),
-    amountCents: v.number(),
-    paidAt: v.number(),
-  })
-    .index("by_order_id", ["orderId"])
-    .index("by_paid_at", ["paidAt"])
-    .index("by_visitor_id", ["visitorId"]),
 
   orderEmailEvents: defineTable({
     orderId: v.id("orders"),
@@ -258,8 +244,6 @@ export default defineSchema({
     email: v.optional(v.string()),
     emailConsent: v.boolean(),
     emailConsentedAt: v.optional(v.number()),
-    emailOptedOutAt: v.optional(v.number()),
-    consentCopyVersion: v.string(),
     status: v.union(
       v.literal("active"),
       v.literal("sending"),
@@ -273,7 +257,6 @@ export default defineSchema({
     unsubscribeToken: v.string(),
     restoreToken: v.string(),
     notificationId: v.string(),
-    reminderScheduled: v.boolean(),
     lastActivityAt: v.number(),
     expiresAt: v.number(),
     emailSentAt: v.optional(v.number()),
@@ -349,10 +332,8 @@ export default defineSchema({
     email: v.string(),
     productId: v.id("products"),
     variantId: v.optional(v.string()),
-    status: v.union(v.literal("pending"), v.literal("notified"), v.literal("cancelled")),
+    status: v.union(v.literal("pending"), v.literal("sending"), v.literal("notified"), v.literal("cancelled")),
     unsubscribeToken: v.string(),
-    notifiedAt: v.optional(v.number()),
-    createdAt: v.number(),
   })
     .index("by_product_and_variant", ["productId", "variantId"])
     .index("by_email_and_product", ["email", "productId"])
@@ -375,10 +356,9 @@ export default defineSchema({
     subject: v.string(),
     message: v.string(),
     status: v.union(v.literal("new"), v.literal("read"), v.literal("replied")),
-    createdAt: v.number(),
   })
-    .index("by_created_at", ["createdAt"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_email", ["email"]),
 
   emailLogs: defineTable({
     templateKey: v.string(),
@@ -390,9 +370,7 @@ export default defineSchema({
     resendId: v.optional(v.string()),
     error: v.optional(v.string()),
     metadata: v.optional(v.any()),
-    createdAt: v.number(),
   })
-    .index("by_created_at", ["createdAt"])
     .index("by_recipient", ["recipient"])
     .index("by_template_key", ["templateKey"])
     .index("by_status", ["status"]),
@@ -446,7 +424,6 @@ export default defineSchema({
     content: v.string(),
     isVerifiedPurchase: v.boolean(),
     status: v.union(v.literal("approved"), v.literal("pending"), v.literal("rejected")),
-    createdAt: v.number(),
   })
     .index("by_product", ["productId"])
     .index("by_product_and_status", ["productId", "status"])
@@ -464,9 +441,7 @@ export default defineSchema({
     storeRating: v.number(),
     deliveryRating: v.optional(v.number()),
     comment: v.optional(v.string()),
-    createdAt: v.number(),
   })
     .index("by_order", ["orderId"])
-    .index("by_user", ["userId"])
-    .index("by_created_at", ["createdAt"]),
+    .index("by_user", ["userId"]),
 });

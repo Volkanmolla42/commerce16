@@ -70,8 +70,3 @@ export function useQuickBuyItem(): CartItem | null {
   );
 }
 
-/** Geriye dönük uyumluluk için */
-export function useQuickBuyDraft() {
-  const item = useQuickBuyItem();
-  return { ready: true, item };
-}

@@ -49,12 +49,10 @@ export const submitContactMessage = mutation({
     // Basit spam önleme: son 60 saniye içinde aynı e-postadan mesaj varsa beklet
     const now = Date.now();
     const oneMinuteAgo = now - 60 * 1000;
-    const recent = await ctx.db
+    const duplicateInLastMinute = await ctx.db
       .query("contactMessages")
-      .withIndex("by_created_at", (q) => q.gt("createdAt", oneMinuteAgo))
-      .collect();
-
-    const duplicateInLastMinute = recent.find((m) => m.email === cleanEmail);
+      .withIndex("by_email", (q) => q.eq("email", cleanEmail).gt("_creationTime", oneMinuteAgo))
+      .first();
     if (duplicateInLastMinute) {
       throw new Error("Kısa süre önce bir mesaj gönderdiniz. Lütfen bir dakika sonra tekrar deneyiniz.");
     }
@@ -66,7 +64,6 @@ export const submitContactMessage = mutation({
       subject: cleanSubject,
       message: cleanMessage,
       status: "new",
-      createdAt: now,
     });
 
     // Yöneticiye anlık e-posta uyarısı tetikle
@@ -94,7 +91,7 @@ export const getContactMessageDetails = internalQuery({
         phone: v.nullable(v.string()),
         subject: v.string(),
         message: v.string(),
-        createdAt: v.number(),
+        _creationTime: v.number(),
       }),
       storeName: v.string(),
     }),
@@ -113,7 +110,7 @@ export const getContactMessageDetails = internalQuery({
         phone: message.phone ?? null,
         subject: message.subject,
         message: message.message,
-        createdAt: message.createdAt,
+        _creationTime: message._creationTime,
       },
       storeName,
     };
@@ -144,7 +141,7 @@ export const sendContactAlertAction = internalAction({
         senderPhone: message.phone,
         messageSubject: message.subject,
         message: message.message,
-        createdAt: message.createdAt,
+        _creationTime: message._creationTime,
       }),
       replyTo: message.email,
       idempotencyKey: `contact/${args.messageId}`,

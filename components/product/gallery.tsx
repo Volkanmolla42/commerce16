@@ -158,8 +158,7 @@ export function Gallery({
         <div className="pointer-events-none absolute left-2 top-2 z-10">
           <ProductBadges
             variants={product.variants}
-            createdAt={product.createdAt}
-            publishedAt={product.publishedAt}
+            _creationTime={product._creationTime}
             soldCount={product.soldCount}
             selectedVariantId={currentVariant?.id}
             size="md"
@@ -229,7 +228,10 @@ export function Gallery({
           product={product}
           title={product.title}
           index={activeIndex}
-          onClose={() => setLightboxOpen(false)}
+          onClose={(index) => {
+            setActiveIndex(index);
+            setLightboxOpen(false);
+          }}
         />
       ) : null}
     </div>

@@ -4,9 +4,8 @@ import { useCart } from "./cart-context";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 import { useEffect, useRef, useState } from "react";
 import { ShoppingBagIcon, CheckIcon } from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui";
-import { getProductVariantTitle, getSelectedVariant } from "@/lib/catalog/variants";
-import { getImagesForVariant } from "@/lib/catalog/product-images";
+import { Button } from "@/components/ui/button";
+import { getSelectedVariant, getVariantProduct } from "@/lib/catalog/variants";
 import { burstCartConfetti } from "./cart-confetti";
 import { RestockNotificationDialog } from "@/components/product/restock-notification-dialog";
 
@@ -36,9 +35,7 @@ export function AddToCart({
   const stockLimit = getItemMaxStock(product.id, selectedVariant?.id);
   const isMaxStockReached = cartQuantity >= stockLimit;
   const canAdd = isAvailable && !isMaxStockReached;
-  const selectedProduct = selectedVariant
-    ? { ...product, price: selectedVariant.price.amount, images: getImagesForVariant(product.images, selectedVariant.selectedOptions), title: getProductVariantTitle(product.title, selectedVariant) }
-    : product;
+  const selectedProduct = selectedVariant ? getVariantProduct(product, selectedVariant) : product;
 
   const handleAdd = (origin?: HTMLElement) => {
     if (!canAdd) return;

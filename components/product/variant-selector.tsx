@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { canSelectOption, hasVariantOptionCombination } from "@/lib/catalog/variants";
+import { matchesVariantOption } from "@/lib/catalog/variants";
 import { ProductOption, ProductVariant } from "@/lib/catalog/types";
 import { useSearchParams } from "next/navigation";
 
@@ -35,7 +35,7 @@ export function VariantSelector({
     for (const option of options) {
       const optionKey = option.name.toLocaleLowerCase("tr-TR");
       const selected = params.get(optionKey);
-      if (optionKey !== key && selected && !hasVariantOptionCombination({ options, variants }, params, option.name, selected)) {
+      if (optionKey !== key && selected && !matchesVariantOption({ options, variants }, params, option.name, selected)) {
         params.delete(optionKey);
       }
     }
@@ -56,8 +56,8 @@ export function VariantSelector({
           </dt>
           <dd className="flex flex-wrap gap-2">
             {option.values.map((value) => {
-              const isAvailableForSale = canSelectOption({ options, variants }, searchParams, option.name, value);
-              const hasCombination = hasVariantOptionCombination({ options, variants }, searchParams, option.name, value);
+              const isAvailableForSale = matchesVariantOption({ options, variants }, searchParams, option.name, value, true);
+              const hasCombination = matchesVariantOption({ options, variants }, searchParams, option.name, value);
               const isActive = activeValue === value;
 
               return (

@@ -48,7 +48,7 @@ export const orderEmailPayloadValidator = v.object({
   total: v.string(),
   couponCode: v.union(v.string(), v.null()),
   couponDiscountKurus: v.union(v.number(), v.null()),
-  createdAt: v.number(),
+  _creationTime: v.number(),
   carrier: v.union(v.string(), v.null()),
   trackingNumber: v.union(v.string(), v.null()),
   trackingUrl: v.union(v.string(), v.null()),
@@ -213,7 +213,7 @@ export function renderOrderEmail(payload: OrderEmailPayload): EmailContent {
     0
   );
   const discount = payload.couponDiscountKurus ? payload.couponDiscountKurus / 100 : 0;
-  const dateText = formatDateTime(payload.createdAt, {
+  const dateText = formatDateTime(payload._creationTime, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -362,7 +362,7 @@ export function sampleOrderPayload(event: OrderEmailEvent, store: EmailPreviewSt
     total: "1250.00",
     couponCode: event === "order_placed" ? "INDIRIM10" : null,
     couponDiscountKurus: event === "order_placed" ? 1000 : null,
-    createdAt: 1_700_000_000_000,
+    _creationTime: 1_700_000_000_000,
     carrier: event === "order_shipped" ? "Yurtiçi Kargo" : null,
     trackingNumber: event === "order_shipped" ? "2500012345678" : null,
     trackingUrl:

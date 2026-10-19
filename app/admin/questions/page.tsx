@@ -22,7 +22,6 @@ type QuestionFilter = QuestionStatus | "all";
 
 type AdminQuestion = {
   _id: string;
-  _creationTime: number;
   productId: string;
   productTitle: string | null;
   productSlug: string | null;
@@ -32,7 +31,7 @@ type AdminQuestion = {
   answer?: string;
   answeredAt?: number;
   status: QuestionStatus;
-  createdAt: number;
+  _creationTime: number;
 };
 
 const statusMeta: Record<QuestionStatus, { label: string; className: string }> = {
@@ -147,7 +146,7 @@ function QuestionCard({
                 </>
               ) : null}
               {" · "}
-              {formatDateTime(item.createdAt, { dateStyle: "medium", timeStyle: "short" })}
+              {formatDateTime(item._creationTime, { dateStyle: "medium", timeStyle: "short" })}
             </p>
           </div>
         </div>

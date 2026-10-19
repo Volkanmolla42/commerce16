@@ -18,17 +18,13 @@ import {
   ShoppingBagIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Separator,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
+import { getShippingQuote } from "@/lib/shipping";
 import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/layout/mobile-summary-bar";
-import { getProductPriceRange, getProductUnitPrice } from "@/lib/catalog/variants";
+import { getProductUnitPrice } from "@/lib/catalog/variants";
 import { CartRecommendationShelf } from "@/components/product/recommendation-shelves";
 import { FreeShippingBar } from "@/components/cart/free-shipping-bar";
 import { quotePromotions } from "@/lib/promotions";
@@ -170,8 +166,8 @@ function CartSummaryCard({
   promotionTitle?: string | null;
   freeShippingTitle?: string | null;
 }) {
-  const isFreeShipping = Boolean(freeShippingTitle) || (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
-  const calculatedShippingFee = isFreeShipping ? 0 : (shippingFee ?? 0);
+  const shipping = getShippingQuote({ subtotal: totalAmount, freeShippingThreshold: threshold, shippingFee, promotionFreeShipping: Boolean(freeShippingTitle) });
+  const calculatedShippingFee = shipping.shippingFee;
   const finalTotal = totalAmount - promotionDiscountKurus / 100 + calculatedShippingFee;
 
   return (
@@ -194,7 +190,7 @@ function CartSummaryCard({
         )}
         <div className="flex justify-between text-muted-foreground">
           <span>Kargo</span>
-          {isFreeShipping ? (
+          {shipping.freeShipping ? (
             <span className="text-right font-medium text-emerald-500">
               Ücretsiz{freeShippingTitle ? ` (${freeShippingTitle})` : ""}
             </span>
@@ -235,8 +231,8 @@ function CartMobileCheckoutBar({
   promotionDiscountKurus?: number;
   freeShippingTitle?: string | null;
 }) {
-  const isFreeShipping = Boolean(freeShippingTitle) || (threshold ?? 0) <= 0 || totalAmount >= (threshold ?? 0);
-  const calculatedShippingFee = isFreeShipping ? 0 : (shippingFee ?? 0);
+  const shipping = getShippingQuote({ subtotal: totalAmount, freeShippingThreshold: threshold, shippingFee, promotionFreeShipping: Boolean(freeShippingTitle) });
+  const calculatedShippingFee = shipping.shippingFee;
   const finalTotal = totalAmount - promotionDiscountKurus / 100 + calculatedShippingFee;
 
   return (
@@ -308,24 +304,7 @@ function CartContent() {
       }
     }
 
-    const restoredProductsById = new Map<string, Product>();
-    for (const product of restoredProducts ?? []) {
-      restoredProductsById.set(product._id, {
-        id: product._id,
-        slug: product.slug,
-        title: product.title,
-        price: getProductPriceRange(product).min,
-        availableForSale: product.availableForSale ?? true,
-        categorySlug: product.categorySlug,
-        images: product.images,
-        options: product.options,
-        variants: product.variants.map(({ price, ...variant }) => ({
-          ...variant,
-          price: { amount: price, currencyCode: "TRY" },
-        })),
-        updatedAt: product.updatedAt || new Date(product._creationTime).toISOString(),
-      });
-    }
+    const restoredProductsById = new Map<string, Product>((restoredProducts ?? []).map((product) => [product.id, product]));
 
     for (const restored of restoredCart?.items ?? []) {
       const product = restoredProductsById.get(restored.productId);

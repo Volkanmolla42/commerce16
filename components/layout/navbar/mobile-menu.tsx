@@ -314,7 +314,7 @@ function CategoryProducts({
       {products.map((product) => {
         const imageUrl = product.images[0]?.url;
         return (
-          <li key={product._id}>
+          <li key={product.id}>
             <Link
               href={`/product/${product.slug}`}
               onClick={onNavigate}

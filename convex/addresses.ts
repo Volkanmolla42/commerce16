@@ -6,7 +6,7 @@ import schema from "./schema";
 import { getDistrictById, getDistrictByName, getProvinceById, getProvinceByName } from "../lib/turkey-provinces";
 
 const addressValidator = schema.doc("addresses");
-const addressInputValidator = addressValidator.omit("_id", "_creationTime", "userId");
+const addressInputValidator = schema.tables.addresses.validator.omit("userId");
 export type AddressInput = Infer<typeof addressInputValidator>;
 const MAX_ADDRESSES = 100;
 

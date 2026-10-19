@@ -8,12 +8,10 @@ import {
   DevicePhoneMobileIcon,
   ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
-import {
-  Input,
-  Label,
-  Card,
-  Badge,
-} from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading } from "../_components/admin-primitives";
 import { useAdminResource } from "../_components/admin-api";
 import { formatDateTime } from "@/lib/format-date";
@@ -42,7 +40,7 @@ interface SentEmailLog {
   error?: string;
   resendId?: string;
   metadata?: Record<string, unknown>;
-  createdAt: number;
+  _creationTime: number;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -261,7 +259,7 @@ function AdminEmailsContent() {
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-0.5">
                     <span className="font-mono">{email.templateKey}</span>
                     <span>
-                      {formatDateTime(email.createdAt, { dateStyle: "short", timeStyle: "short" })}
+                      {formatDateTime(email._creationTime, { dateStyle: "short", timeStyle: "short" })}
                     </span>
                   </div>
                 </button>
@@ -379,7 +377,7 @@ function AdminEmailsContent() {
                   <div>
                     <span className="text-muted-foreground block text-[11px]">Tarih:</span>
                     <span className="text-foreground">
-                      {formatDateTime(activeSentEmail.createdAt, { dateStyle: "long", timeStyle: "medium" })}
+                      {formatDateTime(activeSentEmail._creationTime, { dateStyle: "long", timeStyle: "medium" })}
                     </span>
                   </div>
                   <div className="col-span-2 sm:col-span-1">

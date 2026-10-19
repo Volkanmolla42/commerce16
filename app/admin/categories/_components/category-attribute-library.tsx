@@ -3,7 +3,9 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { Button, Input, Label } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   CATEGORY_ATTRIBUTE_LIMIT, normalizeAttributeLabel, parseAttributeTemplate,
   type CategoryAttributeDefinition, type CategoryAttributeTemplate,

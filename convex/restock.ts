@@ -11,11 +11,7 @@ const rateLimiter = new RateLimiter(components.rateLimiter, {
   restockSubscribe: { kind: "fixed window", rate: 10, period: 60 * 60 * 1000 },
 });
 
-function randomHex(byteLength: number) {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
+import { randomHex } from "./random";
 
 async function hash(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -103,7 +99,6 @@ export const subscribe = mutation({
       variantId: args.variantId,
       status: "pending",
       unsubscribeToken,
-      createdAt: Date.now(),
     });
 
     return {
@@ -123,7 +118,7 @@ export const getSubscriptionByToken = query({
       productTitle: v.string(),
       productSlug: v.string(),
       email: v.string(),
-      status: v.union(v.literal("pending"), v.literal("notified"), v.literal("cancelled")),
+      status: v.union(v.literal("pending"), v.literal("sending"), v.literal("notified"), v.literal("cancelled")),
     }),
     v.null()
   ),
@@ -232,6 +227,8 @@ export const sendRestockEmailAction = internalAction({
 
     if (outcome === "sent") {
       await ctx.runMutation(internal.restock.markNotified, { subscriptionId: data.sub._id });
+    } else {
+      await ctx.runMutation(internal.restock.releaseClaim, { subscriptionId: data.sub._id });
     }
 
     return null;
@@ -269,6 +266,7 @@ export const claimForNotification = internalMutation({
       : null;
 
     const { storeName } = await readStoreSettings(ctx);
+    await ctx.db.patch(sub._id, { status: "sending" });
 
     return {
       sub: {
@@ -292,11 +290,22 @@ export const markNotified = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const sub = await ctx.db.get(args.subscriptionId);
-    if (sub && sub.status === "pending") {
+    if (sub && (sub.status === "sending" || sub.status === "pending")) {
       await ctx.db.patch(sub._id, {
         status: "notified",
-        notifiedAt: Date.now(),
       });
+    }
+    return null;
+  },
+});
+
+export const releaseClaim = internalMutation({
+  args: { subscriptionId: v.id("restockSubscriptions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const sub = await ctx.db.get(args.subscriptionId);
+    if (sub?.status === "sending") {
+      await ctx.db.patch(sub._id, { status: "pending" });
     }
     return null;
   },

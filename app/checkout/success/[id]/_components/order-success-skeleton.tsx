@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardContent } from "@/components/ui";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 
 function Sk({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse bg-muted rounded-xl ${className}`} />;

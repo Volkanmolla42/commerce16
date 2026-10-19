@@ -1,19 +1,8 @@
 import type { CategoryAttributeDefinition, ProductAttribute } from "./attributes";
 
-export type Image = {
-  url: string;
-  altText: string;
-  width: number;
-  height: number;
-};
 export type Menu = {
   title: string;
   path: string;
-};
-
-export type Money = {
-  amount: string;
-  currencyCode: string;
 };
 
 export type ProductOption = {
@@ -32,7 +21,7 @@ export type ProductVariant = {
     name: string;
     value: string;
   }[];
-  price: Money;
+  price: string;
   compareAtPrice?: string;
   stockQuantity?: number;
 };
@@ -67,6 +56,8 @@ export type Product = {
   /** Precomputed card prices avoid transferring every SKU to product lists. */
   priceRange?: { min: string; max: string };
   availableForSale: boolean;
+  /** Listing cards: true when at least one variant is currently sellable. */
+  inStock?: boolean;
   attributes?: ProductAttribute[];
   categorySlug?: string;
   description?: string;
@@ -74,8 +65,7 @@ export type Product = {
   images: ProductImage[];
   options?: ProductOption[];
   variants?: ProductVariant[];
-  createdAt?: number;
-  publishedAt?: number;
+  _creationTime: number;
   soldCount?: number;
   updatedAt: string;
 };

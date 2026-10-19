@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useMutation } from "convex/react";
 import { cartStore, type CartItem, type CartStore } from "./cart-store";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
@@ -8,7 +8,6 @@ import { getCartRecoverySessionKey } from "./recovery-store";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useStockGuard } from "./use-stock-guard";
-export type { CartItem } from "./cart-store";
 
 export type RemovedCartItem = { item: CartItem; index: number };
 
@@ -40,32 +39,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [removedItem, setRemovedItem] = useState<RemovedCartItem | null>(null);
 
   // Otomatik kaldırılan bir satır kullanıcı tarafından yeniden ekleniyorsa stok hafızasını serbest bırak.
-  const addItem = useCallback<CartStore["addItem"]>((product, quantity, variantId) => {
+  const addItem: CartStore["addItem"] = (product, quantity, variantId) => {
     releaseStockKey(product.id, variantId);
     store.addItem(product, quantity, variantId);
-  }, [releaseStockKey, store]);
-  const replaceItem = useCallback<CartStore["replaceItem"]>((sourceProductId, sourceVariantId, product, quantity, variantId) => {
+  };
+  const replaceItem: CartStore["replaceItem"] = (sourceProductId, sourceVariantId, product, quantity, variantId) => {
     releaseStockKey(product.id, variantId);
     store.replaceItem(sourceProductId, sourceVariantId, product, quantity, variantId);
-  }, [releaseStockKey, store]);
-  const removeItem = useCallback<CartStore["removeItem"]>((productId, variantId) => {
+  };
+  const removeItem: CartStore["removeItem"] = (productId, variantId) => {
     const removed = findCartItem(store.getSnapshot(), productId, variantId);
     releaseStockKey(productId, variantId);
     store.removeItem(productId, variantId);
     if (removed) setRemovedItem(removed);
-  }, [releaseStockKey, store]);
-  const clearCart = useCallback<CartStore["clearCart"]>(() => {
+  };
+  const clearCart: CartStore["clearCart"] = () => {
     clearAllStockKeys();
     store.clearCart();
     setRemovedItem(null);
-  }, [clearAllStockKeys, store]);
-  const updateQuantity = useCallback<CartStore["updateQuantity"]>((productId, quantity, variantId) => {
+  };
+  const updateQuantity: CartStore["updateQuantity"] = (productId, quantity, variantId) => {
     const removed = Number.isSafeInteger(quantity) && quantity <= 0
       ? findCartItem(store.getSnapshot(), productId, variantId)
       : null;
     store.updateQuantity(productId, Math.min(getItemMaxStock(productId, variantId), quantity), variantId);
     if (removed) setRemovedItem(removed);
-  }, [getItemMaxStock, store]);
+  };
 
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = items.reduce((sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity, 0) / 100;
@@ -100,11 +99,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timeout);
   }, [removedItem]);
 
-  const restoreLastRemoved = useCallback(() => {
+  const restoreLastRemoved = () => {
     if (!removedItem) return;
     store.restoreItem(removedItem.item, removedItem.index);
     setRemovedItem(null);
-  }, [removedItem, store]);
+  };
 
   return (
     <CartContext.Provider value={{ ...store, addItem, replaceItem, removeItem, clearCart, updateQuantity, getItemMaxStock, items, totalCount, totalAmount, removedItem, restoreLastRemoved }}>

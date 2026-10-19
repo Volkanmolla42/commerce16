@@ -70,6 +70,7 @@ function ProductCard({
   const images = product.images.slice(0, 4);
   const hasMultipleImages = images.length > 1;
   const priceRange = getProductPriceRange(product);
+  const soldOut = product.inStock === false;
   const imageSizes = "(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw";
 
   return (
@@ -104,6 +105,11 @@ function ProductCard({
               ))}
             </ProductImageTransition>
           ) : null}
+          {soldOut ? (
+            <span className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-background/60">
+              <span className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">Tükendi</span>
+            </span>
+          ) : null}
           {hasMultipleImages ? (
             <div
               className="absolute inset-0 z-[1] flex"
@@ -136,8 +142,7 @@ function ProductCard({
           <div className="pointer-events-none absolute left-2 top-2 z-10">
             <ProductBadges
               variants={product.variants}
-              createdAt={product.createdAt}
-              publishedAt={product.publishedAt}
+              _creationTime={product._creationTime}
               soldCount={product.soldCount}
               compact
             />
@@ -150,7 +155,6 @@ function ProductCard({
           <Price
             amount={priceRange.min}
             maxAmount={priceRange.max}
-            currencyCode="TRY"
             className="flex flex-wrap items-baseline text-sm font-semibold text-foreground"
           />
         </div>

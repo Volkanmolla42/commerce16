@@ -6,22 +6,23 @@ import { useQuery } from "convex/react";
 import { ProductGrid } from "@/components/product/product-grid";
 import { useFavorites } from "./favorites-context";
 import Link from "next/link";
-import { Button, Card } from "@/components/ui";
-import { formatProduct } from "@/lib/catalog/format-product";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { FavoritesSkeleton } from "./favorites-skeleton";
 
 export function FavoriteProducts() {
   const { favoriteSlugs, isReady } = useFavorites();
+  const querySlugs = favoriteSlugs.slice(0, 100);
   const products = useQuery(
     api.products.getBySlugs,
-    favoriteSlugs.length ? { slugs: favoriteSlugs } : "skip",
+    querySlugs.length ? { slugs: querySlugs } : "skip",
   );
 
   if (!isReady || (favoriteSlugs.length > 0 && products === undefined)) {
     return <FavoritesSkeleton />;
   }
 
-  const favoriteProducts = (products ?? []).map(formatProduct);
+  const favoriteProducts = products ?? [];
   return (
     <section className="space-y-6">
       {favoriteProducts.length ? (

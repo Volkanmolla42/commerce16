@@ -1,6 +1,7 @@
 "use client";
 
-import { useCart, type CartItem } from "@/components/cart/cart-context";
+import { useCart } from "@/components/cart/cart-context";
+import type { CartItem } from "@/components/cart/cart-store";
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,18 +22,15 @@ import {
   UserIcon,
   BuildingOffice2Icon,
 } from "@heroicons/react/24/outline";
-import {
-  Button,
-  Input,
-  Label,
-  Card,
-  CardHeader,
-  CardTitle,
-  Separator,
-  Badge,
-} from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { MobileSummaryBar, mobileSummaryActionClassName } from "@/components/layout/mobile-summary-bar";
 import { formatMoney } from "@/lib/format-money";
+import { getShippingQuote } from "@/lib/shipping";
 import { formatPhoneInput } from "@/lib/format-phone-input";
 import { getCheckoutDetails, type CheckoutDraft } from "./checkout-details";
 import { useQuickBuyItem } from "@/components/cart/quick-buy-store";
@@ -252,6 +250,11 @@ function CheckoutContent() {
   const isQuickBuy = useSearchParams().get("mode") === "quick-buy";
   const quickBuyItem = useQuickBuyItem();
   const items = isQuickBuy ? (quickBuyItem ? [quickBuyItem] : []) : cartItems;
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  });
+  const itemsKey = items.map((item) => `${item.product.id}:${item.variantId ?? ""}:${item.quantity}`).join(",");
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotalKurus = items.reduce(
     (sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity,
@@ -321,8 +324,13 @@ function CheckoutContent() {
 
   const freeShippingThreshold = storeSettings?.freeShippingThreshold ?? 0;
   const standardShippingFee = storeSettings?.shippingFee ?? 0;
-  const isFreeShipping = promotion.freeShipping || freeShippingThreshold <= 0 || (subtotalKurus / 100) >= freeShippingThreshold;
-  const shippingFee = isFreeShipping ? 0 : standardShippingFee;
+  const shipping = getShippingQuote({
+    subtotal: subtotalKurus / 100,
+    freeShippingThreshold,
+    shippingFee: standardShippingFee,
+    promotionFreeShipping: promotion.freeShipping,
+  });
+  const shippingFee = shipping.shippingFee;
   const shippingFeeKurus = Math.round(shippingFee * 100);
 
   const finalPayableKurus = discountedPayableKurus + codFeeKurus + shippingFeeKurus;
@@ -375,25 +383,25 @@ function CheckoutContent() {
   const hasTrackedCheckoutRef = useRef(false);
 
   useEffect(() => {
-    if (items.length > 0 && !hasTrackedCheckoutRef.current) {
+    const currentItems = itemsRef.current;
+    if (currentItems.length > 0 && !hasTrackedCheckoutRef.current) {
       hasTrackedCheckoutRef.current = true;
       void trackAnalyticsEvent("begin_checkout");
       trackPixelInitiateCheckout({
         value: finalPayableAmount,
         currency: "TRY",
-        num_items: items.reduce((acc, item) => acc + item.quantity, 0),
-        content_ids: items.map((item) => (item.variantId ? `${item.product.id}_${item.variantId}` : item.product.id)),
+        num_items: currentItems.reduce((acc, item) => acc + item.quantity, 0),
+        content_ids: currentItems.map((item) => (item.variantId ? `${item.product.id}_${item.variantId}` : item.product.id)),
       });
     }
-  }, [items.length]);
-
-  const itemsKey = items.map((item) => `${item.product.id}:${item.variantId ?? ""}:${item.quantity}`).join(",");
+  }, [finalPayableAmount, itemsKey]);
 
   useEffect(() => {
-    if (items.length === 0) return;
+    const currentItems = itemsRef.current;
+    if (currentItems.length === 0 || !emailReminderConsent) return;
     let sessionKey: string | null;
     try {
-      sessionKey = getCartRecoverySessionKey(emailReminderConsent);
+      sessionKey = getCartRecoverySessionKey(true);
     } catch {
       return;
     }
@@ -401,15 +409,13 @@ function CheckoutContent() {
     const timeout = window.setTimeout(() => {
       void captureRecovery({
         sessionKey,
-        ...(emailReminderConsent ? { email: customerEmail } : {}),
-        emailConsent: emailReminderConsent,
-        items: emailReminderConsent
-          ? items.map((item) => ({
-            productId: item.product.id,
-            ...(item.variantId ? { variantId: item.variantId } : {}),
-            quantity: item.quantity,
-          }))
-          : [],
+        email: customerEmail,
+        emailConsent: true,
+        items: currentItems.map((item) => ({
+          productId: item.product.id,
+          ...(item.variantId ? { variantId: item.variantId } : {}),
+          quantity: item.quantity,
+        })),
       }).catch(() => undefined);
     }, 700);
     return () => window.clearTimeout(timeout);
@@ -581,7 +587,7 @@ function CheckoutContent() {
       }
 
       const analyticsSessionId = getAnalyticsSessionIdForOrder();
-      const orderId = await createOrder({
+      const { orderId, accessToken } = await createOrder({
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim(),
         customerPhone: phone.trim() || undefined,
@@ -619,7 +625,7 @@ function CheckoutContent() {
         await linkRecoveryOrder({ sessionKey: recoverySessionKey, orderId }).catch(() => undefined);
       }
 
-      router.replace(`/checkout/success/${orderId}`);
+      router.replace(`/checkout/success/${orderId}?token=${encodeURIComponent(accessToken)}${isQuickBuy ? "&mode=quick-buy" : ""}`);
     } catch (err: unknown) {
       setIsSubmitting(false);
       setErrorMessage(err instanceof Error ? err.message : "Sipariş oluşturulurken bir hata oluştu.");
@@ -704,7 +710,7 @@ function CheckoutContent() {
               payableAmount={finalPayableAmount}
               paymentFee={codFee}
               shippingFee={shippingFee}
-              isFreeShipping={isFreeShipping}
+              isFreeShipping={shipping.freeShipping}
               promotionDiscountKurus={promotionDiscountKurus}
               promotionTitle={promotion.title}
               freeShippingTitle={promotion.freeShippingTitle}
@@ -1302,6 +1308,7 @@ function CheckoutContent() {
                       <input
                         type="radio"
                         name="paymentMethod"
+                        aria-label="Kredi / Banka Kartı (PayTR)"
                         checked={effectivePaymentMethod === "paytr"}
                         onChange={() => setSelectedPaymentMethod("paytr")}
                         className="size-4 accent-primary cursor-pointer shrink-0"
@@ -1413,6 +1420,7 @@ function CheckoutContent() {
                       <input
                         type="radio"
                         name="paymentMethod"
+                        aria-label="Havale / EFT ile Ödeme"
                         checked={effectivePaymentMethod === "bank_transfer"}
                         onChange={() => setSelectedPaymentMethod("bank_transfer")}
                         className="size-4 accent-primary cursor-pointer shrink-0"
@@ -1486,6 +1494,7 @@ function CheckoutContent() {
                       <input
                         type="radio"
                         name="paymentMethod"
+                        aria-label="Kapıda Ödeme"
                         checked={effectivePaymentMethod === "cash_on_delivery"}
                         onChange={() => setSelectedPaymentMethod("cash_on_delivery")}
                         className="size-4 accent-primary cursor-pointer shrink-0"
@@ -1611,7 +1620,7 @@ function CheckoutContent() {
               payableAmount={finalPayableAmount}
               paymentFee={codFee}
               shippingFee={shippingFee}
-              isFreeShipping={isFreeShipping}
+              isFreeShipping={shipping.freeShipping}
               promotionDiscountKurus={promotionDiscountKurus}
               promotionTitle={promotion.title}
               freeShippingTitle={promotion.freeShippingTitle}

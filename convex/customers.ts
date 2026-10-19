@@ -8,6 +8,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 const MAX_PAGE_SIZE = 100;
 const ORDER_HISTORY_LIMIT = 50;
 const MAX_CUSTOMER_SCAN_LIMIT = 5000;
+const DETAIL_SCAN_LIMIT = 1000;
 
 const customerSummaryValidator = v.object({
   key: v.string(),
@@ -221,21 +222,21 @@ export const getAdmin = query({
     const accountEmail = user?.email?.trim().toLowerCase() || normalizedEmail;
 
     const addresses = userId
-      ? await ctx.db.query("addresses").withIndex("by_userId", (q) => q.eq("userId", userId)).collect()
+      ? await ctx.db.query("addresses").withIndex("by_userId", (q) => q.eq("userId", userId)).take(DETAIL_SCAN_LIMIT)
       : [];
 
     const userOrders = userId
       ? await ctx.db
           .query("orders")
           .withIndex("by_user", (q) => q.eq("userId", userId))
-          .collect()
+          .take(DETAIL_SCAN_LIMIT)
       : [];
 
     const emailOrders = accountEmail
       ? await ctx.db
           .query("orders")
           .withIndex("by_customerEmail", (q) => q.eq("customerEmail", accountEmail))
-          .collect()
+          .take(DETAIL_SCAN_LIMIT)
       : [];
 
     const orderMap = new Map<string, Doc<"orders">>();

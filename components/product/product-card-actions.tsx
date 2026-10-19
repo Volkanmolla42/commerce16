@@ -8,10 +8,7 @@ import { useCart } from "@/components/cart/cart-context";
 import { setQuickBuyItem } from "@/components/cart/quick-buy-store";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
 import { notifyProductAddedToCart } from "@/components/cart/product-cart-feedback";
-import {
-  getProductVariantTitle,
-} from "@/lib/catalog/variants";
-import { getImagesForVariant } from "@/lib/catalog/product-images";
+import { getVariantProduct } from "@/lib/catalog/variants";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 
 export function ProductCardActions({ product }: { product: Product }) {
@@ -22,19 +19,14 @@ export function ProductCardActions({ product }: { product: Product }) {
   const variants = product.variants ?? [];
   const hasMultipleVariants = variants.length > 1;
   const singleVariant = variants.length === 1 ? variants[0] : undefined;
+  const soldOut = product.inStock === false;
 
   const resolveConfiguredProduct = (variant?: ProductVariant) => {
     const itemVariant = variant ?? singleVariant;
     if (!itemVariant) return { configuredProduct: product, itemVariant: undefined };
 
-    const variantImages = getImagesForVariant(product.images, itemVariant.selectedOptions);
     return {
-      configuredProduct: {
-        ...product,
-        price: typeof itemVariant.price === "string" ? itemVariant.price : itemVariant.price.amount,
-        images: variantImages.length > 0 ? variantImages : product.images,
-        title: getProductVariantTitle(product.title, itemVariant),
-      },
+      configuredProduct: getVariantProduct(product, itemVariant),
       itemVariant,
     };
   };
@@ -42,6 +34,7 @@ export function ProductCardActions({ product }: { product: Product }) {
   const handleAddToCart = (event: React.MouseEvent<HTMLElement>, variant?: ProductVariant) => {
     event.preventDefault();
     event.stopPropagation();
+    if (soldOut) return;
 
     if (hasMultipleVariants && !variant) {
       setIsQuickViewOpen(true);
@@ -57,6 +50,7 @@ export function ProductCardActions({ product }: { product: Product }) {
   const handleQuickBuy = (event: React.MouseEvent<HTMLElement>, variant?: ProductVariant) => {
     event.preventDefault();
     event.stopPropagation();
+    if (soldOut) return;
 
     if (hasMultipleVariants && !variant) {
       setIsQuickViewOpen(true);

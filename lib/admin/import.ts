@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 import sharp from "sharp";
+import { isIP } from "node:net";
+import { lookup } from "node:dns/promises";
 import { slugify } from "./slug";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -82,14 +84,40 @@ function parseBooleanField(val: unknown): boolean {
   return true; // Varsayılan satışta
 }
 
-function isPrivateIp(hostname: string): boolean {
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return true;
-  if (/^10\./.test(hostname)) return true;
-  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return true;
-  if (/^192\.168\./.test(hostname)) return true;
-  if (/^169\.254\./.test(hostname)) return true;
-  if (/^0\./.test(hostname)) return true;
+function isPrivateAddress(address: string): boolean {
+  if (isIP(address) === 4) {
+    const [a, b, c] = address.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+      (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+      (a === 203 && b === 0 && c === 113);
+  }
+  if (isIP(address) === 6) {
+    const host = address.toLowerCase();
+    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isPrivateAddress(mapped[1]!);
+    return host === "::" || host === "::1" ||
+      /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || /^ff/.test(host);
+  }
   return false;
+}
+
+async function isPrivateHost(hostname: string): Promise<boolean> {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
+    return true;
+  }
+  if (isIP(host)) return isPrivateAddress(host);
+  try {
+    const addresses = await lookup(host, { all: true, verbatim: true });
+    return addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address));
+  } catch {
+    return true;
+  }
 }
 
 function parseCsvRows(text: string): Array<Record<string, unknown>> {
@@ -154,7 +182,7 @@ export function parseProductSpreadsheet(buffer: Buffer): ParseResult {
 
   if (rawRows.length === 0) {
     try {
-      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const workbook = XLSX.read(buffer, { type: "buffer", sheetRows: 5000 });
       const sheetName = workbook.SheetNames[0];
       if (sheetName) {
         const sheet = workbook.Sheets[sheetName];
@@ -299,13 +327,15 @@ export async function downloadAndOptimizeImage(url: string): Promise<Buffer | nu
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    if (isPrivateIp(parsed.hostname)) return null;
+    if (await isPrivateHost(parsed.hostname)) return null;
 
     const res = await fetch(url, {
       signal: AbortSignal.timeout(10000),
+      redirect: "manual",
       headers: { "User-Agent": "Commerce16-Importer/1.0" },
     });
 
+    if (res.status >= 300 && res.status < 400) return null;
     if (!res.ok) return null;
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.startsWith("image/")) return null;

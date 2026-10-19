@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { UserIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
-import { Button, Card } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export function AccountLoginCard() {
   return (

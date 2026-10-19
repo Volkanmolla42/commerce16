@@ -47,10 +47,11 @@ function LoadingTableRows() {
 }
 
 function LoadingMetrics({ count = 4 }: { count?: number }) {
+  const columns = count >= 6 ? "lg:grid-cols-3 2xl:grid-cols-6" : count === 5 ? "lg:grid-cols-3 2xl:grid-cols-5" : "xl:grid-cols-4";
   return (
-    <div aria-hidden="true" className={`grid grid-cols-2 gap-3 ${count === 5 ? "lg:grid-cols-3 2xl:grid-cols-5" : "xl:grid-cols-4"}`}>
+    <div aria-hidden="true" className={`grid grid-cols-2 gap-3 ${columns}`}>
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="rounded-lg border border-border bg-card p-4 sm:p-5">
+        <div key={index} className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <SkeletonBlock className="h-3 w-20" />
           <SkeletonBlock className="mt-3 h-7 w-28 max-w-full" />
           <SkeletonBlock className="mt-2 h-3 w-24 max-w-full" />
@@ -123,10 +124,14 @@ export function AdminLoading({
         </>
       ) : contentType === "analytics" ? (
         <>
-          <LoadingMetrics count={5} />
-          <div aria-hidden="true" className="grid gap-4 lg:grid-cols-2">
-            <SkeletonBlock className="h-64 rounded-lg border border-border" />
-            <SkeletonBlock className="h-64 rounded-lg border border-border" />
+          <LoadingMetrics count={6} />
+          <div aria-hidden="true" className="grid gap-4 xl:grid-cols-3">
+            <SkeletonBlock className="h-72 rounded-xl border border-border xl:col-span-2" />
+            <SkeletonBlock className="h-72 rounded-xl border border-border" />
+          </div>
+          <div aria-hidden="true" className="grid gap-4 xl:grid-cols-3">
+            <SkeletonBlock className="h-64 rounded-xl border border-border xl:col-span-2" />
+            <SkeletonBlock className="h-64 rounded-xl border border-border" />
           </div>
         </>
       ) : contentType === "form" || contentType === "settings" ? (

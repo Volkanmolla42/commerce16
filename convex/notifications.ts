@@ -70,7 +70,7 @@ export const getOrderEmailPayload = internalQuery({
       total: order.total,
       couponCode: order.couponCode?.trim() || null,
       couponDiscountKurus: order.couponDiscountKurus ?? null,
-      createdAt: order._creationTime,
+      _creationTime: order._creationTime,
       carrier: order.carrier?.trim() || null,
       trackingNumber: order.trackingNumber?.trim() || null,
       trackingUrl:

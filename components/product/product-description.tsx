@@ -48,7 +48,9 @@ export function ProductDescription({
         item.variantId === replacementVariantId,
     )
     : undefined;
-  const selectedVariant = getSelectedVariant(product, searchParams) ?? defaultVariant;
+  const hasPartialSelection = (product.options ?? []).some((option) =>
+    searchParams.get(option.name.toLocaleLowerCase("tr-TR")) !== null);
+  const selectedVariant = getSelectedVariant(product, searchParams) ?? (hasPartialSelection ? undefined : defaultVariant);
   const availability = useQuery(api.products.getAvailability, {
     productId: product.id as Id<"products">,
   });
@@ -76,7 +78,7 @@ export function ProductDescription({
     availableForSale: isAvailableForSale,
   };
   const priceRange = variant
-    ? { min: variant.price.amount, max: variant.price.amount }
+    ? { min: variant.price, max: variant.price }
     : getProductPriceRange(product, searchParams);
   const canQuickBuy = !isCartReplacement && isAvailableForSale && (!variant || variant.availableForSale);
   const replaceCartItem = replacementSource
@@ -114,7 +116,6 @@ export function ProductDescription({
             amount={priceRange.min}
             maxAmount={priceRange.max}
             compareAtAmount={variant?.compareAtPrice}
-            currencyCode="TRY"
             className="text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white"
           />
         </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { COOKIE_CONSENT_POLICY_VERSION, COOKIE_CONSENT_STORAGE_KEY } from "@/lib/privacy/consent";
 
 type Consent = {

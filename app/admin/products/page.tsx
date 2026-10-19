@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
-import { CsvExportButton } from "../_components/export-button";
+import { ExportMenu } from "../_components/export-button";
 import { ProductImportDialog } from "./_components/product-import-dialog";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
@@ -215,8 +215,7 @@ export default function AdminProductsPage() {
                 Filtreleri Temizle
               </Button>
             )}
-            <CsvExportButton type="products" label="Excel İndir" format="xlsx" />
-            <CsvExportButton type="products" label="CSV İndir" format="csv" />
+            <ExportMenu type="products" />
           </div>
         </div>
 

@@ -12,18 +12,13 @@ import {
   EnvelopeIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AccountLoginCard } from "./account-gate";
 import { Sk } from "./skeleton";
-import { ArrowRight01Icon } from "hugeicons-react";
+import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { formatPhoneInput } from "@/lib/format-phone-input";
 
 function resolveErrorMessage(error: unknown): string {
@@ -405,7 +400,7 @@ export default function AccountProfilePage() {
             onClick={() => signOut()}
             className="rounded-2xl gap-2 font-semibold border-border self-start sm:self-auto"
           >
-            <ArrowRight01Icon className="h-4 w-4 text-muted-foreground" />
+            <ArrowRightIcon className="h-4 w-4 text-muted-foreground" />
             <span>Oturumu Kapat</span>
           </Button>
         </CardContent>

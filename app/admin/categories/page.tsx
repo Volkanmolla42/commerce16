@@ -10,7 +10,10 @@ import {
   ArrowTopRightOnSquareIcon,
   PhotoIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminEmpty, AdminLoading, AdminNotice } from "../_components/admin-primitives";
 import { AdminHeaderAction } from "../_components/admin-header-action";
 import { runAdminAction, useAdminResource } from "../_components/admin-api";

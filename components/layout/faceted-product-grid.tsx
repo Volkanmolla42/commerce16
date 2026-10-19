@@ -7,7 +7,9 @@ import {
   FunnelIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Card, Input } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProductGrid } from "@/components/product/product-grid";
 import { CategorySelect, SortMenu } from "./catalog-selection";

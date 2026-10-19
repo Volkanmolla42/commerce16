@@ -4,12 +4,10 @@ import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Button,
-  Input,
-  Label,
-  Card,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   LockClosedIcon,
   EnvelopeIcon,
@@ -18,7 +16,7 @@ import {
   KeyIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-import { Door01Icon } from "hugeicons-react";
+import { ArrowRightEndOnRectangleIcon } from "@heroicons/react/24/outline";
 
 type AuthStep = "signIn" | "signUp" | "forgotPassword" | "resetPassword";
 
@@ -101,7 +99,7 @@ export default function CustomerLoginPage() {
         {/* Brand / Mode Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto mb-1">
-            {step === "signIn" && <Door01Icon className="h-6 w-6" />}
+            {step === "signIn" && <ArrowRightEndOnRectangleIcon className="h-6 w-6" />}
             {step === "signUp" && <UserPlusIcon className="h-6 w-6" />}
             {isResetFlow && <KeyIcon className="h-6 w-6" />}
           </div>

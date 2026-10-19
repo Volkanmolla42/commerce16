@@ -4,16 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import {
-  Button,
-  Input,
-  Label,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminNotice } from "../../_components/admin-primitives";
 import { runAdminAction } from "../../_components/admin-api";
 import { slugify } from "@/lib/admin/slug";

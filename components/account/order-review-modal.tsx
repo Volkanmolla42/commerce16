@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, SyntheticEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -66,7 +66,7 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
     setProductComments((prev) => ({ ...prev, [productId]: comment }));
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);

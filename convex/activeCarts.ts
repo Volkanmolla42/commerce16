@@ -3,8 +3,8 @@ import { internal, components } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { assertAdminApiSecret } from "./adminAuth";
-import { getImagesForVariant } from "../lib/catalog/product-images";
 import { MAX_CART_QUANTITY, isVariantSellable } from "../lib/catalog/variants";
+import { enrichCartItems, type EnrichedCartItem } from "./cartAdmin";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   sync: { kind: "fixed window", rate: 30, period: 60 * 1000 },
@@ -18,7 +18,7 @@ const activeCartItemValidator = v.object({
 });
 
 const enrichedItemValidator = v.object({
-  productId: v.id("products"),
+  productId: v.string(),
   variantId: v.optional(v.string()),
   quantity: v.number(),
   title: v.string(),
@@ -130,39 +130,11 @@ export const listAdmin = query({
       expiresAt: number;
       itemCount: number;
       estimatedTotal: string;
-      items: Array<{
-        productId: (typeof carts)[number]["items"][number]["productId"];
-        variantId?: string;
-        quantity: number;
-        title: string;
-        variantTitle?: string;
-        price: string;
-        image?: string;
-      }>;
+      items: EnrichedCartItem[];
     }> = [];
     for (const cart of carts) {
       if (cart.expiresAt <= args.now) continue;
-      let itemCount = 0;
-      let total = 0;
-      const items = [];
-      for (const item of cart.items) {
-        const product = await ctx.db.get(item.productId);
-        const variant = item.variantId ? product?.variants?.find((candidate) => candidate.id === item.variantId) : undefined;
-        const price = variant?.price ?? "0.00";
-        itemCount += item.quantity;
-        total += (Number.parseFloat(price) || 0) * item.quantity;
-        const imageRecord = product ? getImagesForVariant(product.images, variant?.selectedOptions ?? [])[0] : undefined;
-        const image = imageRecord ? await ctx.storage.getUrl(imageRecord.storageId) : null;
-        items.push({
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity,
-          title: product?.title ?? "Silinmiş ürün",
-          variantTitle: variant?.title,
-          price,
-          image: image ?? undefined,
-        });
-      }
+      const { items, itemCount, estimatedTotal } = await enrichCartItems(ctx, cart.items);
       results.push({
         _id: cart._id,
         _creationTime: cart._creationTime,
@@ -170,7 +142,7 @@ export const listAdmin = query({
         updatedAt: cart.updatedAt,
         expiresAt: cart.expiresAt,
         itemCount,
-        estimatedTotal: total.toFixed(2),
+        estimatedTotal,
         items,
       });
     }
