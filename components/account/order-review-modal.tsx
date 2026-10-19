@@ -115,9 +115,8 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Değerlendirme kaydedilirken bir hata oluştu.";
       setErrorMessage(message);
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   const reviewedIds: string[] = reviewStatus?.reviewedProductIds ?? [];

@@ -34,14 +34,13 @@ export function AdminGate() {
       if (!response.ok || !result.success) {
         setError(result.error || "Yönetici PIN'i doğrulanamadı.");
         setPin("");
-        return;
+      } else {
+        router.refresh();
       }
-      router.refresh();
     } catch {
       setError("Giriş doğrulanamadı. Tekrar dene.");
-    } finally {
-      setSubmitting(false);
     }
+    setSubmitting(false);
   };
 
   return (

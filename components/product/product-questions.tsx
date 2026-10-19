@@ -48,9 +48,8 @@ export function ProductQuestions({ productId }: { productId: string }) {
       setSuccess(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sorunuz gönderilemedi. Lütfen tekrar deneyin.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   return (

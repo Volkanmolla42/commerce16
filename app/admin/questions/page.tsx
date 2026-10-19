@@ -76,9 +76,8 @@ function QuestionCard({
       onChanged();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Yanıt kaydedilemedi.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const changeStatus = async (status: QuestionStatus) => {
@@ -90,9 +89,8 @@ function QuestionCard({
       onChanged();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Soru durumu güncellenemedi.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const removeQuestion = async () => {
@@ -107,8 +105,8 @@ function QuestionCard({
       onChanged();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Soru silinemedi.");
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const status = statusMeta[item.status];

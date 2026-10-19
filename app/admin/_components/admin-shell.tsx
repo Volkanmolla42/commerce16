@@ -298,8 +298,12 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
     setLogoutError(null);
     try {
       const response = await fetch("/api/admin-auth", { method: "DELETE" });
-      if (!response.ok) throw new Error("Çıkış yapılamadı. Tekrar dene.");
-      window.location.replace(adminPath());
+      if (response.ok) {
+        window.location.replace(adminPath());
+      } else {
+        setLogoutError("Çıkış yapılamadı. Tekrar dene.");
+        setLoggingOut(false);
+      }
     } catch {
       setLogoutError("Çıkış yapılamadı. Tekrar dene.");
       setLoggingOut(false);

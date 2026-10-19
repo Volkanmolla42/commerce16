@@ -33,9 +33,8 @@ function RestockUnsubscribeContent() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Abonelik iptali sırasında bir hata oluştu.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   if (!token) {

@@ -132,9 +132,8 @@ export function CategoryEditor({
       setPresetVersion((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Özellik kütüphaneye kaydedilemedi.");
-    } finally {
-      setSavingPresetKey(null);
     }
+    setSavingPresetKey(null);
   };
 
   const updateAttribute = (key: string, patch: Partial<CategoryAttributeDefinition>) => {
@@ -201,9 +200,8 @@ export function CategoryEditor({
         }
       }
       setError(cause instanceof Error ? cause.message : "Kategori kaydedilemedi.");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   return (

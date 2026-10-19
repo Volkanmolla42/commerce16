@@ -78,9 +78,8 @@ export default function CustomerLoginPage() {
       } else {
         setError("İşlem sırasında bir hata oluştu. Lütfen bilgilerinizi kontrol edin.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   if (isLoading || isAuthenticated) {

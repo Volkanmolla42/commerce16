@@ -111,6 +111,7 @@ function AdminSettingsContent() {
       let nextLogoId = logoStorageId;
       if (pendingLogo) {
         setUploadingLogo(true);
+        let logoError = false;
         try {
           const { uploadUrl } = await runAdminAction<{ uploadUrl: string }>(
             "product.image-upload-url",
@@ -120,17 +121,27 @@ function AdminSettingsContent() {
             headers: { "Content-Type": pendingLogo.blob.type || "image/png" },
             body: pendingLogo.blob,
           });
-          if (!response.ok) throw new Error("Logo Convex Storage'a yüklenemedi.");
-          const uploaded: unknown = await response.json();
+          const uploaded: unknown = response.ok ? await response.json() : null;
           if (
-            typeof uploaded !== "object" || uploaded === null ||
-            !("storageId" in uploaded) || typeof uploaded.storageId !== "string"
+            response.ok &&
+            typeof uploaded === "object" && uploaded !== null &&
+            "storageId" in uploaded && typeof uploaded.storageId === "string"
           ) {
-            throw new Error("Yüklenen logonun kimliği alınamadı.");
+            nextLogoId = uploaded.storageId;
+          } else {
+            setActionError(
+              response.ok ? "Yüklenen logonun kimliği alınamadı." : "Logo Convex Storage'a yüklenemedi.",
+            );
+            logoError = true;
           }
-          nextLogoId = uploaded.storageId;
-        } finally {
-          setUploadingLogo(false);
+        } catch (cause) {
+          setActionError(cause instanceof Error ? cause.message : "Logo yüklenemedi.");
+          logoError = true;
+        }
+        setUploadingLogo(false);
+        if (logoError) {
+          setSaving(false);
+          return;
         }
       }
       await runAdminAction("settings.update", {
@@ -158,9 +169,8 @@ function AdminSettingsContent() {
       setActionError(
         cause instanceof Error ? cause.message : "Mağaza ayarları kaydedilemedi.",
       );
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   if (loading) return <AdminLoading label="Mağaza ayarları" variant="settings-content" />;

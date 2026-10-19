@@ -113,9 +113,8 @@ export default function AccountProfilePage() {
       setStatusMessage("Profil güncellendi.");
     } catch {
       setStatusMessage("Bilgiler güncellenirken bir hata oluştu.");
-    } finally {
-      setIsSaving(false);
     }
+    setIsSaving(false);
   };
 
   const validatePasswordFields = (): string | null => {
@@ -144,9 +143,8 @@ export default function AccountProfilePage() {
       );
     } catch (error) {
       setPasswordError(resolveErrorMessage(error));
-    } finally {
-      setIsSendingCode(false);
     }
+    setIsSendingCode(false);
   };
 
   const handlePasswordSubmit = async (e: React.SyntheticEvent) => {
@@ -183,9 +181,8 @@ export default function AccountProfilePage() {
       setPasswordNotice("Şifreniz başarıyla güncellendi.");
     } catch (error) {
       setPasswordError(resolveErrorMessage(error));
-    } finally {
-      setIsChangingPassword(false);
     }
+    setIsChangingPassword(false);
   };
 
   if (!authLoading && !isAuthenticated) {

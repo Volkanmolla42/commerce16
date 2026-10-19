@@ -138,6 +138,14 @@ async function uploadWebpToStorage(uploadUrl: string, blob: Blob) {
   return uploaded.storageId;
 }
 
+async function resolveUploadedImages(pendingImages: PendingImage[]): Promise<ResolvedPendingImage[]> {
+  return Promise.all(pendingImages.map(async (image) => {
+    const storageId = image.storageId ?? (image.uploadPromise ? await image.uploadPromise : null);
+    if (!storageId) throw new Error("Bazı görseller yüklenemedi. Sorunlu görselleri kaldırıp tekrar deneyin.");
+    return toResolvedPendingImage({ ...image, storageId });
+  }));
+}
+
 function toResolvedPendingImage(image: PendingImage): ResolvedPendingImage {
   return {
     storageId: image.storageId!,
@@ -752,9 +760,8 @@ function ProductEditor({
       setPendingImages((current) => [...current, ...nextImages]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Görsel yüklenemedi.");
-    } finally {
-      setProcessingImages(false);
     }
+    setProcessingImages(false);
   };
 
   const discardPendingImage = (image: PendingImage) => {
@@ -959,15 +966,7 @@ function ProductEditor({
     };
 
     try {
-      const uploadedImages: ResolvedPendingImage[] = [];
-      for (const image of pendingImages) {
-        const storageId = image.storageId ?? (image.uploadPromise ? await image.uploadPromise : null);
-        if (!storageId) {
-          setError("Bazı görseller yüklenemedi. Sorunlu görselleri kaldırıp tekrar deneyin.");
-          return;
-        }
-        uploadedImages.push(toResolvedPendingImage({ ...image, storageId }));
-      }
+      const uploadedImages = await resolveUploadedImages(pendingImages);
       await runAdminAction(product ? "product.update" : "product.create", {
         ...input,
         descriptionImageStorageIds: [
@@ -982,9 +981,8 @@ function ProductEditor({
 
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ürün kaydedilemedi.");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   return (

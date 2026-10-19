@@ -8,7 +8,8 @@
     "dev:convex": "convex dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "doctor": "npx -y react-doctor@latest --json --json-out react-doctor-report.json --yes --no-score --blocking none ."
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.96",

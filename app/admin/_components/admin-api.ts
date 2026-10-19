@@ -54,10 +54,9 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
           setData(null);
           setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
         }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
+      }
+      if (!ignore) {
+        setLoading(false);
       }
     }
 
@@ -84,9 +83,8 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
     } catch (cause: unknown) {
       setData(null);
       setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   return { data, error, loading, refresh };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -22,6 +22,8 @@ import { runAdminAction, useAdminResource } from "../_components/admin-api";
 import { formatMoney } from "@/lib/format-money";
 import { formatDateTime } from "@/lib/format-date";
 import { adminPath } from "@/lib/admin/routes";
+
+const subscribeNoop = () => () => {};
 
 type AbandonedCartItem = {
   productId: string;
@@ -98,10 +100,9 @@ function CartDetailModal({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const origin = useSyncExternalStore(subscribeNoop, () => window.location.origin, () => "");
 
-  const recoverUrl = !isLiveCart && typeof window !== "undefined"
-    ? `${window.location.origin}/cart?recover=${cart.restoreToken}`
-    : !isLiveCart ? `/cart?recover=${cart.restoreToken}` : null;
+  const recoverUrl = !isLiveCart ? `${origin}/cart?recover=${cart.restoreToken}` : null;
 
   const copyRecoverLink = async () => {
     try {

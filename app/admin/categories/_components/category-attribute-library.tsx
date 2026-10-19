@@ -123,9 +123,8 @@ export function CategoryAttributeLibrary({ onAdd, attributes, disabled, revision
       setVersion((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Özellik güncellenemedi.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const remove = async () => {
@@ -141,9 +140,8 @@ export function CategoryAttributeLibrary({ onAdd, attributes, disabled, revision
       setVersion((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Özellik silinemedi.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   return (

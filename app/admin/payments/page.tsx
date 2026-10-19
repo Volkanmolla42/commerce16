@@ -228,9 +228,8 @@ function AdminPaymentsContent() {
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Ödeme yöntemleri kaydedilemedi.");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   return (

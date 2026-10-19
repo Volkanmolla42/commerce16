@@ -144,9 +144,8 @@ export function OrderReorderButton({
       }
     } catch (err) {
       console.error("Tekrar sipariş işleminde hata:", err);
-    } finally {
-      setIsPending(false);
     }
+    setIsPending(false);
   }
 
   function closeModal() {

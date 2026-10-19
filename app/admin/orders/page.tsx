@@ -152,9 +152,10 @@ function ShippingDialog({
     try {
       await onSubmit(carrier.trim(), trackingNumber.trim());
       onClose();
-    } finally {
-      setSaving(false);
+    } catch {
+      // updateStatus surfaces its own error; the dialog stays open.
     }
+    setSaving(false);
   };
 
   return (
@@ -860,9 +861,8 @@ function AdminOrdersContent() {
       setSelectedOrderOverride(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Sipariş durumu güncellenemedi.");
-    } finally {
-      setUpdatingId(null);
     }
+    setUpdatingId(null);
   };
 
   const retryEmail = async (order: Order, event: OrderEmailEvent) => {
@@ -876,9 +876,8 @@ function AdminOrdersContent() {
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "E-posta gönderilemedi.");
-    } finally {
-      setRetryingEmailKey(null);
     }
+    setRetryingEmailKey(null);
   };
 
 

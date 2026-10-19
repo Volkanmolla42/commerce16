@@ -89,11 +89,21 @@ function CouponEditor({
     event.preventDefault();
     setSaving(true);
     setError(null);
+
+    const usageLimit = draft.usageLimit.trim() ? Number(draft.usageLimit) : null;
+    if (usageLimit !== null && !Number.isSafeInteger(usageLimit)) {
+      setError("Kullanım limiti tam sayı olmalı.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const fixedAmount = draft.discountType === "fixed" ? toKurus(draft.discountValue, "İndirim tutarı") : null;
-      if (draft.discountType === "fixed" && fixedAmount === null) throw new Error("İndirim tutarını girin.");
-      const usageLimit = draft.usageLimit.trim() ? Number(draft.usageLimit) : null;
-      if (usageLimit !== null && !Number.isSafeInteger(usageLimit)) throw new Error("Kullanım limiti tam sayı olmalı.");
+      if (draft.discountType === "fixed" && fixedAmount === null) {
+        setError("İndirim tutarını girin.");
+        setSaving(false);
+        return;
+      }
 
       const input = {
         ...(coupon ? { id: coupon._id } : {}),
@@ -112,9 +122,8 @@ function CouponEditor({
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Kupon kaydedilemedi.");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   return (

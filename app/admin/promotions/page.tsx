@@ -69,19 +69,28 @@ export default function AdminPromotionsPage() {
     setSaving(true);
     setMessage(null);
     setActionError(null);
+
+    const trimmedTitle = title.trim();
+    const minSubtotalKurus = minSubtotal.trim()
+      ? Math.round(Number(minSubtotal.replace(",", ".")) * 100)
+      : undefined;
+    const validationError =
+      trimmedTitle.length < 2
+        ? "Kampanya adı en az 2 karakter olmalı."
+        : targetType === "product" && !productId
+          ? "Kampanya için bir ürün seçin."
+          : targetType === "category" && type === "category_free_shipping" && !categorySlug
+            ? "Kargo bedava kampanyası için kategori seçin."
+            : minSubtotalKurus !== undefined && (!Number.isSafeInteger(minSubtotalKurus) || minSubtotalKurus < 0)
+              ? "Asgari sepet tutarı geçersiz."
+              : null;
+    if (validationError) {
+      setActionError(validationError);
+      setSaving(false);
+      return;
+    }
+
     try {
-      const trimmedTitle = title.trim();
-      if (trimmedTitle.length < 2) throw new Error("Kampanya adı en az 2 karakter olmalı.");
-      if (targetType === "product" && !productId) throw new Error("Kampanya için bir ürün seçin.");
-      if (targetType === "category" && type === "category_free_shipping" && !categorySlug) {
-        throw new Error("Kargo bedava kampanyası için kategori seçin.");
-      }
-      const minSubtotalKurus = minSubtotal.trim()
-        ? Math.round(Number(minSubtotal.replace(",", ".")) * 100)
-        : undefined;
-      if (minSubtotalKurus !== undefined && (!Number.isSafeInteger(minSubtotalKurus) || minSubtotalKurus < 0)) {
-        throw new Error("Asgari sepet tutarı geçersiz.");
-      }
       await runAdminAction("promotion.create", {
         title: trimmedTitle,
         type,
@@ -97,9 +106,8 @@ export default function AdminPromotionsPage() {
       await refresh();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Kampanya oluşturulamadı.");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   const disablePromotion = async (rule: Promotion) => {

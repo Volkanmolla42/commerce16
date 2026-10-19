@@ -99,17 +99,16 @@ export function ProductImportDialog({
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Dosya ayrıştırılırken hata oluştu.");
+      if (res.ok) {
+        setPreview(data);
+        setStep("preview");
+      } else {
+        setErrorMsg(data.error || "Dosya ayrıştırılırken hata oluştu.");
       }
-
-      setPreview(data);
-      setStep("preview");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Dosya incelenemedi.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const executeImport = async () => {
@@ -129,19 +128,19 @@ export function ProductImportDialog({
       });
 
       const data = (await res.json()) as ImportResponse;
-      if (!res.ok) {
-        throw new Error(data.error || "İçe aktarma sırasında hata oluştu.");
+      if (res.ok) {
+        setResult(data);
+        setStep("result");
+        onSuccess();
+      } else {
+        setErrorMsg(data.error || "İçe aktarma sırasında hata oluştu.");
+        setStep("preview");
       }
-
-      setResult(data);
-      setStep("result");
-      onSuccess();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "İçe aktarma başarısız oldu.");
       setStep("preview");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const downloadErrorReport = () => {

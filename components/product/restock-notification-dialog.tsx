@@ -56,9 +56,8 @@ export function RestockNotificationDialog({
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Bir hata oluştu. Lütfen tekrar deneyin.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const handleOpenChange = (open: boolean) => {
