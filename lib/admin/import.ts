@@ -65,12 +65,15 @@ export type RowError = {
   scope?: ErrorScope;
 };
 
+export type ImportSource = "shopify" | "woocommerce" | "standard";
+
 export type ParseResult = {
   products: ParsedProduct[];
   allProducts: ParsedProduct[];
   errors: RowError[];
   totalRows: number;
   skippedProducts: number;
+  detectedSource: ImportSource;
 };
 
 type SheetRow = {
@@ -95,32 +98,32 @@ function normalizeHeaderKey(header: string): string {
 
 function matchColumn(key: string): string | null {
   const normalized = normalizeHeaderKey(key);
-  if (["urunadresi", "slug", "adres", "link", "url"].includes(normalized)) return "slug";
-  if (["baslik", "title", "urunadi", "ad", "urun"].includes(normalized)) return "title";
-  if (["kategori", "category", "kategoriadi", "kategoriad", "categoryname", "categorytitle", "kategoriadresi", "kategorislug"].includes(normalized)) return "categorySlug";
-  if (["aciklama", "description", "detay", "icerik"].includes(normalized)) return "description";
-  if (["satista", "available", "durum", "aktif", "satistami"].includes(normalized)) return "availableForSale";
+  if (["urunadresi", "slug", "adres", "link", "url", "handle", "postname"].includes(normalized)) return "slug";
+  if (["baslik", "title", "urunadi", "ad", "urun", "posttitle"].includes(normalized)) return "title";
+  if (["kategori", "category", "kategoriadi", "kategoriad", "categoryname", "categorytitle", "kategoriadresi", "kategorislug", "productcategory", "type", "urunturu", "taxproductcat"].includes(normalized)) return "categorySlug";
+  if (["aciklama", "description", "detay", "icerik", "bodyhtml", "body", "postcontent"].includes(normalized)) return "description";
+  if (["satista", "available", "durum", "aktif", "satistami", "published", "status", "poststatus"].includes(normalized)) return "availableForSale";
   if (["varyantbasligi", "varianttitle", "varyant", "varyantadi"].includes(normalized)) return "variantTitle";
-  if (["sku", "stokkodu", "kod", "urunkodu"].includes(normalized)) return "sku";
-  if (["barkod", "barcode", "gtin", "ean"].includes(normalized)) return "barcode";
-  if (["fiyat", "satisfiyati", "price", "tutar", "fiyattl", "satisfiyatitl"].includes(normalized)) return "price";
-  if (["listefiyati", "eskifiyat", "piyasafiyati", "compareatprice", "listefiyatitl", "eskifiyattl", "piyasafiyatitl"].includes(normalized)) return "compareAtPrice";
-  if (["stok", "stock", "stokadedi", "adet", "miktar"].includes(normalized)) return "stockQuantity";
-  if (["secenek1adi", "option1name", "ozellik1adi"].includes(normalized)) return "opt1Name";
-  if (["secenek1degeri", "option1value", "ozellik1degeri"].includes(normalized)) return "opt1Val";
-  if (["secenek2adi", "option2name", "ozellik2adi"].includes(normalized)) return "opt2Name";
-  if (["secenek2degeri", "option2value", "ozellik2degeri"].includes(normalized)) return "opt2Val";
-  if (["secenek3adi", "option3name", "ozellik3adi"].includes(normalized)) return "opt3Name";
-  if (["secenek3degeri", "option3value", "ozellik3degeri"].includes(normalized)) return "opt3Val";
-  if (["gorseller", "gorsellerurl", "gorselurl", "gorselurls", "urungorseli", "urungorselleri", "urunresmi", "resimler", "resimlerurl", "resimurl", "images", "imageurl", "gorsel"].includes(normalized)) return "images";
+  if (["sku", "stokkodu", "kod", "urunkodu", "variantsku"].includes(normalized)) return "sku";
+  if (["barkod", "barcode", "gtin", "ean", "variantbarcode"].includes(normalized)) return "barcode";
+  if (["fiyat", "satisfiyati", "price", "tutar", "fiyattl", "satisfiyatitl", "variantprice", "regularprice"].includes(normalized)) return "price";
+  if (["listefiyati", "eskifiyat", "piyasafiyati", "compareatprice", "variantcompareatprice", "listefiyatitl", "eskifiyattl", "piyasafiyatitl", "saleprice"].includes(normalized)) return "compareAtPrice";
+  if (["stok", "stock", "stokadedi", "adet", "miktar", "variantinventoryqty", "stockquantity"].includes(normalized)) return "stockQuantity";
+  if (["secenek1adi", "option1name", "ozellik1adi", "attribute1name"].includes(normalized)) return "opt1Name";
+  if (["secenek1degeri", "option1value", "ozellik1degeri", "attribute1value"].includes(normalized)) return "opt1Val";
+  if (["secenek2adi", "option2name", "ozellik2adi", "attribute2name"].includes(normalized)) return "opt2Name";
+  if (["secenek2degeri", "option2value", "ozellik2degeri", "attribute2value"].includes(normalized)) return "opt2Val";
+  if (["secenek3adi", "option3name", "ozellik3adi", "attribute3name"].includes(normalized)) return "opt3Name";
+  if (["secenek3degeri", "option3value", "ozellik3degeri", "attribute3value"].includes(normalized)) return "opt3Val";
+  if (["gorseller", "gorsellerurl", "gorselurl", "gorselurls", "urungorseli", "urungorselleri", "urunresmi", "resimler", "resimlerurl", "resimurl", "images", "imageurl", "gorsel", "imagesrc", "imagesource"].includes(normalized)) return "images";
   return null;
 }
 
 function parseBooleanField(val: unknown): boolean {
   if (typeof val === "boolean") return val;
   const str = String(val ?? "").trim().toLocaleLowerCase("tr-TR");
-  if (["evet", "true", "1", "aktif", "active", "yes", "y"].includes(str)) return true;
-  if (["hayir", "false", "0", "pasif", "inactive", "no", "n"].includes(str)) return false;
+  if (["evet", "true", "1", "aktif", "active", "yes", "y", "publish"].includes(str)) return true;
+  if (["hayir", "false", "0", "pasif", "inactive", "no", "n", "archived", "draft", "taslak", "arsiv"].includes(str)) return false;
   return true;
 }
 
@@ -150,6 +153,28 @@ function parseDecimalAmount(value: string): number | null {
 
 function categoryKey(value: string): string {
   return normalizeHeaderKey(value);
+}
+
+export function extractCategorySegments(value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.includes(">")) {
+    return trimmed.split(">").map((p) => p.trim()).filter(Boolean);
+  }
+  if (trimmed.includes(" - ")) {
+    return trimmed.split(" - ").map((p) => p.trim()).filter(Boolean);
+  }
+  return [trimmed];
+}
+
+export function extractCategoryLeaf(value: string): string {
+  const segments = extractCategorySegments(value);
+  return segments[segments.length - 1] ?? value.trim();
+}
+
+export function extractCategoryRoot(value: string): string {
+  const segments = extractCategorySegments(value);
+  return segments[0] ?? value.trim();
 }
 
 function categoryLookup(categories: ImportCategory[]): Map<string, ImportCategory> {
@@ -276,58 +301,81 @@ function isPrivateAddress(address: string): boolean {
   return false;
 }
 
+const hostResolutionCache = new Map<string, boolean>();
+
 async function isPrivateHost(hostname: string): Promise<boolean> {
   const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
     return true;
   }
   if (isIP(host)) return isPrivateAddress(host);
+  if (hostResolutionCache.has(host)) return hostResolutionCache.get(host)!;
   try {
     const addresses = await lookup(host, { all: true, verbatim: true });
-    return addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address));
+    const isPrivate = addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address));
+    hostResolutionCache.set(host, isPrivate);
+    return isPrivate;
   } catch {
     return true;
   }
 }
 
 function detectDelimiter(text: string): string {
-  const line = text.split(/\r?\n/).find((entry) => entry.trim().length > 0) ?? "";
   let semicolon = 0;
   let comma = 0;
   let quoted = false;
-  for (const char of line) {
+  for (let i = 0; i < text.length && i < 2000; i++) {
+    const char = text[i];
     if (char === '"') quoted = !quoted;
-    else if (!quoted && char === ";") semicolon++;
-    else if (!quoted && char === ",") comma++;
-  }
-  return semicolon >= comma ? ";" : ",";
-}
-
-function parseCsvLine(line: string, delimiter: string): string[] {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let index = 0; index < line.length; index++) {
-    const char = line[index];
-    if (char === '"') {
-      if (quoted && line[index + 1] === '"') {
-        current += '"';
-        index++;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (char === delimiter && !quoted) {
-      cells.push(current.trim());
-      current = "";
-    } else {
-      current += char;
+    else if (!quoted) {
+      if (char === "\n" || char === "\r") break;
+      if (char === ";") semicolon++;
+      else if (char === ",") comma++;
     }
   }
-  cells.push(current.trim());
-  return cells;
+  return semicolon >= comma && semicolon > 0 ? ";" : ",";
 }
 
-// ponytail: satır bazlı CSV; tırnak içindeki çok satırlı alanlar desteklenmez. Gerekirse RFC 4180 durum makinesine geç.
+function parseCsv(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+  const len = text.length;
+
+  for (let i = 0; i < len; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === delimiter && !inQuotes) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\r" || char === "\n") && !inQuotes) {
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell.trim());
+      cell = "";
+      if (row.some((c) => c.length > 0)) {
+        rows.push(row);
+      }
+      row = [];
+    } else {
+      cell += char;
+    }
+  }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell.trim());
+    if (row.some((c) => c.length > 0)) {
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
 function decodeCsvBuffer(buffer: Buffer): string {
   const utf8 = buffer.toString("utf8");
   if (!utf8.includes("\uFFFD")) return utf8;
@@ -339,22 +387,31 @@ function decodeCsvBuffer(buffer: Buffer): string {
 }
 
 function readCsvTable(text: string): SheetTable {
-  const lines = text.split(/\r?\n/);
-  const headerIndex = lines.findIndex((line) => line.trim().length > 0);
-  if (headerIndex < 0) return { headers: [], rows: [] };
-
   const delimiter = detectDelimiter(text);
-  const headers = parseCsvLine(lines[headerIndex] ?? "", delimiter);
+  const matrix = parseCsv(text, delimiter);
+  if (matrix.length === 0) return { headers: [], rows: [] };
+
+  const headers = matrix[0] ?? [];
   const rows: SheetRow[] = [];
-  for (let index = headerIndex + 1; index < lines.length; index++) {
-    if (!(lines[index] ?? "").trim()) continue;
+  for (let index = 1; index < matrix.length; index++) {
     rows.push({
       rowNumber: index + 1,
       sheetRow: index,
-      cells: parseCsvLine(lines[index] ?? "", delimiter),
+      cells: matrix[index] ?? [],
     });
   }
   return { headers, rows };
+}
+
+export function detectSpreadsheetSource(headers: string[]): ImportSource {
+  const normalized = new Set(headers.map(normalizeHeaderKey));
+  if (normalized.has("handle") || normalized.has("variantprice") || normalized.has("bodyhtml")) {
+    return "shopify";
+  }
+  if (normalized.has("posttitle") || normalized.has("taxproductcat") || normalized.has("regularprice")) {
+    return "woocommerce";
+  }
+  return "standard";
 }
 
 function tableFromMatrix(matrix: unknown[][]): SheetTable {
@@ -523,6 +580,7 @@ export function parseProductSpreadsheet(
       errors: [{ rowNumber: 1, error: "Dosya okunamadı. Geçerli bir Excel veya CSV dosyası seçin.", scope: "field" }],
       totalRows: 0,
       skippedProducts: 0,
+      detectedSource: "standard",
     };
   }
 
@@ -533,9 +591,11 @@ export function parseProductSpreadsheet(
       errors: [{ rowNumber: 1, error: "Tabloda veri satırı bulunamadı.", scope: "field" }],
       totalRows: 0,
       skippedProducts: 0,
+      detectedSource: "standard",
     };
   }
 
+  const detectedSource = detectSpreadsheetSource(table.headers);
   const lookup = categoryLookup(categories);
   const normalizedHeaders = new Set(table.headers.map(normalizeHeaderKey).filter(Boolean));
   const standardHeaders = new Set(
@@ -570,6 +630,7 @@ export function parseProductSpreadsheet(
     store.set(slug, [...(store.get(slug) ?? []), { rowNumber, slug, error, scope }]);
   };
 
+  let lastSlug = "";
   for (const row of table.rows) {
     const normalizedCells = new Map<string, string>();
     for (let index = 0; index < table.headers.length; index++) {
@@ -580,14 +641,38 @@ export function parseProductSpreadsheet(
     const mapped: Record<string, string> = {};
     for (const [key, value] of normalizedCells) {
       const field = matchColumn(key);
-      if (field && mapped[field] === undefined) mapped[field] = value;
+      if (field) {
+        if (field === "categorySlug") {
+          if (!mapped[field] || key === "type" || key === "kategori" || key === "category") {
+            if (value.trim()) mapped[field] = value;
+          }
+        } else if (mapped[field] === undefined) {
+          mapped[field] = value;
+        }
+      }
     }
 
     let slug = mapped.slug ? slugify(mapped.slug) : "";
     const title = mapped.title || "";
     if (!slug && title) slug = slugify(title);
+    if (!slug && lastSlug) slug = lastSlug;
     if (!slug) {
       errors.push({ rowNumber: row.rowNumber, error: "Ürün adresi (slug) veya başlık belirtilmeli." });
+      continue;
+    }
+    lastSlug = slug;
+
+    const existingProduct = productMap.get(slug);
+
+    // Ek görsel satırı kontrolü (Shopify gibi sistemlerde 2. ve sonraki görseller başlıksız/fiyatsız gelir)
+    if (existingProduct && !mapped.price && !mapped.sku && !mapped.opt1Val) {
+      existingProduct.rowNumbers.push(row.rowNumber);
+      const rowImages = parseImageUrls(mapped.images ?? "");
+      for (const url of rowImages) {
+        if (!existingProduct.imageUrls.includes(url)) existingProduct.imageUrls.push(url);
+      }
+      const embedded = embeddedImages.get(row.sheetRow) ?? [];
+      existingProduct.embeddedImages.push(...embedded);
       continue;
     }
 
@@ -618,22 +703,47 @@ export function parseProductSpreadsheet(
     const stockQuantity = Number.isFinite(stockNum) && stockNum >= 0 ? stockNum : 0;
 
     const rawCategory = mapped.categorySlug?.trim() ?? "";
-    const existingProduct = productMap.get(slug);
+    const segments = extractCategorySegments(rawCategory);
+    const rootCategory = segments[0] ?? "";
+    const leafCategory = segments[segments.length - 1] ?? "";
+    const primaryCategory = rootCategory || leafCategory || rawCategory;
+
+    for (const seg of segments) {
+      const segSlug = slugify(seg);
+      if (segSlug && !lookup.has(categoryKey(segSlug)) && !lookup.has(categoryKey(seg))) {
+        const segCategory: ImportCategory = { slug: segSlug, title: seg, attributes: [] };
+        lookup.set(categoryKey(segSlug), segCategory);
+        lookup.set(categoryKey(seg), segCategory);
+      }
+    }
+
     let category: ImportCategory | null = existingProduct?.categorySlug
       ? lookup.get(categoryKey(existingProduct.categorySlug)) ?? null
       : null;
 
     if (rawCategory) {
-      const resolved = lookup.get(categoryKey(rawCategory)) ?? null;
+      const resolved = lookup.get(categoryKey(primaryCategory)) ??
+        lookup.get(categoryKey(rawCategory)) ??
+        (leafCategory ? lookup.get(categoryKey(leafCategory)) : null) ?? null;
       if (!resolved) {
-        recordIssue(
-          categoryIssues,
-          row.rowNumber,
-          slug,
-          "category-missing",
-          `"${rawCategory}" kategorisi bulunamadı.`,
-          "category",
-        );
+        const autoTitle = primaryCategory;
+        const autoSlug = slugify(autoTitle);
+        if (autoSlug) {
+          const autoCategory: ImportCategory = { slug: autoSlug, title: autoTitle, attributes: [] };
+          lookup.set(categoryKey(autoSlug), autoCategory);
+          lookup.set(categoryKey(autoTitle), autoCategory);
+          lookup.set(categoryKey(rawCategory), autoCategory);
+          category = autoCategory;
+        } else {
+          recordIssue(
+            categoryIssues,
+            row.rowNumber,
+            slug,
+            "category-missing",
+            `"${primaryCategory}" kategorisi bulunamadı.`,
+            "category",
+          );
+        }
       } else if (category && category.slug !== resolved.slug) {
         recordIssue(
           categoryIssues,
@@ -658,10 +768,22 @@ export function parseProductSpreadsheet(
     }
 
     const selectedOptions: Array<{ name: string; value: string }> = [];
-    for (const pair of [["opt1Name", "opt1Val"], ["opt2Name", "opt2Val"], ["opt3Name", "opt3Val"]] as const) {
-      const optionName = mapped[pair[0]];
-      const optionValue = mapped[pair[1]];
-      if (optionName && optionValue) selectedOptions.push({ name: optionName, value: optionValue });
+    for (let i = 0; i < 3; i++) {
+      const nameKey = `opt${i + 1}Name` as "opt1Name" | "opt2Name" | "opt3Name";
+      const valKey = `opt${i + 1}Val` as "opt1Val" | "opt2Val" | "opt3Val";
+      const optionName = mapped[nameKey] || existingProduct?.options[i]?.name;
+      const optionValue = mapped[valKey];
+      if (optionName && optionValue) {
+        const normN = optionName.toLocaleLowerCase("en-US").trim();
+        const normV = optionValue.toLocaleLowerCase("en-US").trim();
+        if (
+          (normN === "title" || normN === "baslik") &&
+          (normV === "default title" || normV === "varsayilan baslik")
+        ) {
+          continue;
+        }
+        selectedOptions.push({ name: optionName, value: optionValue });
+      }
     }
 
     let product = existingProduct;
@@ -724,7 +846,7 @@ export function parseProductSpreadsheet(
     const variantTitle = mapped.variantTitle ||
       (selectedOptions.length > 0 ? selectedOptions.map((option) => option.value).join(" / ") : "Standart");
 
-    const sku = mapped.sku
+    let sku = mapped.sku
       ? mapped.sku.trim().toLocaleUpperCase("en-US")
       : [slug, ...selectedOptions.map((option) => slugify(option.value))].filter(Boolean).join("-").toLocaleUpperCase("en-US");
     if (!/^[A-Z0-9][A-Z0-9._-]{0,63}$/.test(sku)) {
@@ -741,9 +863,13 @@ export function parseProductSpreadsheet(
 
     const skuOwner = skuOwners.get(sku);
     if (skuOwner !== undefined) {
-      errors.push({ rowNumber: row.rowNumber, slug, error: `${sku} SKU kodu dosyada birden fazla kez kullanılmış.` });
-      failedSlugs.add(slug);
-      continue;
+      if (skuOwner === slug && !mapped.sku) {
+        sku = `${sku}-${product.variants.length + 1}`;
+      } else {
+        errors.push({ rowNumber: row.rowNumber, slug, error: `${sku} SKU kodu dosyada birden fazla kez kullanılmış.` });
+        failedSlugs.add(slug);
+        continue;
+      }
     }
     skuOwners.set(sku, slug);
 
@@ -899,6 +1025,7 @@ export function parseProductSpreadsheet(
     errors,
     totalRows: table.rows.length,
     skippedProducts: allProducts.length - products.length,
+    detectedSource,
   };
 }
 
@@ -906,7 +1033,7 @@ export async function optimizeImageBuffer(buffer: Buffer): Promise<Buffer | null
   try {
     return await sharp(buffer)
       .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 80 })
+      .webp({ quality: 80, effort: 3 })
       .toBuffer();
   } catch {
     return null;

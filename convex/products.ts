@@ -345,7 +345,7 @@ export const existingSlugsAdmin = query({
   returns: v.array(v.string()),
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
-    if (args.slugs.length > 100) throw new Error("En fazla 100 ürün adresi kontrol edilebilir.");
+    if (args.slugs.length > 1000) throw new Error("En fazla 1000 ürün adresi kontrol edilebilir.");
     const unique = [...new Set(args.slugs)];
     const found = await Promise.all(unique.map(async (slug) => {
       const product = await ctx.db
@@ -370,7 +370,7 @@ export const list = query({
     const items = args.categorySlug === undefined
       ? await ctx.db.query("products").withIndex("by_available", (q) => q.eq("availableForSale", true)).take(limit)
       : await ctx.db.query("products").withIndex("by_available_and_category", (q) =>
-          q.eq("availableForSale", true).eq("categorySlug", args.categorySlug)).take(limit);
+        q.eq("availableForSale", true).eq("categorySlug", args.categorySlug)).take(limit);
     return await Promise.all(items.map((item) => toStorefrontProduct(ctx, item)));
   },
 });
@@ -926,8 +926,8 @@ export const remove = mutation({
     const product = await ctx.db.get(args.id);
     const descriptionImageStorageIds = product
       ? (product.descriptionImageStorageIds ?? []).filter(
-          (storageId) => !product.images.some((image) => image.storageId === storageId),
-        )
+        (storageId) => !product.images.some((image) => image.storageId === storageId),
+      )
       : [];
     if (product) {
       // Sipariş geçmişindeki görsel URL'leri ürün silindikten sonra da çalışmalı; galeri blob'ları korunur.

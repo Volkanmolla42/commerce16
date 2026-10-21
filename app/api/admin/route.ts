@@ -569,6 +569,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, result });
       }
 
+      case "system.reset-all": {
+        await client.mutation(api.settings.resetAllData, { adminSecret });
+        invalidateCatalog("products");
+        invalidateCatalog("categories");
+        revalidateTag("store-settings", { expire: 0 });
+        revalidatePath("/", "layout");
+        return NextResponse.json({ success: true });
+      }
+
       default:
         return NextResponse.json({ error: "Desteklenmeyen işlem." }, { status: 400 });
     }

@@ -4,6 +4,14 @@ import Image from "next/image";
 import { SyntheticEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -65,6 +73,9 @@ function AdminSettingsContent() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => () => {
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
@@ -169,6 +180,28 @@ function AdminSettingsContent() {
       );
     }
     setSaving(false);
+  };
+
+  const handleResetAll = async () => {
+    if (resetConfirmInput !== "SIFIRLA") return;
+    setResetting(true);
+    setMessage(null);
+    setActionError(null);
+
+    try {
+      await runAdminAction("system.reset-all");
+      setIsResetDialogOpen(false);
+      setResetConfirmInput("");
+      setEdits({});
+      setPendingLogo(null);
+      logoEditRef.current = null;
+      setMessage("Tüm mağaza verileri, ürünler, kategoriler, siparişler, müşteriler ve analitik kayıtları başarıyla sıfırlandı.");
+      await refresh();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Sıfırlama işlemi başarısız oldu.");
+    } finally {
+      setResetting(false);
+    }
   };
 
   if (loading) return <AdminLoading label="Mağaza ayarları" variant="settings-content" />;
@@ -498,6 +531,81 @@ function AdminSettingsContent() {
           </div>
         </SettingsSection>
       </form>
+
+      <div className="mt-8">
+        <SettingsSection
+          title="Tehlikeli Bölge"
+          description="Mağazadaki tüm ürünleri, stokları, kategorileri ve operasyonel verileri sıfırlama."
+        >
+          <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-destructive">Tüm Mağazayı Sıfırla</h3>
+              <p className="text-xs text-muted-foreground">
+                Tüm ürünler, stoklar, kategoriler, soru-cevaplar, siparişler, müşteriler, sepetler, ödeme yöntemleri, kuponlar, kampanyalar, e-postalar ve analitik verileri kalıcı olarak silinir.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={saving || resetting}
+              onClick={() => {
+                setResetConfirmInput("");
+                setIsResetDialogOpen(true);
+              }}
+              className="shrink-0 font-semibold"
+            >
+              Her Şeyi Sıfırla
+            </Button>
+          </div>
+        </SettingsSection>
+      </div>
+
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Tüm Mağaza Verilerini Sıfırla</DialogTitle>
+            <DialogDescription>
+              Bu işlem geri alınamaz. Tüm ürünler, stoklar, kategoriler, soru-cevaplar, siparişler, müşteriler, sepetler, ödeme yöntemleri, kuponlar, kampanyalar, e-postalar ve analitik verileri kalıcı olarak silinecektir.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <Label htmlFor="reset-confirm" className="text-xs font-medium">
+              Onaylamak için kutuya büyük harflerle <strong className="text-destructive">SIFIRLA</strong> yazın:
+            </Label>
+            <Input
+              id="reset-confirm"
+              value={resetConfirmInput}
+              onChange={(event) => setResetConfirmInput(event.target.value)}
+              placeholder="SIFIRLA"
+              disabled={resetting}
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={resetting}
+              onClick={() => setIsResetDialogOpen(false)}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={resetConfirmInput !== "SIFIRLA" || resetting}
+              onClick={handleResetAll}
+            >
+              {resetting ? "Sıfırlanıyor…" : "Her Şeyi Kalıcı Olarak Sil"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 

@@ -14,12 +14,20 @@ import {
   toProductBase,
 } from "./productShape";
 
+const optionFilterItemValidator = v.object({ name: v.string(), values: v.array(v.string()) });
+const attributeFilterItemValidator = v.object({
+  key: v.string(),
+  values: v.array(v.string()),
+  min: v.string(),
+  max: v.string(),
+});
+
 const filtersValidator = v.object({
   minPrice: v.string(),
   maxPrice: v.string(),
-  options: v.optional(v.record(v.string(), v.array(v.string()))),
+  options: v.optional(v.array(optionFilterItemValidator)),
 });
-const attributeFiltersValidator = v.record(v.string(), v.object({ values: v.array(v.string()), min: v.string(), max: v.string() }));
+const attributeFiltersValidator = v.array(attributeFilterItemValidator);
 const availabilityValidator = v.union(v.literal("all"), v.literal("active"), v.literal("inactive"));
 const cardValidator = v.object({
   id: v.id("products"), title: v.string(), slug: v.string(), price: v.string(),
@@ -108,7 +116,13 @@ export const page = query({
         variants: product.variants,
         updatedAt: product.updatedAt,
       };
-      return matchesCatalogFilters(target, args.filters) && matchesCategoryAttributeFilters(target, definitions, args.attributes);
+      const optionsRecord = Object.fromEntries(
+        (args.filters.options ?? []).map((o) => [o.name, o.values]),
+      );
+      const attributesRecord = Object.fromEntries(
+        args.attributes.map((a) => [a.key, { values: a.values, min: a.min, max: a.max }]),
+      );
+      return matchesCatalogFilters(target, { ...args.filters, options: optionsRecord }) && matchesCategoryAttributeFilters(target, definitions, attributesRecord);
     });
     return { ...result, page: await Promise.all(matches.map((product) => card(ctx, product))) };
   },
@@ -124,20 +138,21 @@ export const stats = query({
 });
 
 export const facets = query({
-  args: { categorySlug: v.string() }, returns: v.record(v.string(), v.array(v.string())),
+  args: { categorySlug: v.string() },
+  returns: v.array(v.object({ key: v.string(), values: v.array(v.string()) })),
   handler: async (ctx, { categorySlug }) => {
     const category = await ctx.db.query("categories").withIndex("by_slug", (q) => q.eq("slug", categorySlug)).unique();
     const entries = await Promise.all((category?.attributes ?? []).map(async (definition) => {
-      if (definition.type === "text") return [definition.key, []] as const;
+      if (definition.type === "text") return { key: definition.key, values: [] };
       if (definition.type === "number") {
         const values = () => ctx.db.query("catalogFacetValues").withIndex("by_category_and_key_and_numericValue", (q) => q.eq("categorySlug", categorySlug).eq("key", definition.key).gt("numericValue", undefined));
         const [min, max] = await Promise.all([values().order("asc").first(), values().order("desc").first()]);
-        return [definition.key, min && max ? [min.value, max.value] : []] as const;
+        return { key: definition.key, values: min && max ? [min.value, max.value] : [] };
       }
       const values = await ctx.db.query("catalogFacetValues").withIndex("by_category_and_key_and_value", (q) => q.eq("categorySlug", categorySlug).eq("key", definition.key)).take(100);
-      return [definition.key, values.map((entry) => entry.value)] as const;
+      return { key: definition.key, values: values.map((entry) => entry.value) };
     }));
-    return Object.fromEntries(entries);
+    return entries;
   },
 });
 
@@ -179,7 +194,7 @@ function extractOptionFacets(products: Doc<"products">[]): Record<string, string
 
 export const optionFacets = query({
   args: { categorySlug: v.optional(v.string()) },
-  returns: v.record(v.string(), v.array(v.string())),
+  returns: v.array(v.object({ name: v.string(), values: v.array(v.string()) })),
   handler: async (ctx, { categorySlug }) => {
     const base = ctx.db.query("products");
     const listing = categorySlug !== undefined
@@ -187,6 +202,7 @@ export const optionFacets = query({
       : base.withIndex("by_available", (q) => q.eq("availableForSale", true));
 
     const products = await listing.take(200);
-    return extractOptionFacets(products);
+    const facetsRecord = extractOptionFacets(products);
+    return Object.entries(facetsRecord).map(([name, values]) => ({ name, values }));
   },
 });

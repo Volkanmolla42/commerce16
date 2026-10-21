@@ -26,6 +26,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AdminNotice } from "../../_components/admin-primitives";
 import { AdminHeaderAction } from "../../_components/admin-header-action";
+import { CategoryEditor } from "../../categories/_components/category-editor";
+import { slugify } from "@/lib/admin/slug";
 import { formatMoney } from "@/lib/format-money";
 import { adminPath } from "@/lib/admin/routes";
 import type { CategoryAttributeDefinition, ProductAttribute } from "@/lib/catalog/attributes";
@@ -72,6 +74,7 @@ type CategoryOption = {
 type PreviewResult = {
   success: true;
   dryRun: true;
+  detectedSource?: "shopify" | "woocommerce" | "standard";
   totalRows: number;
   productCount: number;
   parsedProductCount: number;
@@ -212,6 +215,14 @@ function buildOverrides(
       attributes: category ? buildAttributes(category.attributes ?? [], state.values) : [],
     };
   });
+}
+
+function getImportStatusMessage(progress: number): string {
+  if (progress < 25) return "Dosya taranıyor ve kategoriler hazırlanıyor…";
+  if (progress < 60) return "Ürün görselleri indiriliyor ve WebP formatına dönüştürülüyor…";
+  if (progress < 85) return "Varyantlar, stoklar ve özellikler kaydediliyor…";
+  if (progress < 100) return "Veritabanı kayıtları tamamlanıyor…";
+  return "Aktarım tamamlandı!";
 }
 
 function StepIndicator({ currentStep }: { currentStep: Step }) {
@@ -403,6 +414,8 @@ export default function ProductImportPage() {
   const [submitErrors, setSubmitErrors] = useState<ImportError[]>([]);
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
   const reset = () => {
     requestIdRef.current++;
@@ -418,6 +431,8 @@ export default function ProductImportPage() {
     setSubmitErrors([]);
     setLoading(false);
     setDragActive(false);
+    setCategoryEditorOpen(false);
+    setImportProgress(0);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -532,6 +547,16 @@ export default function ProductImportPage() {
     setError(null);
     setSubmitErrors([]);
     setStep("importing");
+    setImportProgress(10);
+
+    const interval = setInterval(() => {
+      setImportProgress((prev) => {
+        if (prev >= 92) return 92;
+        const remaining = 92 - prev;
+        const stepAmount = Math.max(0.6, remaining * 0.08);
+        return Math.min(92, prev + stepAmount);
+      });
+    }, 350);
 
     try {
       const formData = new FormData();
@@ -540,16 +565,23 @@ export default function ProductImportPage() {
       formData.append("overrides", JSON.stringify(buildOverrides(preview.products, edits, preview.categoryOptions)));
       const response = await fetch("/api/admin/products/import", { method: "POST", body: formData });
       const data = (await response.json().catch(() => null)) as ImportResult | null;
+      clearInterval(interval);
+
       if (!response.ok || !data) {
+        setImportProgress(0);
         setError(data?.error || "İçe aktarma sırasında bir sorun oluştu.");
         setSubmitErrors(data?.errors ?? []);
         setStep("preview");
       } else {
+        setImportProgress(100);
+        await new Promise((resolve) => setTimeout(resolve, 350));
         setResult(data);
         setSubmitErrors([]);
         setStep("result");
       }
     } catch {
+      clearInterval(interval);
+      setImportProgress(0);
       setError("İçe aktarma tamamlanamadı. Bağlantınızı kontrol edip tekrar deneyin.");
       setStep("preview");
     } finally {
@@ -581,6 +613,7 @@ export default function ProductImportPage() {
     if (!item.slug) continue;
     errorsBySlug.set(item.slug, [...(errorsBySlug.get(item.slug) ?? []), item]);
   }
+
 
   const rows: TableRow[] = (preview?.products ?? []).map((product) => {
     const edit = edits[product.slug] ?? defaultRowState(product);
@@ -704,18 +737,21 @@ export default function ProductImportPage() {
               <p className="mt-1.5 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {loading
                   ? "Ürünler, varyantlar ve kategori eşleşmeleri taranıyor. Lütfen bekleyin…"
-                  : "Excel (.xlsx, .xls) veya CSV dosyanızı yükleyerek toplu ürün aktarımını başlatın."}
+                  : "Excel veya CSV dosyanızı yükleyin. Standart tablolar, Shopify ve WooCommerce dışa aktarımları otomatik algılanır."}
               </p>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <span className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground">
-                  .XLSX
+                  Excel (.xlsx, .xls)
                 </span>
                 <span className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground">
-                  .XLS
+                  Standart CSV
                 </span>
                 <span className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground">
-                  .CSV
+                  Shopify CSV
+                </span>
+                <span className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground">
+                  WooCommerce CSV
                 </span>
                 <span className="text-[11px] text-muted-foreground">· En fazla 20 MB</span>
               </div>
@@ -854,6 +890,21 @@ export default function ProductImportPage() {
           )}
 
           {/* Metric Overview */}
+          {preview.detectedSource === "shopify" && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+              <CheckCircleIcon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span><strong>Shopify CSV formatı algılandı:</strong> Ürünler, varyantlar ve CDN fotoğrafları otomatik eşleştirildi.</span>
+            </div>
+          )}
+          {preview.detectedSource === "woocommerce" && (
+            <div className="flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2.5 text-xs text-blue-800 dark:text-blue-300">
+              <CheckCircleIcon className="size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+              <span><strong>WooCommerce CSV formatı algılandı:</strong> Ürünler ve varyantlar otomatik eşleştirildi.</span>
+            </div>
+          )}
+
+
+
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <div className="rounded-xl border border-border bg-card px-4 py-3">
               <span className="text-xs font-medium text-muted-foreground">Toplam Ürün</span>
@@ -911,6 +962,17 @@ export default function ProductImportPage() {
                 >
                   <ArrowUpTrayIcon className="size-3.5" />
                   <span>Farklı Dosya Seç</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCategoryEditorOpen(true)}
+                  disabled={loading}
+                  className="h-8 gap-1.5 text-xs cursor-pointer"
+                >
+                  <PlusIcon className="size-3.5" />
+                  <span>Yeni Kategori Ekle</span>
                 </Button>
                 <Button
                   type="button"
@@ -1130,17 +1192,49 @@ export default function ProductImportPage() {
                                     </option>
                                   ))}
                                 </select>
-                                {product.categoryValue && (
-                                  <p className="truncate text-[10px] text-muted-foreground">
-                                    Dosyadaki: <span className="font-medium text-foreground/80">{product.categoryValue}</span>
-                                    {product.category && edit.categorySlug === product.category.slug && (
-                                      <span className="ml-1 text-emerald-600 dark:text-emerald-400 font-medium">✓ eşleşti</span>
-                                    )}
-                                    {!product.category && (
-                                      <span className="ml-1 text-amber-600 dark:text-amber-400 font-medium">⚠ eşleşmedi</span>
-                                    )}
-                                  </p>
-                                )}
+                                {product.categoryValue && (() => {
+                                  const segments = product.categoryValue.includes(">")
+                                    ? product.categoryValue.split(">").map((s) => s.trim()).filter(Boolean)
+                                    : product.categoryValue.includes(" - ")
+                                    ? product.categoryValue.split(" - ").map((s) => s.trim()).filter(Boolean)
+                                    : [];
+                                  return (
+                                    <div className="space-y-1.5 pt-0.5">
+                                      <p className="truncate text-[10px] text-muted-foreground" title={product.categoryValue}>
+                                        Dosyadaki: <span className="font-medium text-foreground/80">{product.categoryValue}</span>
+                                      </p>
+                                      {segments.length > 1 && (
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          <span className="text-[10px] text-muted-foreground font-medium">Hızlı Seçim:</span>
+                                          {segments.map((seg) => {
+                                            const segSlug = slugify(seg);
+                                            const matchedOption = preview.categoryOptions.find(
+                                              (c) => c.title.toLocaleLowerCase("tr-TR") === seg.toLocaleLowerCase("tr-TR") ||
+                                                     c.slug === segSlug,
+                                            );
+                                            const targetSlug = matchedOption?.slug ?? segSlug;
+                                            const isSelected = edit.categorySlug === targetSlug;
+                                            return (
+                                              <button
+                                                key={seg}
+                                                type="button"
+                                                onClick={() => changeCategory(product.slug, targetSlug, edit)}
+                                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer ${
+                                                  isSelected
+                                                    ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                                                    : "border border-border bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
+                                                }`}
+                                              >
+                                                {isSelected && <CheckIcon className="size-2.5" />}
+                                                <span>{seg}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
 
                               {/* Column 4: Attributes Status Summary */}
@@ -1339,14 +1433,28 @@ export default function ProductImportPage() {
       {/* ================= STEP 3: IMPORTING PROGRESS ================= */}
       {step === "importing" && (
         <div className="mx-auto max-w-xl py-12">
-          <Card className="rounded-2xl p-10 text-center shadow-lg">
+          <Card className="rounded-2xl p-8 sm:p-10 text-center shadow-lg border-border">
             <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
               <ArrowPathIcon className="size-8 animate-spin" aria-hidden="true" />
             </div>
             <h2 className="mt-5 text-lg font-bold tracking-tight text-foreground">Ürünler Mağazaya Aktarılıyor</h2>
             <p className="mt-1 text-xs font-mono text-muted-foreground">{file?.name}</p>
-            <p className="mx-auto mt-4 max-w-sm text-xs leading-relaxed text-muted-foreground">
-              Görseller indiriliyor, varyantlar ve kategori özellikleri kaydediliyor. Bu işlem dosya boyutuna bağlı olarak birkaç dakika sürebilir; lütfen sayfayı kapatmayın.
+
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className="text-muted-foreground truncate">{getImportStatusMessage(importProgress)}</span>
+                <span className="font-mono text-foreground font-semibold tabular-nums ml-2">%{Math.round(importProgress)}</span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+                  style={{ width: `${Math.max(4, Math.min(100, importProgress))}%` }}
+                />
+              </div>
+            </div>
+
+            <p className="mx-auto mt-5 max-w-sm text-xs leading-relaxed text-muted-foreground">
+              Görseller indiriliyor, varyantlar ve kategori özellikleri kaydediliyor. Bu işlem dosya boyutuna bağlı olarak biraz sürebilir; lütfen sayfayı kapatmayın.
             </p>
           </Card>
         </div>
@@ -1435,6 +1543,17 @@ export default function ProductImportPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {categoryEditorOpen && (
+        <CategoryEditor
+          category={null}
+          onClose={() => setCategoryEditorOpen(false)}
+          onSaved={() => {
+            setCategoryEditorOpen(false);
+            if (file) void loadPreview(file);
+          }}
+        />
       )}
     </div>
   );

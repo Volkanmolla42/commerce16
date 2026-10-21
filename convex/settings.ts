@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Id, TableNames } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
 import { DEFAULT_LOW_STOCK_THRESHOLD, MAX_LOW_STOCK_THRESHOLD } from "../lib/catalog/low-stock";
@@ -196,3 +196,65 @@ export const updateStoreSettings = mutation({
     };
   },
 });
+
+export const resetAllData = mutation({
+  args: { adminSecret: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertAdminApiSecret(args.adminSecret);
+
+    const tables: TableNames[] = [
+      "products",
+      "catalogStats",
+      "catalogFacetValues",
+      "categories",
+      "categoryAttributePresets",
+      "coupons",
+      "promotions",
+      "orders",
+      "analyticsSessions",
+      "orderEmailEvents",
+      "productSkus",
+      "abandonedCarts",
+      "activeCarts",
+      "storeSettings",
+      "addresses",
+      "favorites",
+      "passwordChangeCodes",
+      "restockSubscriptions",
+      "lowStockAlerts",
+      "contactMessages",
+      "emailLogs",
+      "paymentSettings",
+      "productQuestions",
+      "reviews",
+      "orderFeedback",
+      "users",
+      "authSessions",
+      "authAccounts",
+      "authRefreshTokens",
+      "authVerificationCodes",
+      "authVerifiers",
+      "authRateLimits",
+    ];
+
+    for (const tableName of tables) {
+      const rows = await ctx.db.query(tableName).collect();
+      for (const row of rows) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    const storageFiles = await ctx.db.system.query("_storage").collect();
+    for (const file of storageFiles) {
+      try {
+        await ctx.storage.delete(file._id);
+      } catch {
+        // Silinmiş veya erişilemeyen dosyalar gözardı edilir
+      }
+    }
+
+    return null;
+  },
+});
+

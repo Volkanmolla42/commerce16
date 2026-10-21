@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import { toCsv } from "@/lib/admin/csv";
+import { slugify } from "@/lib/admin/slug";
 import { ATTRIBUTE_TYPES, type ProductAttributeValue } from "@/lib/catalog/attributes";
 import { api } from "@/convex/_generated/api";
 import {
@@ -12,6 +13,7 @@ import {
   downloadAndOptimizeImage,
   optimizeImageBuffer,
   imagePreviewDataUrl,
+  extractCategorySegments,
   type ImportCategory,
   type ParsedProduct,
   type ProductOverride,
@@ -20,7 +22,7 @@ import {
 } from "@/lib/admin/import";
 import type { Id } from "@/convex/_generated/dataModel";
 
-const PREVIEW_PRODUCT_LIMIT = 60;
+const PREVIEW_PRODUCT_LIMIT = 300;
 const PREVIEW_IMAGE_LIMIT = 4;
 const IMPORT_CHUNK_SIZE = 25;
 
@@ -42,6 +44,15 @@ function parsedProductSummary(products: ParsedProduct[]) {
     parsedProductCount: products.length,
     parsedVariantCount: products.reduce((total, product) => total + product.variants.length, 0),
   };
+}
+
+function findCategoryTitle(categoryValue: string | undefined, categorySlug: string): string {
+  if (!categoryValue) return categorySlug;
+  const segs = extractCategorySegments(categoryValue);
+  for (const seg of segs) {
+    if (slugify(seg) === categorySlug) return seg;
+  }
+  return segs[0] || categoryValue;
 }
 
 function parseOverrides(value: FormDataEntryValue | null): ProductOverride[] {
@@ -295,7 +306,34 @@ export async function POST(request: NextRequest) {
         adminSecret,
         slugs: previewProducts.map((product) => product.slug),
       }));
-      const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+      const allCategoryOptions: ImportCategory[] = categories.map((category) => ({
+        slug: category.slug,
+        title: category.title,
+        attributes: category.attributes ?? [],
+      }));
+      for (const product of parseResult.allProducts) {
+        if (product.categoryValue) {
+          const segs = extractCategorySegments(product.categoryValue);
+          for (const seg of segs) {
+            const segSlug = slugify(seg);
+            if (segSlug && !allCategoryOptions.some((c) => c.slug === segSlug)) {
+              allCategoryOptions.push({
+                slug: segSlug,
+                title: seg,
+                attributes: [],
+              });
+            }
+          }
+        }
+        if (product.categorySlug && !allCategoryOptions.some((c) => c.slug === product.categorySlug)) {
+          allCategoryOptions.push({
+            slug: product.categorySlug,
+            title: findCategoryTitle(product.categoryValue, product.categorySlug),
+            attributes: [],
+          });
+        }
+      }
+      const categoryBySlug = new Map(allCategoryOptions.map((category) => [category.slug, category]));
       const products = await Promise.all(previewProducts.map(async (product) => {
         const category = product.categorySlug ? categoryBySlug.get(product.categorySlug) : undefined;
         const attributeLabels = new Map(
@@ -336,6 +374,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         dryRun: true,
+        detectedSource: parseResult.detectedSource,
         totalRows: parseResult.totalRows,
         productCount: parseResult.products.length,
         ...parsedProductSummary(parseResult.allProducts),
@@ -343,7 +382,7 @@ export async function POST(request: NextRequest) {
         productsTruncated: parseResult.allProducts.length > PREVIEW_PRODUCT_LIMIT,
         previewLimit: PREVIEW_PRODUCT_LIMIT,
         products,
-        categoryOptions: categories.map((category) => ({
+        categoryOptions: allCategoryOptions.map((category) => ({
           slug: category.slug,
           title: category.title,
           attributes: category.attributes ?? [],
@@ -375,48 +414,99 @@ export async function POST(request: NextRequest) {
       return { storageId, fileName };
     };
 
+    const existingCategorySlugs = new Set(categories.map((c) => c.slug));
+    const missingCategories = new Map<string, string>();
+    for (const product of parseResult.products) {
+      if (product.categorySlug && !existingCategorySlugs.has(product.categorySlug)) {
+        missingCategories.set(product.categorySlug, findCategoryTitle(product.categoryValue, product.categorySlug));
+      }
+    }
+    for (const [slug, title] of missingCategories) {
+      try {
+        await client.mutation(api.categories.create, {
+          adminSecret,
+          title,
+          slug,
+          description: "",
+        });
+        existingCategorySlugs.add(slug);
+      } catch {
+        // Zaten varsa veya eşzamanlı eklendiyse devam et
+      }
+    }
+
     const batchPayload = [];
     const allErrors: RowError[] = [...parseResult.errors];
     const rowBySlug = new Map(parseResult.products.map((product) => [product.slug, product.rowNumbers[0] ?? 0]));
     const uploadedBySlug = new Map<string, StorageImageResult[]>();
+    const uploadedImageCache = new Map<string, StorageImageResult>();
     let imagesImported = 0;
     let imagesFailed = 0;
 
-    for (const product of parseResult.products) {
-      const uploadedImages: StorageImageResult[] = [];
+    const PRODUCT_CONCURRENCY = 4;
+    const productResults: Array<{
+      product: (typeof parseResult.products)[number];
+      uploadedImages: StorageImageResult[];
+    }> = new Array(parseResult.products.length);
 
-      for (const url of product.imageUrls) {
-        if (uploadedImages.length >= MAX_IMPORT_IMAGES) break;
-        const webp = await downloadAndOptimizeImage(url);
-        if (!webp) {
-          imagesFailed++;
-          continue;
-        }
-        const uploaded = await uploadImage(webp, `${product.slug}-${uploadedImages.length + 1}.webp`);
-        if (uploaded) {
-          uploadedImages.push(uploaded);
-          imagesImported++;
-        } else {
-          imagesFailed++;
-        }
-      }
+    for (let i = 0; i < parseResult.products.length; i += PRODUCT_CONCURRENCY) {
+      const slice = parseResult.products.slice(i, i + PRODUCT_CONCURRENCY);
+      await Promise.all(
+        slice.map(async (product, sliceIdx) => {
+          const globalIdx = i + sliceIdx;
+          const uploadedImages: StorageImageResult[] = [];
+          const imageUrlsToProcess = product.imageUrls.slice(0, MAX_IMPORT_IMAGES);
 
-      for (const image of product.embeddedImages) {
-        if (uploadedImages.length >= MAX_IMPORT_IMAGES) break;
-        const webp = await optimizeImageBuffer(image);
-        if (!webp) {
-          imagesFailed++;
-          continue;
-        }
-        const uploaded = await uploadImage(webp, `${product.slug}-${uploadedImages.length + 1}.webp`);
-        if (uploaded) {
-          uploadedImages.push(uploaded);
-          imagesImported++;
-        } else {
-          imagesFailed++;
-        }
-      }
+          if (imageUrlsToProcess.length > 0) {
+            const results = await Promise.all(
+              imageUrlsToProcess.map(async (url, idx) => {
+                const cached = uploadedImageCache.get(url);
+                if (cached) return cached;
+                const webp = await downloadAndOptimizeImage(url);
+                if (!webp) return null;
+                const uploaded = await uploadImage(webp, `${product.slug}-${idx + 1}.webp`);
+                if (uploaded) uploadedImageCache.set(url, uploaded);
+                return uploaded;
+              }),
+            );
+            for (const res of results) {
+              if (res) {
+                uploadedImages.push(res);
+                imagesImported++;
+              } else {
+                imagesFailed++;
+              }
+            }
+          }
 
+          const remainingSlots = MAX_IMPORT_IMAGES - uploadedImages.length;
+          if (remainingSlots > 0 && product.embeddedImages.length > 0) {
+            const embeddedToProcess = product.embeddedImages.slice(0, remainingSlots);
+            const results = await Promise.all(
+              embeddedToProcess.map(async (image, idx) => {
+                const webp = await optimizeImageBuffer(image);
+                if (!webp) return null;
+                return await uploadImage(webp, `${product.slug}-${uploadedImages.length + idx + 1}.webp`);
+              }),
+            );
+            for (const res of results) {
+              if (res) {
+                uploadedImages.push(res);
+                imagesImported++;
+              } else {
+                imagesFailed++;
+              }
+            }
+          }
+
+          productResults[globalIdx] = { product, uploadedImages };
+        }),
+      );
+    }
+
+    for (const item of productResults) {
+      if (!item) continue;
+      const { product, uploadedImages } = item;
       uploadedBySlug.set(product.slug, uploadedImages);
       batchPayload.push({
         slug: product.slug,
