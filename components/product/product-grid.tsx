@@ -93,8 +93,7 @@ function ProductCard({
                   alt={product.title}
                   fill
                   sizes={imageSizes}
-                  loading={priority && index === 0 ? "eager" : "lazy"}
-                  fetchPriority={priority && index === 0 ? "high" : "low"}
+                  preload={priority && index === 0}
                   className={cn(
                     "object-cover transition-opacity duration-300 ease-out",
                     index === activeIndex

@@ -110,7 +110,7 @@ export function Gallery({
                 fill
                 sizes="(min-width: 1024px) 45vw, 100vw"
                 className="object-contain"
-                priority
+                preload={true}
               />
             </ProductImageTransition>
 

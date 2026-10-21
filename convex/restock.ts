@@ -75,12 +75,8 @@ export const subscribe = mutation({
     // Zaten pending kaydı var mı kontrolü (idempotent)
     const existing = await ctx.db
       .query("restockSubscriptions")
-      .withIndex("by_email_and_product", (q) => q.eq("email", email).eq("productId", args.productId))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("variantId"), args.variantId),
-          q.eq(q.field("status"), "pending")
-        )
+      .withIndex("by_email_and_product_and_variant_and_status", (q) =>
+        q.eq("email", email).eq("productId", args.productId).eq("variantId", args.variantId).eq("status", "pending")
       )
       .first();
 
@@ -173,16 +169,18 @@ export const triggerRestockCheck = internalMutation({
     // Bekleyen aboneleri topla
     let subs = await ctx.db
       .query("restockSubscriptions")
-      .withIndex("by_product_and_variant", (q) => q.eq("productId", args.productId).eq("variantId", args.variantId))
-      .filter((q) => q.eq(q.field("status"), "pending"))
+      .withIndex("by_product_and_variant_and_status", (q) =>
+        q.eq("productId", args.productId).eq("variantId", args.variantId).eq("status", "pending")
+      )
       .take(100);
 
     // Eğer genel ürün seviyesinde stok geldiyse varyantsız bekleyenleri de ekle
     if (args.variantId) {
       const genericSubs = await ctx.db
         .query("restockSubscriptions")
-        .withIndex("by_product_and_variant", (q) => q.eq("productId", args.productId).eq("variantId", undefined))
-        .filter((q) => q.eq(q.field("status"), "pending"))
+        .withIndex("by_product_and_variant_and_status", (q) =>
+          q.eq("productId", args.productId).eq("variantId", undefined).eq("status", "pending")
+        )
         .take(100);
       subs = [...subs, ...genericSubs];
     }

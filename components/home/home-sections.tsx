@@ -149,8 +149,7 @@ export function HomeHero({
             alt={featuredProduct.title}
             fill
             sizes="(min-width: 1536px) 740px, (min-width: 1024px) 52vw, calc(100vw - 2rem)"
-            loading="eager"
-            fetchPriority="high"
+            preload={true}
             className="object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
           /></ProductImageTransition>
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-5 pb-5 pt-16 text-white sm:px-8 sm:pb-7">

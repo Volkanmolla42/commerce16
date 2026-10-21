@@ -336,7 +336,9 @@ export default defineSchema({
     unsubscribeToken: v.string(),
   })
     .index("by_product_and_variant", ["productId", "variantId"])
+    .index("by_product_and_variant_and_status", ["productId", "variantId", "status"])
     .index("by_email_and_product", ["email", "productId"])
+    .index("by_email_and_product_and_variant_and_status", ["email", "productId", "variantId", "status"])
     .index("by_unsubscribe_token", ["unsubscribeToken"])
     .index("by_status", ["status"]),
 
