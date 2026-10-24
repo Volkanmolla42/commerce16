@@ -1,4 +1,4 @@
-export type AnalyticsDays = 7 | 30 | 90;
+type AnalyticsDays = 7 | 30 | 90;
 
 export type AnalyticsDashboard = {
   days: AnalyticsDays;

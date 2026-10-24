@@ -1,3 +1,4 @@
+import { routes } from "@/lib/storefront-routes";
 import {
   ArrowPathIcon,
   ArrowUpRightIcon,
@@ -8,7 +9,6 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import type { Category, Product } from "@/lib/catalog/types";
-import { ProductImageLink, ProductImageTransition } from "@/components/product/product-image-transition";
 
 import { formatMoney } from "@/lib/format-money";
 
@@ -25,7 +25,7 @@ export function HomeValueProps({
   const valueProps = [
     { icon: TruckIcon, title: "Ücretsiz Kargo", description: shippingDescription },
     { icon: ArrowPathIcon, title: "14 Gün Cayma Hakkı", description: "Teslimattan itibaren" },
-    { icon: LockClosedIcon, title: "Güvenli Ödeme", description: "Kart bilgileriniz saklanmaz" },
+    { icon: LockClosedIcon, title: "Esnek Ödeme", description: "Havale/EFT veya kapıda ödeme" },
   ];
 
   return (
@@ -123,7 +123,7 @@ export function HomeHero({
         </h1>
         <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 sm:mt-9">
           <Link
-            href="/search"
+            href={routes.search}
             className="inline-flex min-h-12 items-center justify-center gap-5 rounded-full bg-foreground px-6 text-sm font-semibold text-background transition-opacity hover:opacity-85"
           >
             Ürünleri keşfet
@@ -138,22 +138,21 @@ export function HomeHero({
       </div>
 
       {heroImage && featuredProduct ? (
-        <ProductImageLink
-          productId={featuredProduct.id}
-          href={`/product/${featuredProduct.slug}`}
+        <Link
+          href={routes.product(featuredProduct.slug)}
           aria-label={`${featuredProduct.title} ürününü incele`}
           className="group relative block aspect-[6/5] overflow-hidden bg-neutral-100 sm:aspect-[4/3] lg:aspect-auto lg:min-h-[520px]"
         >
-          <ProductImageTransition><Image
+          <Image
             src={heroImage.url}
             alt={featuredProduct.title}
             fill
             sizes="(min-width: 1536px) 740px, (min-width: 1024px) 52vw, calc(100vw - 2rem)"
             preload={true}
             className="object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.03]"
-          /></ProductImageTransition>
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-5 pb-5 pt-16 text-white sm:px-8 sm:pb-7">
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-white/75">Koleksiyondan</p>
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-5 pb-5 pt-16 text-white sm:px-8 sm:pb-7">
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-white/90">Koleksiyondan</p>
             <div className="flex items-end justify-between gap-4">
               <p className="max-w-sm text-sm font-medium leading-5 text-balance sm:text-base">{featuredProduct.title}</p>
               <span className="grid size-10 shrink-0 place-items-center rounded-full border border-white/40 bg-black/10 backdrop-blur-sm">
@@ -161,7 +160,7 @@ export function HomeHero({
               </span>
             </div>
           </div>
-        </ProductImageLink>
+        </Link>
       ) : null}
     </section>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -59,13 +61,13 @@ export function FreeShippingBar({
 
         {!isFree ? (
           <Link
-            href="/search"
+            href={routes.search}
             className="text-[11px] font-semibold text-primary underline underline-offset-4 hover:opacity-80 transition-opacity"
           >
-            Ürün Ekle ➔
+            Ürün Ekle
           </Link>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
             <SparklesIcon className="size-3.5" />
             <span>Kargo Bedava</span>
           </span>

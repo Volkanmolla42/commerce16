@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { ArrowsUpDownIcon, ChevronDownIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -45,7 +47,7 @@ function SelectionMenu({ label, value, inline, options, icon: Icon }: {
               onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
               className={cn(
                 "flex min-h-11 items-center rounded-xl px-3 text-sm transition-colors",
-                option.active ? "bg-blue-500/10 font-medium text-blue-400" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                option.active ? "bg-blue-500/10 font-medium text-blue-700 dark:text-blue-400" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               {option.title}
@@ -58,7 +60,7 @@ function SelectionMenu({ label, value, inline, options, icon: Icon }: {
 }
 
 export function SortMenu({ inline = false }: { inline?: boolean }) {
-  const pathname = usePathname() ?? "/search";
+  const pathname = usePathname() ?? routes.search;
   const searchParams = useSearchParams();
   const selectedSort = sorting.find((item) => item.slug === searchParams.get("sort")) ?? defaultSort;
 

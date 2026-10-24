@@ -1,6 +1,11 @@
 "use client";
 
 import { ReactNode } from "react";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function AdminNotice({
   children,
@@ -154,6 +159,161 @@ export function AdminEmpty({
     <div className="rounded-lg border border-dashed border-input bg-card px-6 py-12 text-center">
       <h2 className="text-base font-semibold text-foreground">{title}</h2>
       <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+export function AdminActionNotice({
+  message,
+  error,
+}: {
+  message?: string | null;
+  error?: string | null;
+}) {
+  if (error) {
+    return (
+      <div className="mb-4">
+        <AdminNotice kind="error">{error}</AdminNotice>
+      </div>
+    );
+  }
+  if (message) {
+    return (
+      <div className="mb-4">
+        <AdminNotice kind="success">{message}</AdminNotice>
+      </div>
+    );
+  }
+  return null;
+}
+
+export function AdminSearchField({
+  id,
+  label,
+  placeholder,
+  value,
+  onChange,
+  className = "h-10 text-sm",
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className="relative min-w-0">
+      <Label htmlFor={id} className="sr-only">
+        {label}
+      </Label>
+      <MagnifyingGlassIcon
+        aria-hidden="true"
+        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+      />
+      <Input
+        id={id}
+        name={id}
+        type="search"
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`pl-9 ${className}`}
+      />
+    </div>
+  );
+}
+
+export function AdminListCard({
+  toolbar,
+  loading,
+  loadingLabel,
+  empty,
+  footer,
+  children,
+}: {
+  toolbar?: ReactNode;
+  loading: boolean;
+  loadingLabel: string;
+  empty?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="overflow-hidden rounded-lg">
+      {toolbar}
+      {loading ? (
+        <AdminLoading label={loadingLabel} variant="table" />
+      ) : empty ? (
+        <div className="p-5">{empty}</div>
+      ) : (
+        children
+      )}
+      {!loading ? footer : null}
+    </Card>
+  );
+}
+
+export function AdminPagination({
+  page,
+  hasNext,
+  nextCursor,
+  pending,
+  onPrevious,
+  onNext,
+}: {
+  page: number;
+  hasNext: boolean;
+  nextCursor: string;
+  pending: boolean;
+  onPrevious: () => void;
+  onNext: (cursor: string) => void;
+}) {
+  if (page === 1 && !hasNext) return null;
+  return (
+    <nav aria-label="Sayfalama" className="flex items-center justify-between border-t border-border p-4">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={pending || page <= 1}
+        onClick={onPrevious}
+        className="cursor-pointer"
+      >
+        Önceki Sayfa
+      </Button>
+      <span className="text-xs font-mono text-muted-foreground">Sayfa {page}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={pending || !hasNext || !nextCursor}
+        onClick={() => onNext(nextCursor)}
+        className="cursor-pointer"
+      >
+        Sonraki Sayfa
+      </Button>
+    </nav>
+  );
+}
+
+export function AdminFormFooter({
+  onCancel,
+  submitLabel = "Kaydet",
+  savingLabel = "Kaydediliyor...",
+  saving = false,
+}: {
+  onCancel: () => void;
+  submitLabel?: string;
+  savingLabel?: string;
+  saving?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+      <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel} className="cursor-pointer">
+        Vazgeç
+      </Button>
+      <Button type="submit" size="sm" disabled={saving} className="cursor-pointer">
+        {saving ? savingLabel : submitLabel}
+      </Button>
     </div>
   );
 }

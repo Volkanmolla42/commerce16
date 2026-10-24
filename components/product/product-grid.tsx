@@ -1,8 +1,10 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useState, type ReactNode } from "react";
 import Image from "next/image";
-import { ProductImageLink, ProductImageTransition } from "./product-image-transition";
+import Link from "next/link";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import Price from "@/components/price";
 import { getProductPriceRange } from "@/lib/catalog/variants";
@@ -78,19 +80,17 @@ function ProductCard({
       onMouseLeave={() => setActiveIndex(0)}
       className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-blue-500/40 hover:shadow-lg"
     >
-      <ProductImageLink
-        productId={product.id}
-        href={href ?? `/product/${product.slug}`}
+      <Link
+        href={href ?? routes.product(product.slug)}
         className="flex h-full flex-col"
       >
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-900">
-          {images.length > 0 ? (
-            <ProductImageTransition>
-              {images.map((img, index) => (
+          {images.length > 0
+            ? images.map((img, index) => (
                 <Image
                   key={img.url}
                   src={img.url}
-                  alt={product.title}
+                  alt=""
                   fill
                   sizes={imageSizes}
                   preload={priority && index === 0}
@@ -101,9 +101,8 @@ function ProductCard({
                       : "opacity-0 pointer-events-none"
                   )}
                 />
-              ))}
-            </ProductImageTransition>
-          ) : null}
+              ))
+            : null}
           {soldOut ? (
             <span className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-background/60">
               <span className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">Tükendi</span>
@@ -157,7 +156,7 @@ function ProductCard({
             className="flex flex-wrap items-baseline text-sm font-semibold text-foreground"
           />
         </div>
-      </ProductImageLink>
+      </Link>
       {action ? (
         <div className="flex flex-col gap-2 px-3 pb-3 sm:px-3.5 sm:pb-3.5">{action}</div>
       ) : (

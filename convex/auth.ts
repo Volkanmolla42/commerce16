@@ -6,6 +6,7 @@ import { api, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import { renderOtpEmail } from "./emails/templates/account";
 import { sendEmail } from "./emails/send";
+import { storeConfig } from "../lib/store-config";
 
 // convex-auth, e-posta sağlayıcısında ctx'i ikinci argüman olarak çalıştırmada veriyor
 // ama tip tanımlarında onu açıklamıyor; mağaza adı için runQuery gerekiyor.
@@ -18,9 +19,9 @@ async function sendPasswordResetCode(
   const settings = await ctx.runQuery(api.settings.getStoreSettings, {});
   const outcome = await sendEmail(ctx, {
     to: email,
-    storeName: settings.storeName,
+    storeName: storeConfig.name,
     templateKey: "password_reset_otp",
-    content: renderOtpEmail({ storeName: settings.storeName, token, purpose: "reset" }),
+    content: renderOtpEmail({ storeName: storeConfig.name, token, purpose: "reset" }),
     replyTo: settings.email || undefined,
   });
   if (outcome !== "sent") {

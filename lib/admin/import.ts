@@ -1,9 +1,5 @@
-import * as XLSX from "xlsx";
-import sharp from "sharp";
-import { isIP } from "node:net";
-import { lookup } from "node:dns/promises";
-import { slugify } from "./slug";
-import type { Id } from "@/convex/_generated/dataModel";
+import { normalizeHeaderKey, slugify } from "../text";
+import { readSpreadsheetTable, type SheetTable } from "./spreadsheet";
 import type {
   CategoryAttributeDefinition,
   ProductAttribute,
@@ -12,7 +8,7 @@ import type {
 
 export const MAX_IMPORT_IMAGES = 8;
 
-export type ParsedVariant = {
+type ParsedVariant = {
   id: string;
   title: string;
   sku: string;
@@ -23,7 +19,7 @@ export type ParsedVariant = {
   selectedOptions: Array<{ name: string; value: string }>;
 };
 
-export type ParsedOption = {
+type ParsedOption = {
   id: string;
   name: string;
   values: string[];
@@ -65,9 +61,9 @@ export type RowError = {
   scope?: ErrorScope;
 };
 
-export type ImportSource = "shopify" | "woocommerce" | "standard";
+type ImportSource = "shopify" | "woocommerce" | "standard";
 
-export type ParseResult = {
+type ParseResult = {
   products: ParsedProduct[];
   allProducts: ParsedProduct[];
   errors: RowError[];
@@ -75,26 +71,6 @@ export type ParseResult = {
   skippedProducts: number;
   detectedSource: ImportSource;
 };
-
-type SheetRow = {
-  rowNumber: number;
-  sheetRow: number;
-  cells: string[];
-};
-
-type SheetTable = {
-  headers: string[];
-  rows: SheetRow[];
-};
-
-function normalizeHeaderKey(header: string): string {
-  return header
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
 
 function matchColumn(key: string): string | null {
   const normalized = normalizeHeaderKey(key);
@@ -119,19 +95,19 @@ function matchColumn(key: string): string | null {
   return null;
 }
 
-function parseBooleanField(val: unknown): boolean {
-  if (typeof val === "boolean") return val;
-  const str = String(val ?? "").trim().toLocaleLowerCase("tr-TR");
-  if (["evet", "true", "1", "aktif", "active", "yes", "y", "publish"].includes(str)) return true;
-  if (["hayir", "false", "0", "pasif", "inactive", "no", "n", "archived", "draft", "taslak", "arsiv"].includes(str)) return false;
-  return true;
+const TRUE_VALUES = new Set(["evet", "true", "1", "aktif", "active", "yes", "y", "publish", "var"]);
+const FALSE_VALUES = new Set(["hayir", "false", "0", "pasif", "inactive", "no", "n", "archived", "draft", "taslak", "arsiv", "yok"]);
+
+function parseBooleanValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  const normalized = String(value ?? "").trim().toLocaleLowerCase("tr-TR");
+  if (TRUE_VALUES.has(normalized)) return true;
+  if (FALSE_VALUES.has(normalized)) return false;
+  return null;
 }
 
-function parseAttributeBoolean(value: string): boolean | null {
-  const str = value.trim().toLocaleLowerCase("tr-TR");
-  if (["evet", "true", "1", "aktif", "active", "yes", "y", "var"].includes(str)) return true;
-  if (["hayir", "false", "0", "pasif", "inactive", "no", "n", "yok"].includes(str)) return false;
-  return null;
+function parseBooleanField(value: unknown): boolean {
+  return parseBooleanValue(value) ?? true;
 }
 
 function parseDecimalAmount(value: string): number | null {
@@ -151,10 +127,6 @@ function parseDecimalAmount(value: string): number | null {
   return Number.isFinite(amount) ? amount : null;
 }
 
-function categoryKey(value: string): string {
-  return normalizeHeaderKey(value);
-}
-
 export function extractCategorySegments(value: string): string[] {
   const trimmed = value.trim();
   if (!trimmed) return [];
@@ -167,21 +139,11 @@ export function extractCategorySegments(value: string): string[] {
   return [trimmed];
 }
 
-export function extractCategoryLeaf(value: string): string {
-  const segments = extractCategorySegments(value);
-  return segments[segments.length - 1] ?? value.trim();
-}
-
-export function extractCategoryRoot(value: string): string {
-  const segments = extractCategorySegments(value);
-  return segments[0] ?? value.trim();
-}
-
 function categoryLookup(categories: ImportCategory[]): Map<string, ImportCategory> {
   const lookup = new Map<string, ImportCategory>();
-  for (const category of categories) lookup.set(categoryKey(category.slug), category);
+  for (const category of categories) lookup.set(normalizeHeaderKey(category.slug), category);
   for (const category of categories) {
-    const titleKey = categoryKey(category.title);
+    const titleKey = normalizeHeaderKey(category.title);
     if (!lookup.has(titleKey)) lookup.set(titleKey, category);
   }
   return lookup;
@@ -193,8 +155,8 @@ function attributeColumns(
 ): Map<string, CategoryAttributeDefinition> {
   const columns = new Map<string, CategoryAttributeDefinition>();
   for (const definition of category.attributes ?? []) {
-    const labelKey = categoryKey(definition.label);
-    const keyKey = categoryKey(definition.key);
+    const labelKey = normalizeHeaderKey(definition.label);
+    const keyKey = normalizeHeaderKey(definition.key);
     if (labelKey && !standardHeaders.has(labelKey)) columns.set(labelKey, definition);
     if (keyKey && keyKey !== labelKey && !standardHeaders.has(keyKey)) columns.set(keyKey, definition);
   }
@@ -212,7 +174,7 @@ function parseAttributeValue(
       : { value: amount };
   }
   if (definition.type === "boolean") {
-    const value = parseAttributeBoolean(raw);
+    const value = parseBooleanValue(raw);
     return value === null
       ? { error: `${definition.label} Evet veya Hayır olarak yazılmalı.` }
       : { value };
@@ -228,7 +190,7 @@ function parseAttributeValue(
         options.push(part);
         continue;
       }
-      const match = allowed.find((option) => categoryKey(option) === categoryKey(part));
+      const match = allowed.find((option) => normalizeHeaderKey(option) === normalizeHeaderKey(part));
       if (!match) {
         return {
           error: `${definition.label} için geçersiz seçenek: "${part}". Geçerli seçenekler: ${allowed.join(", ")}.`,
@@ -279,131 +241,7 @@ function attributeValueIsEmpty(value: ProductAttributeValue | undefined) {
   return value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
 }
 
-function isPrivateAddress(address: string): boolean {
-  if (isIP(address) === 4) {
-    const [a, b, c] = address.split(".").map(Number);
-    return a === 0 || a === 10 || a === 127 || a >= 224 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
-      (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
-      (a === 203 && b === 0 && c === 113);
-  }
-  if (isIP(address) === 6) {
-    const host = address.toLowerCase();
-    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isPrivateAddress(mapped[1]!);
-    return host === "::" || host === "::1" ||
-      /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || /^ff/.test(host);
-  }
-  return false;
-}
-
-const hostResolutionCache = new Map<string, boolean>();
-
-async function isPrivateHost(hostname: string): Promise<boolean> {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
-    return true;
-  }
-  if (isIP(host)) return isPrivateAddress(host);
-  if (hostResolutionCache.has(host)) return hostResolutionCache.get(host)!;
-  try {
-    const addresses = await lookup(host, { all: true, verbatim: true });
-    const isPrivate = addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address));
-    hostResolutionCache.set(host, isPrivate);
-    return isPrivate;
-  } catch {
-    return true;
-  }
-}
-
-function detectDelimiter(text: string): string {
-  let semicolon = 0;
-  let comma = 0;
-  let quoted = false;
-  for (let i = 0; i < text.length && i < 2000; i++) {
-    const char = text[i];
-    if (char === '"') quoted = !quoted;
-    else if (!quoted) {
-      if (char === "\n" || char === "\r") break;
-      if (char === ";") semicolon++;
-      else if (char === ",") comma++;
-    }
-  }
-  return semicolon >= comma && semicolon > 0 ? ";" : ",";
-}
-
-function parseCsv(text: string, delimiter: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let inQuotes = false;
-  const len = text.length;
-
-  for (let i = 0; i < len; i++) {
-    const char = text[i];
-    if (char === '"') {
-      if (inQuotes && text[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === delimiter && !inQuotes) {
-      row.push(cell.trim());
-      cell = "";
-    } else if ((char === "\r" || char === "\n") && !inQuotes) {
-      if (char === "\r" && text[i + 1] === "\n") i++;
-      row.push(cell.trim());
-      cell = "";
-      if (row.some((c) => c.length > 0)) {
-        rows.push(row);
-      }
-      row = [];
-    } else {
-      cell += char;
-    }
-  }
-  if (cell.length > 0 || row.length > 0) {
-    row.push(cell.trim());
-    if (row.some((c) => c.length > 0)) {
-      rows.push(row);
-    }
-  }
-  return rows;
-}
-
-function decodeCsvBuffer(buffer: Buffer): string {
-  const utf8 = buffer.toString("utf8");
-  if (!utf8.includes("\uFFFD")) return utf8;
-  try {
-    return new TextDecoder("windows-1254").decode(buffer);
-  } catch {
-    return utf8;
-  }
-}
-
-function readCsvTable(text: string): SheetTable {
-  const delimiter = detectDelimiter(text);
-  const matrix = parseCsv(text, delimiter);
-  if (matrix.length === 0) return { headers: [], rows: [] };
-
-  const headers = matrix[0] ?? [];
-  const rows: SheetRow[] = [];
-  for (let index = 1; index < matrix.length; index++) {
-    rows.push({
-      rowNumber: index + 1,
-      sheetRow: index,
-      cells: matrix[index] ?? [],
-    });
-  }
-  return { headers, rows };
-}
-
-export function detectSpreadsheetSource(headers: string[]): ImportSource {
+function detectSpreadsheetSource(headers: string[]): ImportSource {
   const normalized = new Set(headers.map(normalizeHeaderKey));
   if (normalized.has("handle") || normalized.has("variantprice") || normalized.has("bodyhtml")) {
     return "shopify";
@@ -414,130 +252,10 @@ export function detectSpreadsheetSource(headers: string[]): ImportSource {
   return "standard";
 }
 
-function tableFromMatrix(matrix: unknown[][]): SheetTable {
-  const nonEmpty = (row: unknown[] | undefined) =>
-    Boolean(row?.some((cell) => String(cell ?? "").trim().length > 0));
-
-  const headerIndex = matrix.findIndex(nonEmpty);
-  if (headerIndex < 0) return { headers: [], rows: [] };
-
-  const headers = (matrix[headerIndex] ?? []).map((cell) => String(cell ?? "").trim());
-  const rows: SheetRow[] = [];
-  for (let index = headerIndex + 1; index < matrix.length; index++) {
-    if (!nonEmpty(matrix[index])) continue;
-    rows.push({
-      rowNumber: index + 1,
-      sheetRow: index,
-      cells: headers.map((_, column) => String(matrix[index]?.[column] ?? "").trim()),
-    });
-  }
-  return { headers, rows };
-}
-
-function readTable(buffer: Buffer): { table: SheetTable; embedded: Map<number, Buffer[]> } {
-  const isZip = buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b;
-  const isLegacyXls = buffer.length > 4 && buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
-
-  if (!isZip && !isLegacyXls) {
-    return {
-      table: readCsvTable(decodeCsvBuffer(buffer).replace(/^\uFEFF/, "")),
-      embedded: new Map(),
-    };
-  }
-
-  const workbook = XLSX.read(buffer, { type: "buffer", sheetRows: 5000 });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) return { table: { headers: [], rows: [] }, embedded: new Map() };
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
-    header: 1,
-    defval: "",
-    blankrows: true,
-  });
-
-  return {
-    table: tableFromMatrix(matrix),
-    embedded: isZip ? extractEmbeddedImagesByRow(buffer) : new Map(),
-  };
-}
-
-function resolveZipPath(baseDir: string, target: string): string {
-  if (target.startsWith("/")) return target.slice(1);
-  const parts = `${baseDir}/${target}`.split("/");
-  const stack: string[] = [];
-  for (const part of parts) {
-    if (!part || part === ".") continue;
-    if (part === "..") stack.pop();
-    else stack.push(part);
-  }
-  return stack.join("/");
-}
-
-function relationshipTarget(xml: string, id: string): string | undefined {
-  const tag = [...xml.matchAll(/<Relationship\b[^>]*>/g)]
-    .map((match) => match[0])
-    .find((entry) => new RegExp(`\\bId="${id}"`).test(entry));
-  return tag ? /Target="([^"]+)"/.exec(tag)?.[1] : undefined;
-}
-
-function extractEmbeddedImagesByRow(buffer: Buffer): Map<number, Buffer[]> {
-  const result = new Map<number, Buffer[]>();
-  try {
-    const zip = XLSX.CFB.read(buffer, { type: "buffer" });
-    const files = new Map<string, Buffer>();
-    for (let index = 0; index < zip.FileIndex.length; index++) {
-      const entry = zip.FileIndex[index];
-      const path = String(zip.FullPaths[index] ?? "").replace(/^Root Entry\//, "");
-      if (!entry.content || !path) continue;
-      files.set(path, Buffer.from(entry.content));
-    }
-
-    const workbookXml = files.get("xl/workbook.xml")?.toString("utf8") ?? "";
-    const firstSheetId = /<sheet\b[^>]*r:id="([^"]+)"/.exec(workbookXml)?.[1];
-    const workbookRels = files.get("xl/_rels/workbook.xml.rels")?.toString("utf8") ?? "";
-    const sheetTarget = firstSheetId
-      ? relationshipTarget(workbookRels, firstSheetId)
-      : undefined;
-    if (!sheetTarget) return result;
-    const sheetPath = resolveZipPath("xl", sheetTarget);
-    const sheetFile = sheetPath.split("/").pop() ?? "";
-    const sheetRels = files.get(`xl/worksheets/_rels/${sheetFile}.rels`)?.toString("utf8") ?? "";
-
-    const drawingTargets = [...sheetRels.matchAll(/<Relationship\b[^>]*>/g)]
-      .map((match) => match[0])
-      .filter((tag) => /Type="[^"]*\/drawing"/.test(tag))
-      .map((tag) => /Target="([^"]+)"/.exec(tag)?.[1])
-      .filter((target): target is string => Boolean(target));
-
-    for (const drawingTarget of drawingTargets) {
-      const drawingPath = resolveZipPath("xl/worksheets", drawingTarget);
-      const drawingFile = drawingPath.split("/").pop() ?? "";
-      const drawingXml = files.get(drawingPath)?.toString("utf8") ?? "";
-      const drawingRels = files.get(`xl/drawings/_rels/${drawingFile}.rels`)?.toString("utf8") ?? "";
-
-      for (const anchor of drawingXml.split(/<xdr:(?:twoCellAnchor|oneCellAnchor)\b/).slice(1)) {
-        const row = Number(/<xdr:row>(\d+)<\/xdr:row>/.exec(anchor)?.[1]);
-        if (!Number.isInteger(row) || row < 0) continue;
-        for (const blip of anchor.matchAll(/r:embed="([^"]+)"/g)) {
-          const target = relationshipTarget(drawingRels, blip[1]!);
-          if (!target) continue;
-          const media = files.get(resolveZipPath("xl/drawings", target));
-          if (!media || media.length === 0) continue;
-          const rowImages = result.get(row) ?? [];
-          rowImages.push(media);
-          result.set(row, rowImages);
-        }
-      }
-    }
-  } catch {
-    return result;
-  }
-  return result;
-}
-
 function variantCombinationKey(selectedOptions: Array<{ name: string; value: string }>) {
   return JSON.stringify(
     [...selectedOptions]
-      .map((option) => ({ name: categoryKey(option.name), value: option.value }))
+      .map((option) => ({ name: normalizeHeaderKey(option.name), value: option.value }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
 }
@@ -547,10 +265,10 @@ function normalizedOption(
   name: string,
   value: string,
 ): { name: string; value: string } {
-  const existing = product.options.find((option) => categoryKey(option.name) === categoryKey(name));
+  const existing = product.options.find((option) => normalizeHeaderKey(option.name) === normalizeHeaderKey(name));
   const option = existing ?? { id: slugify(name), name, values: [] };
   if (!existing) product.options.push(option);
-  const existingValue = option.values.find((entry) => categoryKey(entry) === categoryKey(value));
+  const existingValue = option.values.find((entry) => normalizeHeaderKey(entry) === normalizeHeaderKey(value));
   if (existingValue === undefined) option.values.push(value);
   return { name: option.name, value: existingValue ?? value };
 }
@@ -562,6 +280,17 @@ function parseImageUrls(value: string): string[] {
     .filter((url) => /^https?:\/\//i.test(url));
 }
 
+function emptyParseResult(error: string): ParseResult {
+  return {
+    products: [],
+    allProducts: [],
+    errors: [{ rowNumber: 1, error, scope: "field" }],
+    totalRows: 0,
+    skippedProducts: 0,
+    detectedSource: "standard",
+  };
+}
+
 export function parseProductSpreadsheet(
   buffer: Buffer,
   categories: ImportCategory[] = [],
@@ -570,29 +299,15 @@ export function parseProductSpreadsheet(
   let table: SheetTable = { headers: [], rows: [] };
   let embeddedImages = new Map<number, Buffer[]>();
   try {
-    const parsed = readTable(buffer);
+    const parsed = readSpreadsheetTable(buffer);
     table = parsed.table;
     embeddedImages = parsed.embedded;
-  } catch {
-    return {
-      products: [],
-      allProducts: [],
-      errors: [{ rowNumber: 1, error: "Dosya okunamadı. Geçerli bir Excel veya CSV dosyası seçin.", scope: "field" }],
-      totalRows: 0,
-      skippedProducts: 0,
-      detectedSource: "standard",
-    };
+  } catch (cause) {
+    return emptyParseResult(cause instanceof Error ? cause.message : "Dosya okunamadı. Geçerli bir Excel veya CSV dosyası seçin.");
   }
 
   if (table.rows.length === 0) {
-    return {
-      products: [],
-      allProducts: [],
-      errors: [{ rowNumber: 1, error: "Tabloda veri satırı bulunamadı.", scope: "field" }],
-      totalRows: 0,
-      skippedProducts: 0,
-      detectedSource: "standard",
-    };
+    return emptyParseResult("Tabloda veri satırı bulunamadı.");
   }
 
   const detectedSource = detectSpreadsheetSource(table.headers);
@@ -710,29 +425,29 @@ export function parseProductSpreadsheet(
 
     for (const seg of segments) {
       const segSlug = slugify(seg);
-      if (segSlug && !lookup.has(categoryKey(segSlug)) && !lookup.has(categoryKey(seg))) {
+      if (segSlug && !lookup.has(normalizeHeaderKey(segSlug)) && !lookup.has(normalizeHeaderKey(seg))) {
         const segCategory: ImportCategory = { slug: segSlug, title: seg, attributes: [] };
-        lookup.set(categoryKey(segSlug), segCategory);
-        lookup.set(categoryKey(seg), segCategory);
+        lookup.set(normalizeHeaderKey(segSlug), segCategory);
+        lookup.set(normalizeHeaderKey(seg), segCategory);
       }
     }
 
     let category: ImportCategory | null = existingProduct?.categorySlug
-      ? lookup.get(categoryKey(existingProduct.categorySlug)) ?? null
+      ? lookup.get(normalizeHeaderKey(existingProduct.categorySlug)) ?? null
       : null;
 
     if (rawCategory) {
-      const resolved = lookup.get(categoryKey(primaryCategory)) ??
-        lookup.get(categoryKey(rawCategory)) ??
-        (leafCategory ? lookup.get(categoryKey(leafCategory)) : null) ?? null;
+      const resolved = lookup.get(normalizeHeaderKey(primaryCategory)) ??
+        lookup.get(normalizeHeaderKey(rawCategory)) ??
+        (leafCategory ? lookup.get(normalizeHeaderKey(leafCategory)) : null) ?? null;
       if (!resolved) {
         const autoTitle = primaryCategory;
         const autoSlug = slugify(autoTitle);
         if (autoSlug) {
           const autoCategory: ImportCategory = { slug: autoSlug, title: autoTitle, attributes: [] };
-          lookup.set(categoryKey(autoSlug), autoCategory);
-          lookup.set(categoryKey(autoTitle), autoCategory);
-          lookup.set(categoryKey(rawCategory), autoCategory);
+          lookup.set(normalizeHeaderKey(autoSlug), autoCategory);
+          lookup.set(normalizeHeaderKey(autoTitle), autoCategory);
+          lookup.set(normalizeHeaderKey(rawCategory), autoCategory);
           category = autoCategory;
         } else {
           recordIssue(
@@ -910,7 +625,7 @@ export function parseProductSpreadsheet(
 
     if (hasCategoryOverride) {
       const nextSlug = override.categorySlug!.trim();
-      category = nextSlug ? lookup.get(categoryKey(nextSlug)) ?? null : null;
+      category = nextSlug ? lookup.get(normalizeHeaderKey(nextSlug)) ?? null : null;
       if (!category) {
         errors.push({
           rowNumber: product.rowNumbers[0] ?? 0,
@@ -923,7 +638,7 @@ export function parseProductSpreadsheet(
         product.categorySlug = category.slug;
       }
     } else {
-      category = product.categorySlug ? lookup.get(categoryKey(product.categorySlug)) ?? null : null;
+      category = product.categorySlug ? lookup.get(normalizeHeaderKey(product.categorySlug)) ?? null : null;
       for (const issue of categoryIssues.get(product.slug) ?? []) {
         errors.push(issue);
         failedSlugs.add(product.slug);
@@ -977,7 +692,7 @@ export function parseProductSpreadsheet(
         if (invalidKeys.has(definition.key)) continue;
         const value = values.get(definition.key);
         if (!attributeValueIsEmpty(value) || !definition.required) continue;
-        const hasColumn = normalizedHeaders.has(categoryKey(definition.label));
+        const hasColumn = normalizedHeaders.has(normalizeHeaderKey(definition.label));
         errors.push({
           rowNumber: product.rowNumbers[0] ?? 0,
           slug: product.slug,
@@ -1028,60 +743,3 @@ export function parseProductSpreadsheet(
     detectedSource,
   };
 }
-
-export async function optimizeImageBuffer(buffer: Buffer): Promise<Buffer | null> {
-  try {
-    return await sharp(buffer)
-      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 80, effort: 3 })
-      .toBuffer();
-  } catch {
-    return null;
-  }
-}
-
-export async function imagePreviewDataUrl(buffer: Buffer): Promise<string | null> {
-  try {
-    const thumbnail = await sharp(buffer)
-      .resize({ width: 120, height: 120, fit: "cover" })
-      .webp({ quality: 60 })
-      .toBuffer();
-    return `data:image/webp;base64,${thumbnail.toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
-
-export async function downloadAndOptimizeImage(url: string): Promise<Buffer | null> {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    if (await isPrivateHost(parsed.hostname)) return null;
-
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
-      redirect: "manual",
-      headers: { "User-Agent": "Commerce16-Importer/1.0" },
-    });
-
-    if (res.status >= 300 && res.status < 400) return null;
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.startsWith("image/")) return null;
-
-    const contentLength = Number(res.headers.get("content-length"));
-    if (contentLength && contentLength > 10 * 1024 * 1024) return null;
-
-    const arrayBuf = await res.arrayBuffer();
-    if (arrayBuf.byteLength > 10 * 1024 * 1024) return null;
-
-    return await optimizeImageBuffer(Buffer.from(arrayBuf));
-  } catch {
-    return null;
-  }
-}
-
-export type StorageImageResult = {
-  storageId: Id<"_storage">;
-  fileName: string;
-};

@@ -34,6 +34,7 @@ const eslintConfig = defineConfig([
     "convex/_generated/**",
     "*.mjs",
     "*.cjs",
+    "scripts/**",
     ".tmp*",
     "*.tmp*",
   ]),

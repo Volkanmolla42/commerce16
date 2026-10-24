@@ -11,6 +11,7 @@ import schema from "./schema";
 import { assertAdminApiSecret } from "./adminAuth";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 import { formatOrderCode, resolveCarrierTrackingUrl } from "../lib/orders";
 import { adminAlertTo } from "./emails/config";
 import {
@@ -85,7 +86,7 @@ export const getOrderEmailPayload = internalQuery({
         image: item.image ?? null,
         sku: item.sku ?? null,
       })),
-      storeName: settings.storeName,
+      storeName: storeConfig.name,
       storeEmail: settings.email.trim() || null,
       storePhone: settings.phone.trim() || null,
       paymentMethod: order.paymentMethod ?? null,

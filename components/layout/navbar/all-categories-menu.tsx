@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import Link from "next/link";
 import { useRef, useState } from "react";
 import type { Menu } from "@/lib/catalog/types";
@@ -31,7 +33,7 @@ export function AllCategoriesMenu({ categories }: { categories: Menu[] }) {
       }}
     >
       <Link
-        href="/search"
+        href={routes.search}
         prefetch
         aria-expanded={open}
         aria-controls={panelId}
@@ -47,7 +49,7 @@ export function AllCategoriesMenu({ categories }: { categories: Menu[] }) {
         <nav aria-label="Tüm kategoriler" className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-xl dark:border-neutral-700 dark:bg-neutral-900 sm:p-5">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Kategoriler</h2>
-            <Link href="/search" prefetch={false} className="text-xs text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline dark:hover:text-white">
+            <Link href={routes.search} prefetch={false} className="text-xs text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline dark:hover:text-white">
               Tüm ürünler
             </Link>
           </div>

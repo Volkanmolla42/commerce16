@@ -1,6 +1,6 @@
 export type PromotionType = "cart_percentage" | "buy_x_get_y" | "category_free_shipping";
 
-export type PromotionRule = {
+type PromotionRule = {
   id: string;
   title: string;
   type: PromotionType;
@@ -12,14 +12,14 @@ export type PromotionRule = {
   minSubtotalKurus?: number;
 };
 
-export type PromotionLine = {
+type PromotionLine = {
   productId: string;
   unitPriceKurus: number;
   quantity: number;
   categorySlug?: string;
 };
 
-export type PromotionQuote = {
+type PromotionQuote = {
   discountKurus: number;
   title: string | null;
   freeShipping: boolean;

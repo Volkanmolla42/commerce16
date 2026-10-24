@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ProductGrid } from "@/components/product/product-grid";
@@ -16,7 +18,7 @@ import {
   RECENT_PRODUCTS_EVENT,
   recordRecentProduct,
 } from "@/lib/catalog/recommendations";
-import { getSelectedVariant, getVariantProduct } from "@/lib/catalog/variants";
+import { getProductPurchaseState } from "@/lib/catalog/variants";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
 import { trackPixelViewContent } from "@/lib/analytics/meta-pixel";
 
@@ -83,7 +85,11 @@ export function Shelf({ title, products, showCartActions = false, upsellSources,
   if (products.length === 0) return null;
 
   const resolveProduct = (product: Product) => {
-    const defaultVariant = getSelectedVariant(product, new URLSearchParams());
+    const {
+      selectedVariant: defaultVariant,
+      selectedProduct,
+      needsSelection: needsVariant,
+    } = getProductPurchaseState(product);
     const upsellSource = upsellSources?.get(product.id);
     const params = upsellSource
       ? new URLSearchParams({ cartReplaceProductId: upsellSource.product.id })
@@ -94,9 +100,9 @@ export function Shelf({ title, products, showCartActions = false, upsellSources,
     return {
       defaultVariant,
       upsellSource,
-      needsVariant: Boolean(product.variants?.length && !defaultVariant),
-      href: params ? `/product/${product.slug}?${params.toString()}` : `/product/${product.slug}`,
-      selectedProduct: defaultVariant ? getVariantProduct(product, defaultVariant) : product,
+      needsVariant,
+      href: params ? `${routes.product(product.slug)}?${params.toString()}` : routes.product(product.slug),
+      selectedProduct,
     };
   };
 

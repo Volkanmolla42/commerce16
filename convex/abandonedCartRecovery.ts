@@ -1,3 +1,4 @@
+import { routes } from "../lib/storefront-routes";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
@@ -9,7 +10,7 @@ import { enrichCartItems } from "./cartAdmin";
 import { isEmailConfigured, siteLink } from "./emails/config";
 import { renderCartRecoveryEmail } from "./emails/templates/marketing";
 import { sendEmail } from "./emails/send";
-import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   cartRecoveryConsent: { kind: "fixed window", rate: 5, period: 60 * 60 * 1000 },
@@ -304,8 +305,6 @@ export const claimReminder = internalMutation({
       return null;
     }
 
-    const { storeName } = await readStoreSettings(ctx);
-
     await ctx.db.patch(cartId, { status: "sending" });
     return {
       cartId,
@@ -313,7 +312,7 @@ export const claimReminder = internalMutation({
       email,
       unsubscribeToken: cart.unsubscribeToken,
       restoreToken: cart.restoreToken,
-      storeName,
+      storeName: storeConfig.name,
       items,
     };
   },
@@ -360,8 +359,8 @@ export const processReminder = internalAction({
             image: item.imageUrl,
             meta: item.variantTitle,
           })),
-          cartUrl: siteLink("/cart", { recover: reminder.restoreToken }),
-          unsubscribeUrl: siteLink("/cart-reminders/unsubscribe", { token: reminder.unsubscribeToken }),
+          cartUrl: siteLink(routes.cart, { recover: reminder.restoreToken }),
+          unsubscribeUrl: siteLink(routes.cartRemindersUnsubscribe, { token: reminder.unsubscribeToken }),
         }),
         idempotencyKey: `cart-recovery/${reminder.notificationId}`,
         metadata: {

@@ -3,10 +3,9 @@ import { DEFAULT_NEW_BADGE_DAYS, isNewProduct } from "./new-badge";
 import type { ProductVariant } from "./types";
 import { isVariantSellable } from "./variants";
 
-const LOW_STOCK_THRESHOLD = DEFAULT_LOW_STOCK_THRESHOLD;
 const BESTSELLER_SALES_THRESHOLD = 10;
 
-export type ProductBadge =
+type ProductBadge =
   | { kind: "discount"; percent: number }
   | { kind: "new" }
   | { kind: "low-stock" }
@@ -28,7 +27,7 @@ export function getProductBadges({
   selectedVariantId,
   compact = false,
   newBadgeDays = DEFAULT_NEW_BADGE_DAYS,
-  lowStockThreshold = LOW_STOCK_THRESHOLD,
+  lowStockThreshold = DEFAULT_LOW_STOCK_THRESHOLD,
   now,
 }: {
   variants?: ProductVariant[];

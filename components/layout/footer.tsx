@@ -1,7 +1,8 @@
+import { routes } from "@/lib/storefront-routes";
 import Link from "next/link";
 import Image from "next/image";
-import StoreInitial from "@/components/store-initial";
 import { getMenu, getStoreSettings } from "@/lib/catalog";
+import { storeConfig } from "@/lib/store-config";
 import { Menu } from "@/lib/catalog/types";
 import { cacheTag } from "next/cache";
 import { CookiePreferencesButton } from "@/components/privacy/cookie-consent-manager";
@@ -13,7 +14,7 @@ import {
 
 import { formatDate } from "@/lib/format-date";
 import { formatPhone, formatWhatsAppUrl } from "@/lib/orders";
-import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
+import { WhatsAppIcon } from "@/components/icons/social-icons";
 
 export default async function Footer() {
   "use cache";
@@ -25,7 +26,7 @@ export default async function Footer() {
     getStoreSettings(),
   ]);
 
-  const hasContact = Boolean(settings.phone || settings.email || settings.address);
+  const hasContact = Boolean(settings.phone || settings.email || storeConfig.address);
   const whatsappUrl = formatWhatsAppUrl(settings.phone, "Merhaba, ürünleriniz hakkında bilgi almak istiyorum.");
 
   return (
@@ -38,30 +39,24 @@ export default async function Footer() {
               href="/"
               className="inline-flex w-fit items-center gap-2.5 text-black transition-opacity hover:opacity-80 dark:text-white"
             >
-              {settings.logoUrl ? (
-                <Image
-                  src={settings.logoUrl}
-                  alt={settings.storeName}
-                  width={32}
-                  height={32}
-                  unoptimized
-                  className="size-8 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-neutral-950"
-                />
-              ) : (
-                <StoreInitial storeName={settings.storeName} size="sm" />
-              )}
-              <span className="text-sm font-semibold uppercase tracking-wider">{settings.storeName}</span>
+              <Image
+                src={storeConfig.logo}
+                alt=""
+                width={32}
+                height={32}
+                className="size-8 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700"
+              />
+              <span className="text-sm font-semibold uppercase tracking-wider">{storeConfig.name}</span>
             </Link>
 
-            {settings.slogan ? (
+            {storeConfig.slogan ? (
               <p className="max-w-sm text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-                {settings.slogan}
+                {storeConfig.slogan}
               </p>
             ) : null}
 
             {hasContact && (
-              <ul className="mt-1 flex flex-col gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
-                {settings.phone && (
+              <ul className="mt-1 flex flex-col gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">                {settings.phone && (
                   <li>
                     <a href={`tel:${settings.phone}`} className="inline-flex items-center gap-2.5 transition-colors hover:text-black dark:hover:text-white">
                       <PhoneIcon className="size-4 shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
@@ -85,14 +80,23 @@ export default async function Footer() {
                     </a>
                   </li>
                 )}
-                {settings.address && (
+                {storeConfig.address && (
                   <li className="flex items-start gap-2.5">
                     <MapPinIcon className="mt-0.5 size-4 shrink-0 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
-                    <span className="leading-snug">{settings.address}</span>
+                    <span className="leading-snug">{storeConfig.address}</span>
                   </li>
                 )}
               </ul>
             )}
+
+            {(storeConfig.legalName || storeConfig.taxOffice || storeConfig.taxNumber || storeConfig.mersis) ? (
+              <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+                {storeConfig.legalName ? <><span className="font-medium text-neutral-700 dark:text-neutral-300">Unvan:</span> {storeConfig.legalName}</> : null}
+                {storeConfig.taxOffice ? <> · <span className="font-medium text-neutral-700 dark:text-neutral-300">Vergi Dairesi:</span> {storeConfig.taxOffice}</> : null}
+                {storeConfig.taxNumber ? <> · <span className="font-medium text-neutral-700 dark:text-neutral-300">Vergi No / TCKN:</span> {storeConfig.taxNumber}</> : null}
+                {storeConfig.mersis ? <> · <span className="font-medium text-neutral-700 dark:text-neutral-300">MERSİS:</span> {storeConfig.mersis}</> : null}
+              </p>
+            ) : null}
           </div>
 
           <nav aria-label="Kategoriler" className="lg:col-span-2">
@@ -112,7 +116,7 @@ export default async function Footer() {
                   {menu.length > 8 && (
                     <li className="pt-1">
                       <Link
-                        href="/search"
+                        href={routes.search}
                         className="text-xs font-medium text-neutral-500 underline underline-offset-4 transition-colors hover:text-black dark:hover:text-white"
                       >
                         Tüm Kategoriler ({menu.length}) →
@@ -121,7 +125,7 @@ export default async function Footer() {
                   )}
                 </>
               ) : (
-                <li className="text-neutral-400 dark:text-neutral-500">Henüz kategori eklenmemiş.</li>
+                <li className="text-muted-foreground">Henüz kategori eklenmemiş.</li>
               )}
             </ul>
           </nav>
@@ -132,22 +136,22 @@ export default async function Footer() {
             </h3>
             <ul className="mt-4 flex flex-col gap-3 text-sm text-neutral-600 dark:text-neutral-400">
               <li>
-                <Link href="/about" className="transition-colors hover:text-black dark:hover:text-white">
+                <Link href={routes.about} className="transition-colors hover:text-black dark:hover:text-white">
                   Hakkımızda
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="transition-colors hover:text-black dark:hover:text-white">
+                <Link href={routes.contact} className="transition-colors hover:text-black dark:hover:text-white">
                   İletişim
                 </Link>
               </li>
               <li>
-                <Link href="/terms-conditions" className="transition-colors hover:text-black dark:hover:text-white">
+                <Link href={routes.termsConditions} className="transition-colors hover:text-black dark:hover:text-white">
                   Kullanım Koşulları
                 </Link>
               </li>
               <li>
-                <Link href="/privacy-policy" className="transition-colors hover:text-black dark:hover:text-white">
+                <Link href={routes.privacyPolicy} className="transition-colors hover:text-black dark:hover:text-white">
                   Gizlilik Politikası
                 </Link>
               </li>
@@ -160,13 +164,23 @@ export default async function Footer() {
             </h3>
             <ul className="mt-4 flex flex-col gap-3 text-sm text-neutral-600 dark:text-neutral-400">
               <li>
-                <Link href="/distance-sales-agreement" className="transition-colors hover:text-black dark:hover:text-white">
+                <Link href={routes.distanceSalesAgreement} className="transition-colors hover:text-black dark:hover:text-white">
                   Mesafeli Satış Sözleşmesi
                 </Link>
               </li>
               <li>
-                <Link href="/pre-information-form" className="transition-colors hover:text-black dark:hover:text-white">
+                <Link href={routes.preInformationForm} className="transition-colors hover:text-black dark:hover:text-white">
                   Ön Bilgilendirme Formu
+                </Link>
+              </li>
+              <li>
+                <Link href={routes.refundPolicy} className="transition-colors hover:text-black dark:hover:text-white">
+                  İade ve Cayma Hakkı
+                </Link>
+              </li>
+              <li>
+                <Link href={routes.cookiePolicy} className="transition-colors hover:text-black dark:hover:text-white">
+                  Çerez Politikası
                 </Link>
               </li>
             </ul>
@@ -178,7 +192,7 @@ export default async function Footer() {
       <div className="border-t border-neutral-200 dark:border-neutral-800">
         <div className="mx-auto flex max-w-screen-2xl flex-col items-center justify-between gap-4 px-4 py-6 sm:px-6 md:flex-row lg:px-8">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            &copy; {copyrightDate} {settings.storeName}. Tüm hakları saklıdır.
+            &copy; {copyrightDate} {storeConfig.name}. Tüm hakları saklıdır.
           </p>
 
           <CookiePreferencesButton />

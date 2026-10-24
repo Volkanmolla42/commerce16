@@ -7,7 +7,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   HeartIcon,
   ShoppingBagIcon,
-  ShoppingCartIcon,
 } from "@heroicons/react/24/outline";
 
 type SocialProofMessage = {
@@ -29,10 +28,6 @@ export function ProductSocialProof({
     now > 0 ? { productId: productId as Id<"products">, now } : "skip",
   );
   const favoriteCount = useQuery(api.favorites.getProductFavoriteCount, { productSlug });
-  const cartCount = useQuery(
-    api.activeCarts.getProductCartCount,
-    now > 0 ? { productId: productId as Id<"products">, now } : "skip",
-  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => setNow(Date.now()), 0);
@@ -61,13 +56,6 @@ export function ProductSocialProof({
       key: "favorite",
       icon: <HeartIcon className="size-3.5" aria-hidden="true" />,
       text: `${favoriteCount.limited ? "500+" : favoriteCount.count} kişi favoriledi`,
-    });
-  }
-  if (cartCount && cartCount.count > 0) {
-    messages.push({
-      key: "cart",
-      icon: <ShoppingCartIcon className="size-3.5" aria-hidden="true" />,
-      text: `${cartCount.limited ? "500+" : cartCount.count} kişinin sepetinde`,
     });
   }
 

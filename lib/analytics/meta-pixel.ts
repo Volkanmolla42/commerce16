@@ -28,7 +28,6 @@ export function initMetaPixel(): boolean {
   if (!pixelId) return false;
   if (!hasMarketingConsent()) return false;
   if (isInitialized) return true;
-
   // Initialize the standard fbq snippet if not already loaded
   if (!window.fbq) {
     const fbq: FbqFunction = function (...args: unknown[]) {
@@ -61,7 +60,22 @@ export function initMetaPixel(): boolean {
   return true;
 }
 
-export function trackPixelEvent(eventName: string, data?: Record<string, unknown>): void {
+function stripSensitiveQueryParams(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  let changed = false;
+  for (const key of ["token", "recover"]) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) {
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+}
+
+function trackPixelEvent(eventName: string, data?: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
   const pixelId = getMetaPixelId();
   if (!pixelId) return;
@@ -71,6 +85,8 @@ export function trackPixelEvent(eventName: string, data?: Record<string, unknown
     const initialized = initMetaPixel();
     if (!initialized) return;
   }
+
+  stripSensitiveQueryParams();
 
   if (window.fbq) {
     if (data) {
@@ -146,4 +162,15 @@ export function trackPixelPurchase(params: {
     ...(params.num_items !== undefined ? { num_items: params.num_items } : {}),
     ...(params.content_ids ? { content_ids: params.content_ids, content_type: "product" } : {}),
   });
+}
+
+export function revokeMarketingConsent(): void {
+  isInitialized = false;
+  if (typeof document === "undefined") return;
+  for (const name of ["_fbp", "_fbc"]) {
+    document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+  }
+  if (window.fbq) {
+    window.fbq.queue = [];
+  }
 }

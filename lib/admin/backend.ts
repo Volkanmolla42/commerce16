@@ -12,7 +12,7 @@ export function getAdminBackend() {
   return { adminSecret, client: new ConvexHttpClient(url, { logger: false }) };
 }
 
-export function getAdminErrorMessage(error: unknown) {
+function getAdminErrorMessage(error: unknown) {
   if (!(error instanceof Error)) return "İşlem tamamlanamadı.";
 
   const rawMessage = error.message.trim();

@@ -1,9 +1,12 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import type { CartItem } from "./cart-store";
 
-export const QUICK_BUY_STORAGE_KEY = "commerce_quick_buy_v2";
+const QUICK_BUY_STORAGE_KEY = "commerce_quick_buy_v2";
 
 let inMemoryItem: CartItem | null = null;
 let initialized = false;
@@ -57,6 +60,14 @@ export function clearQuickBuyItem() {
     // In-memory fallback
   }
   notify();
+}
+
+export function useQuickBuy() {
+  const router = useRouter();
+  return (product: CartItem["product"], variantId?: string) => {
+    setQuickBuyItem({ product, quantity: 1, variantId });
+    router.push(routes.checkoutQuickBuy);
+  };
 }
 
 export function useQuickBuyItem(): CartItem | null {

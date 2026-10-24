@@ -4,7 +4,7 @@ import { getOrderPriceBreakdown, getOrderPaymentMethodTitle } from "@/lib/orders
 import { formatMoney } from "@/lib/format-money";
 import { Separator } from "@/components/ui/separator";
 
-export interface OrderPriceSummaryProps {
+interface OrderPriceSummaryProps {
   order: {
     total: string | number;
     items: Array<{ price: string | number; quantity: number }>;
@@ -62,13 +62,13 @@ export function OrderPriceSummary({
           className={
             isAdmin
               ? "flex items-center justify-between text-xs pb-2 border-b border-border/70"
-              : "flex justify-between text-emerald-600 dark:text-emerald-400 font-medium text-sm"
+              : "flex justify-between text-emerald-700 dark:text-emerald-400 font-medium text-sm"
           }
         >
           <span className={isAdmin ? "text-muted-foreground" : ""}>
             {isAdmin ? `İndirim Kuponu (${order.couponCode})` : `Kupon (${order.couponCode})`}
           </span>
-          <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+          <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
             −{formatMoney(breakdown.couponDiscount)}
           </span>
         </div>
@@ -79,13 +79,13 @@ export function OrderPriceSummary({
           className={
             isAdmin
               ? "flex items-center justify-between text-xs pb-2 border-b border-border/70"
-              : "flex justify-between text-emerald-600 dark:text-emerald-400 font-medium text-sm"
+              : "flex justify-between text-emerald-700 dark:text-emerald-400 font-medium text-sm"
           }
         >
           <span className={isAdmin ? "text-muted-foreground" : ""}>
             Kampanya{order.promotionTitle ? ` (${order.promotionTitle})` : ""}
           </span>
-          <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+          <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
             −{formatMoney(breakdown.promotionDiscount)}
           </span>
         </div>
@@ -94,7 +94,7 @@ export function OrderPriceSummary({
       <div className={rowClass}>
         <span className="text-muted-foreground">Kargo</span>
         {breakdown.isFreeShipping ? (
-          <span className="text-right font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="text-right font-medium text-emerald-700 dark:text-emerald-400">
             Ücretsiz{order.freeShippingPromotionTitle ? ` (${order.freeShippingPromotionTitle})` : ""}
           </span>
         ) : (

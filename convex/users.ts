@@ -32,6 +32,43 @@ export const getMyProfile = query({
   },
 });
 
+export const acceptTerms = mutation({
+  args: {
+    termsVersion: v.string(),
+    privacyVersion: v.string(),
+    acceptedAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
+    const termsVersion = args.termsVersion.trim();
+    const privacyVersion = args.privacyVersion.trim();
+    if (!termsVersion || termsVersion.length > 40 || !privacyVersion || privacyVersion.length > 40 || !Number.isFinite(args.acceptedAt)) {
+      throw new Error("Onay bilgileri geçersiz.");
+    }
+    const existing = await ctx.db
+      .query("legalAcceptances")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        termsVersion,
+        privacyVersion,
+        acceptedAt: args.acceptedAt,
+      });
+    } else {
+      await ctx.db.insert("legalAcceptances", {
+        userId,
+        termsVersion,
+        privacyVersion,
+        acceptedAt: args.acceptedAt,
+      });
+    }
+    return null;
+  },
+});
+
 export const updateProfile = mutation({
   args: {
     name: v.optional(v.string()),

@@ -1,3 +1,4 @@
+import { routes } from "../../lib/storefront-routes";
 import type { EmailContent } from "./content";
 import { adminLink, siteLink, siteUrl } from "./config";
 import { renderContactEmail, renderLowStockEmail, renderProductQuestionEmail } from "./templates/alerts";
@@ -134,11 +135,11 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
       renderProductQuestionEmail({
         storeName: store.storeName,
         productTitle: "Klasik Pamuk Gömlek",
-        productUrl: siteLink("/product/klasik-pamuk-gomlek"),
+        productUrl: siteLink(routes.product("klasik-pamuk-gomlek")),
         user: { name: "Ayşe Demir", email: "ayse@example.com" },
         question: "Bu ürünün kumaşı yazın terletir mi? Beden olarak normal kalıp mı?",
         _creationTime: 1_700_000_000_000,
-        adminQuestionsUrl: adminLink("questions"),
+        adminQuestionsUrl: adminLink("sorular"),
       }),
   },
   {
@@ -153,7 +154,7 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
         variantTitle: "Beden: M / Beyaz",
         currentStock: Math.max(0, store.lowStockThreshold - 1),
         threshold: store.lowStockThreshold,
-        adminInventoryUrl: adminLink("inventory"),
+        adminInventoryUrl: adminLink("stok"),
       }),
   },
   {
@@ -168,8 +169,8 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
           { title: "Klasik Pamuk Gömlek", quantity: 1, price: "450.00", meta: "Beden: M / Beyaz" },
           { title: "Premium Keten Pantolon", quantity: 1, price: "800.00", meta: "Beden: 32 / Bej" },
         ],
-        cartUrl: siteLink("/cart"),
-        unsubscribeUrl: siteLink("/cart-reminders/unsubscribe"),
+        cartUrl: siteLink(routes.cart),
+        unsubscribeUrl: siteLink(routes.cartRemindersUnsubscribe),
       }),
   },
   {
@@ -183,8 +184,8 @@ export const EMAIL_TEMPLATES: TemplateMeta[] = [
         productTitle: "Klasik Pamuk Gömlek",
         variantTitle: "Beden: M / Beyaz",
         price: "450.00",
-        productUrl: siteLink("/product/klasik-pamuk-gomlek"),
-        unsubscribeUrl: siteLink("/restock/unsubscribe"),
+        productUrl: siteLink(routes.product("klasik-pamuk-gomlek")),
+        unsubscribeUrl: siteLink(routes.restockUnsubscribe),
       }),
   },
 ];

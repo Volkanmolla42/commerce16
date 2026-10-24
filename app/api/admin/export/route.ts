@@ -4,7 +4,7 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { getAdminBackend, adminErrorResponse } from "@/lib/admin/backend";
 import { hasAdminSession } from "@/lib/admin/session";
 import { toCsv } from "@/lib/admin/csv";
-import { orderStatusLabels, orderPaymentStatusLabels, getOrderCode, getOrderPaymentMethodTitle } from "@/lib/orders";
+import { orderStatusLabels, orderPaymentStatusLabels, formatOrderCode, getOrderPaymentMethodTitle } from "@/lib/orders";
 import { kurusToLira } from "@/lib/format-money";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 import { NextRequest, NextResponse } from "next/server";
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
         "Fatura Adresi",
       ];
       const rows = allOrders.map((order) => [
-        getOrderCode(order, true),
+        formatOrderCode(order, true),
         formatDateTime(order._creationTime, { dateStyle: "short", timeStyle: "short" }),
         orderStatusLabels[order.status],
         orderPaymentStatusLabels[order.paymentStatus],

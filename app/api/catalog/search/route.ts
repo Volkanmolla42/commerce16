@@ -1,3 +1,4 @@
+import { routes } from "@/lib/storefront-routes";
 import { NextRequest, NextResponse } from "next/server";
 import { getCatalogPage } from "@/lib/catalog/pages";
 import { getCategories } from "@/lib/catalog";
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
     ...catalog.products.slice(0, 5).map((product) => {
       const range = getProductPriceRange(product);
       return { key: `product-${product.slug}`, kind: "product", title: product.title,
-        href: `/product/${encodeURIComponent(product.slug)}`, image: product.images[0]?.url ?? null,
+        href: routes.product(product.slug), image: product.images[0]?.url ?? null,
         price: range.min, maxPrice: range.max };
     }),
   ];

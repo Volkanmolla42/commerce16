@@ -6,6 +6,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -70,14 +71,14 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.5 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.55 0.24 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.85 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --input: oklch(0.62 0 0);
+  --ring: oklch(0.55 0 0);
   --radius: 0.75rem;
 }
 
@@ -97,11 +98,11 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.145 0 0);
   --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  --input: oklch(0.48 0 0);
+  --ring: oklch(0.6 0 0);
 }
 
 @utility no-scrollbar {
@@ -134,7 +135,7 @@
 a,
 input,
 button {
-  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-50 dark:focus-visible:ring-neutral-600 dark:focus-visible:ring-offset-neutral-900;
+  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-700 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-50 dark:focus-visible:ring-neutral-300 dark:focus-visible:ring-offset-neutral-900;
 }
 
 /* Admin colors are scoped to the admin shell; storefront themes remain independent. */
@@ -157,8 +158,8 @@ button {
   --destructive: oklch(0.52 0.19 28);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.88 0 0);
-  --input: oklch(0.84 0 0);
-  --ring: oklch(0.62 0 0);
+  --input: oklch(0.62 0 0);
+  --ring: oklch(0.55 0 0);
 }
 
 :root:has(.admin-theme[data-admin-theme="dark"]) {
@@ -177,11 +178,11 @@ button {
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.145 0 0);
   --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  --input: oklch(0.56 0 0);
+  --ring: oklch(0.65 0 0);
 }
 
 .admin-theme[data-admin-theme="light"] {
@@ -243,29 +244,6 @@ body:has(.admin-theme[data-admin-theme="dark"]) {
   a:active,
   [role="button"]:active {
     transform: none !important;
-  }
-}
-
-::view-transition-group(.product-image-morph) {
-  animation-duration: 380ms;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-}
-
-::view-transition-old(.product-image-morph) {
-  display: none;
-}
-
-::view-transition-new(.product-image-morph) {
-  animation: none;
-  mix-blend-mode: normal;
-  height: 100%;
-  width: 100%;
-  overflow: clip;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(.product-image-morph) {
-    animation-duration: 0s !important;
   }
 }
 

@@ -8,7 +8,7 @@ export function notifyProductAddedToCart() {
   window.dispatchEvent(new Event(PRODUCT_CART_ADDED));
 }
 
-// Animate a disposable image, leaving the gallery and its ViewTransition intact.
+// Animate a disposable image, leaving the gallery intact.
 function flyProductImageToCart(target: HTMLElement, onArrive: () => void) {
   const image = findRenderedElement<HTMLImageElement>(
     "[data-product-gallery-image]",

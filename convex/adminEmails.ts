@@ -5,6 +5,7 @@ import schema from "./schema";
 import { EMAIL_TEMPLATES, type EmailPreviewStore } from "./emails/registry";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 
 /** Gönderilen her e-postanın tarihsel denetim kaydı. Tek yazıcı: emails/send.ts */
 export const recordEmailLog = internalMutation({
@@ -70,7 +71,7 @@ export const listTemplatesAdmin = query({
     const settings = await readStoreSettings(ctx);
     const payments = await readPaymentSettings(ctx);
     const store: EmailPreviewStore = {
-      storeName: settings.storeName,
+      storeName: storeConfig.name,
       storeEmail: settings.email,
       storePhone: settings.phone,
       lowStockThreshold: settings.lowStockThreshold,

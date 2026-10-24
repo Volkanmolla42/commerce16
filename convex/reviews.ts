@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { assertAdminApiSecret } from "./adminAuth";
+import { maskName } from "../lib/mask-name";
 
 const reviewItemValidator = v.object({
   _id: v.id("reviews"),
@@ -17,6 +18,17 @@ const reviewItemValidator = v.object({
   _creationTime: v.number(),
 });
 
+const publicReviewValidator = v.object({
+  _id: v.id("reviews"),
+  productId: v.id("products"),
+  authorName: v.string(),
+  rating: v.number(),
+  title: v.optional(v.string()),
+  content: v.string(),
+  isVerifiedPurchase: v.boolean(),
+  _creationTime: v.number(),
+});
+
 /** Bir ürünün onaylanmış yorumlarını ve özet puan istatistiklerini getirir. */
 export const getByProduct = query({
   args: {
@@ -24,7 +36,7 @@ export const getByProduct = query({
     limit: v.optional(v.number()),
   },
   returns: v.object({
-    reviews: v.array(reviewItemValidator),
+    reviews: v.array(publicReviewValidator),
     averageRating: v.number(),
     reviewCount: v.number(),
     commentCount: v.number(),
@@ -32,13 +44,14 @@ export const getByProduct = query({
   handler: async (ctx, args) => {
     const limit = Math.min(Math.max(args.limit ?? 20, 1), 100);
 
-    const allApproved = await ctx.db
+    const allApproved = (await ctx.db
       .query("reviews")
       .withIndex("by_product_and_status", (q) =>
         q.eq("productId", args.productId).eq("status", "approved")
       )
       .order("desc")
-      .take(100);
+      .take(100))
+      .filter((review) => review.isVerifiedPurchase);
 
     const reviewCount = allApproved.length;
     let sum = 0;
@@ -52,7 +65,16 @@ export const getByProduct = query({
     const averageRating = reviewCount > 0 ? Number((sum / reviewCount).toFixed(1)) : 0;
 
     return {
-      reviews: allApproved.slice(0, limit),
+      reviews: allApproved.slice(0, limit).map((review) => ({
+        _id: review._id,
+        productId: review.productId,
+        authorName: maskName(review.authorName),
+        rating: review.rating,
+        title: review.title,
+        content: review.content,
+        isVerifiedPurchase: review.isVerifiedPurchase,
+        _creationTime: review._creationTime,
+      })),
       averageRating,
       reviewCount,
       commentCount,
@@ -70,12 +92,13 @@ export const getSummary = query({
     reviewCount: v.number(),
   }),
   handler: async (ctx, args) => {
-    const allApproved = await ctx.db
+    const allApproved = (await ctx.db
       .query("reviews")
       .withIndex("by_product_and_status", (q) =>
         q.eq("productId", args.productId).eq("status", "approved")
       )
-      .take(100);
+      .take(100))
+      .filter((review) => review.isVerifiedPurchase);
 
     const reviewCount = allApproved.length;
     if (reviewCount === 0) {
@@ -241,6 +264,10 @@ export const submitOrderReview = mutation({
     const authorName = order.customerName || "Değerli Müşterimiz";
     let savedReviewsCount = 0;
 
+    if (args.productReviews.length === 0 && !args.storeFeedback) {
+      throw new Error("En az bir ürün veya mağaza değerlendirmesi girin.");
+    }
+
     // 1. Ürün Yorumlarını Kaydet (Doğrulanmış Satın Alım Olarak)
     for (const item of args.productReviews) {
       // Siparişte bu ürün var mı doğrula
@@ -248,7 +275,10 @@ export const submitOrderReview = mutation({
       if (!itemInOrder) continue;
 
       const trimmedContent = item.content.trim();
-      const rating = Math.min(5, Math.max(1, Math.round(item.rating)));
+      if (!Number.isInteger(item.rating) || item.rating < 1 || item.rating > 5) {
+        throw new Error("Ürün puanı 1 ile 5 arasında bir tam sayı olmalıdır.");
+      }
+      const rating = item.rating;
 
       if (!trimmedContent || trimmedContent.length < 3) {
         throw new Error("Ürün yorumu en az 3 karakter olmalıdır.");
@@ -289,10 +319,15 @@ export const submitOrderReview = mutation({
     // 2. Alışveriş / Mağaza Deneyimi Geri Bildirimini Kaydet (Sadece Admin / Mağaza İçi Kanal)
     let savedStoreFeedback = false;
     if (args.storeFeedback) {
-      const storeRating = Math.min(5, Math.max(1, Math.round(args.storeFeedback.storeRating)));
-      const deliveryRating = args.storeFeedback.deliveryRating
-        ? Math.min(5, Math.max(1, Math.round(args.storeFeedback.deliveryRating)))
-        : undefined;
+      if (!Number.isInteger(args.storeFeedback.storeRating) || args.storeFeedback.storeRating < 1 || args.storeFeedback.storeRating > 5) {
+        throw new Error("Mağaza puanı 1 ile 5 arasında bir tam sayı olmalıdır.");
+      }
+      if (args.storeFeedback.deliveryRating !== undefined &&
+        (!Number.isInteger(args.storeFeedback.deliveryRating) || args.storeFeedback.deliveryRating < 1 || args.storeFeedback.deliveryRating > 5)) {
+        throw new Error("Teslimat puanı 1 ile 5 arasında bir tam sayı olmalıdır.");
+      }
+      const storeRating = args.storeFeedback.storeRating;
+      const deliveryRating = args.storeFeedback.deliveryRating;
       const comment = args.storeFeedback.comment?.trim() || undefined;
 
       const existingFeedback = await ctx.db

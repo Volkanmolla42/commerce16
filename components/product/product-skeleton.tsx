@@ -5,20 +5,13 @@ import {
   productGalleryClassName,
   productPurchaseBarClassName,
 } from "./product-layout";
-import { Suspense } from "react";
-import { ProductImagePreview } from "./product-image-transition";
-
 export function ProductGallerySkeleton() {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div
         aria-hidden="true"
-        className={`${productGalleryClassName} order-1 bg-muted motion-safe:animate-pulse [&:has(img)]:animate-none`}
-      >
-        <Suspense fallback={null}>
-          <ProductImagePreview />
-        </Suspense>
-      </div>
+        className={`${productGalleryClassName} order-1 bg-muted motion-safe:animate-pulse`}
+      />
       <div
         aria-hidden="true"
         className="flex items-center gap-2 py-1"

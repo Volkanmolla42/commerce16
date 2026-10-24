@@ -1,7 +1,7 @@
-import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationResultValidator } from "convex/server";
-import { getLegalDocuments } from "../lib/legal-documents";
+import { getLegalDocuments, TERMS_VERSION } from "../lib/legal-documents";
 import schema from "./schema";
 import { insertAddress } from "./addresses";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -9,16 +9,17 @@ import { assertAdminApiSecret } from "./adminAuth";
 import { resolveVariantImageUrl } from "./productMedia";
 import { components, internal } from "./_generated/api";
 import { RateLimiter } from "@convex-dev/rate-limiter";
-import type { Id, Doc } from "./_generated/dataModel";
 import { getDistrictById, getProvinceById } from "../lib/turkey-provinces";
-import { commitCouponReservation, quoteCouponForOrder, releaseCouponReservation, reserveCouponForOrder } from "./coupons";
-import { patchCatalogProduct } from "./catalogModel";
+import { quoteCouponForOrder, reserveCouponForOrder } from "./coupons";
 import { readPaymentSettings } from "./payments";
 import { readStoreSettings } from "./settings";
-import { isRevenueOrder, isValidTaxNumber, type OrderStatusUpdate } from "../lib/orders";
+import { getSellerInfo } from "../lib/store-config";
+import { isValidTaxNumber } from "../lib/orders";
 import { getProductVariantTitle } from "../lib/catalog/variants";
 import { quotePromotions } from "../lib/promotions";
 import { getShippingQuote } from "../lib/shipping";
+import { randomHex } from "./random";
+import { adjustInventoryForOrder, changeOrderStatus, publicOrderValidator, toPublicOrder } from "./orders/helpers";
 
 const orderRateLimiter = new RateLimiter(components.rateLimiter, {
   orderByEmail: { kind: "fixed window", rate: 4, period: 60 * 60 * 1000 },
@@ -30,11 +31,9 @@ const orderItemValidator = orderValidator.fields.items.element;
 const orderStatusValidator = orderValidator.fields.status;
 const orderPaymentStatusValidator = orderValidator.fields.paymentStatus;
 
-import { randomHex } from "./random";
-
 export const getMyOrders = query({
   args: {},
-  returns: v.array(orderValidator),
+  returns: v.array(publicOrderValidator),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
@@ -47,7 +46,7 @@ export const getMyOrders = query({
       .order("desc")
       .take(20);
 
-    return orders;
+    return orders.map(toPublicOrder);
   },
 });
 
@@ -143,7 +142,7 @@ export const getOrderById = query({
     id: v.string(),
     token: v.optional(v.string()),
   },
-  returns: v.union(orderValidator, v.null()),
+  returns: v.union(publicOrderValidator, v.null()),
   handler: async (ctx, args) => {
     const orderId = ctx.db.normalizeId("orders", args.id);
     if (!orderId) return null;
@@ -157,7 +156,7 @@ export const getOrderById = query({
       return null;
     }
 
-    return order;
+    return toPublicOrder(order);
   },
 });
 
@@ -172,27 +171,26 @@ export const createOrder = mutation({
     couponCode: v.optional(v.string()),
     provinceId: v.string(),
     districtId: v.string(),
-    shippingAddress: v.optional(v.string()),
+    shippingAddress: v.string(),
     billingType: v.optional(v.union(v.literal("individual"), v.literal("corporate"))),
     companyName: v.optional(v.string()),
     taxOffice: v.optional(v.string()),
     taxNumber: v.optional(v.string()),
     billingAddress: v.optional(v.string()),
-    legalAcceptance: v.optional(v.object({
+    legalAcceptance: v.object({
       accepted: v.literal(true),
-      distanceSalesAgreementVersion: v.optional(v.string()),
-      preInformationFormVersion: v.optional(v.string()),
-    })),
+      distanceSalesAgreementVersion: v.string(),
+      preInformationFormVersion: v.string(),
+      termsVersion: v.string(),
+    }),
     saveAddress: v.optional(
       schema.doc("addresses").pick("title", "city", "district", "provinceId", "districtId", "addressLine1")
         .extend({ isDefault: v.optional(v.boolean()) })
     ),
-    paymentMethod: v.optional(
-      v.union(
-        v.literal("cash_on_delivery"),
-        v.literal("bank_transfer"),
-        v.literal("paytr")
-      )
+    paymentMethod: v.union(
+      v.literal("cash_on_delivery"),
+      v.literal("bank_transfer"),
+      v.literal("paytr")
     ),
   },
   returns: v.object({ orderId: v.id("orders"), accessToken: v.string() }),
@@ -209,8 +207,8 @@ export const createOrder = mutation({
     if (args.customerPhone && args.customerPhone.trim().length > 30) {
       throw new Error("Telefon numarası en fazla 30 karakter olabilir.");
     }
-    if (args.shippingAddress && args.shippingAddress.trim().length > 500) {
-      throw new Error("Teslimat adresi en fazla 500 karakter olabilir.");
+    if (args.shippingAddress.trim().length < 10 || args.shippingAddress.trim().length > 500) {
+      throw new Error("Geçerli bir teslimat adresi gereklidir (10-500 karakter).");
     }
     const billingType = args.billingType ?? "individual";
     const companyName = args.companyName?.trim();
@@ -235,29 +233,36 @@ export const createOrder = mutation({
       throw new Error("Fatura adresi en fazla 500 karakter olabilir.");
     }
     const storeSettings = await readStoreSettings(ctx);
-    let recordedLegalAcceptance = undefined;
-    if (args.legalAcceptance) {
-      const { distanceSalesAgreement: agreement, preInformationForm: preInformation } =
-        getLegalDocuments(storeSettings);
-      if (args.legalAcceptance.accepted !== true ||
-        (args.legalAcceptance.distanceSalesAgreementVersion && args.legalAcceptance.distanceSalesAgreementVersion !== agreement.version) ||
-        (args.legalAcceptance.preInformationFormVersion && args.legalAcceptance.preInformationFormVersion !== preInformation.version)) {
-        throw new Error("Yasal belgeler değişti veya onaylanmadı. Sayfayı yenileyip tekrar kontrol edin.");
-      }
-      recordedLegalAcceptance = {
-        acceptedAt: Date.now(),
-        distanceSalesAgreement: {
-          title: agreement.title,
-          version: agreement.version,
-          body: agreement.body,
-        },
-        preInformationForm: {
-          title: preInformation.title,
-          version: preInformation.version,
-          body: preInformation.body,
-        },
-      };
+    if (!storeSettings.isOpen) {
+      throw new Error("Mağaza şu anda sipariş kabul etmiyor.");
     }
+    const { distanceSalesAgreement: agreement, preInformationForm: preInformation } =
+      getLegalDocuments(getSellerInfo(storeSettings));
+    if (!agreement.ready || !preInformation.ready) {
+      throw new Error("Satıcı bilgileri tamamlanmadığı için sipariş kabul edilemiyor.");
+    }
+    if (
+      args.legalAcceptance.accepted !== true ||
+      args.legalAcceptance.distanceSalesAgreementVersion !== agreement.version ||
+      args.legalAcceptance.preInformationFormVersion !== preInformation.version ||
+      args.legalAcceptance.termsVersion !== TERMS_VERSION
+    ) {
+      throw new Error("Yasal belgeler değişti veya onaylanmadı. Sayfayı yenileyip tekrar kontrol edin.");
+    }
+    const recordedLegalAcceptance = {
+      acceptedAt: Date.now(),
+      distanceSalesAgreement: {
+        title: agreement.title,
+        version: agreement.version,
+        body: agreement.body,
+      },
+      preInformationForm: {
+        title: preInformation.title,
+        version: preInformation.version,
+        body: preInformation.body,
+      },
+      termsVersion: args.legalAcceptance.termsVersion,
+    };
     const emailKey = args.customerEmail.trim().toLowerCase();
     const emailLimit = await orderRateLimiter.limit(ctx, "orderByEmail", { key: emailKey });
     if (!emailLimit.ok) throw new Error("Bu e-posta adresiyle çok sık sipariş başlatıldı. Bir süre sonra tekrar deneyin.");
@@ -352,10 +357,7 @@ export const createOrder = mutation({
         }
         paymentMethodTitle = "Havale / EFT";
       } else if (args.paymentMethod === "paytr") {
-        if (!paymentSettings.paytr.enabled) {
-          throw new Error("PayTR ile ödeme yöntemi şu anda aktif değildir.");
-        }
-        paymentMethodTitle = paymentSettings.paytr.testMode ? "PayTR (Demo)" : "PayTR (Kredi Kartı)";
+        throw new Error("Kart ile ödeme bu sürümde kullanıma açık değildir. Havale/EFT veya kapıda ödemeyi seçin.");
       }
     }
 
@@ -464,149 +466,6 @@ export const createOrder = mutation({
     return { orderId, accessToken };
   },
 });
-
-async function adjustInventoryForOrder(ctx: MutationCtx, order: Doc<"orders">, direction: -1 | 1) {
-  const productDeltas = new Map<string, Map<string, number>>();
-  for (const item of order.items) {
-    const productId = ctx.db.normalizeId("products", item.productId);
-    if (!productId) continue;
-    let variantMap = productDeltas.get(productId);
-    if (!variantMap) {
-      variantMap = new Map();
-      productDeltas.set(productId, variantMap);
-    }
-    const targetKey = item.variantId ?? "";
-    variantMap.set(targetKey, (variantMap.get(targetKey) ?? 0) + item.quantity * direction);
-  }
-
-  for (const [productId, deltas] of productDeltas) {
-    const product = await ctx.db.get(productId as Id<"products">);
-    if (!product || !product.variants) continue;
-    const nextVariants = product.variants.map((v) => {
-      const delta = deltas.get(v.id) ?? (product.variants.length === 1 ? deltas.get("") : undefined);
-      if (delta !== undefined) {
-        return { ...v, stockQuantity: Math.max(0, v.stockQuantity + delta) };
-      }
-      return v;
-    });
-    await patchCatalogProduct(ctx, product, { variants: nextVariants });
-
-    // Stok düşüşü olduğunda kritik stok uyarısı kontrolü
-    for (const v of nextVariants) {
-      const prevV = product.variants.find((cand) => cand.id === v.id);
-      if (prevV && v.stockQuantity < prevV.stockQuantity) {
-        await ctx.scheduler.runAfter(0, internal.lowStock.checkLowStockForVariant, {
-          productId: product._id,
-          variantId: v.id,
-          currentStock: v.stockQuantity,
-          previousStock: prevV.stockQuantity,
-        });
-      }
-    }
-  }
-}
-
-async function syncSoldCount(ctx: MutationCtx, order: Doc<"orders">, delta: number) {
-  for (const item of order.items) {
-    const productId = ctx.db.normalizeId("products", item.productId);
-    if (!productId) continue;
-    const product = await ctx.db.get(productId);
-    if (!product) continue;
-    await ctx.db.patch(productId, {
-      soldCount: Math.max(0, (product.soldCount ?? 0) + delta * item.quantity),
-    });
-  }
-}
-
-async function changeOrderStatus(
-  ctx: MutationCtx,
-  id: Id<"orders">,
-  opts: OrderStatusUpdate
-) {
-  const order = await ctx.db.get(id);
-  if (!order) throw new Error("Sipariş bulunamadı.");
-
-  const targetStatus = opts.status ?? order.status;
-  let targetPaymentStatus = opts.paymentStatus ?? order.paymentStatus;
-
-  // Kapıda ödeme teslim edildiğinde otomatik olarak ödendi ("paid") olarak işaretlenir
-  if (targetStatus === "delivered" && order.paymentMethod === "cash_on_delivery" && targetPaymentStatus === "pending") {
-    targetPaymentStatus = "paid";
-  }
-
-  const statusChanged = targetStatus !== order.status;
-  const paymentStatusChanged = targetPaymentStatus !== order.paymentStatus;
-
-  if (
-    !statusChanged &&
-    !paymentStatusChanged &&
-    opts.carrier === undefined &&
-    opts.trackingNumber === undefined &&
-    opts.trackingUrl === undefined
-  ) {
-    return null;
-  }
-
-  const canceling = order.status !== "cancelled" && targetStatus === "cancelled";
-  const unCanceling = order.status === "cancelled" && targetStatus !== "cancelled";
-
-  if (canceling) {
-    await releaseCouponReservation(ctx, order);
-    // Stok sipariş oluşturulurken rezerve edilmişti; her iptalde geri yüklenir.
-    await adjustInventoryForOrder(ctx, order, 1);
-    for (const item of order.items) {
-      const productId = ctx.db.normalizeId("products", item.productId);
-      if (productId) {
-        await ctx.scheduler.runAfter(0, internal.restock.triggerRestockCheck, {
-          productId,
-          variantId: item.variantId,
-        });
-      }
-    }
-  } else if (unCanceling) {
-    // İptal edilen sipariş tekrar aktif duruma alınırsa stok ve kupon yeniden rezerve edilir.
-    await adjustInventoryForOrder(ctx, order, -1);
-    await reserveCouponForOrder(ctx, order);
-  }
-
-  if (!canceling && ((targetStatus !== "received" && targetStatus !== "cancelled") || targetPaymentStatus === "paid")) {
-    await commitCouponReservation(ctx, order);
-  }
-
-  const patchData: Record<string, unknown> = {
-    status: targetStatus,
-    paymentStatus: targetPaymentStatus,
-    ...(targetPaymentStatus === "paid" && !order.paidAt ? { paidAt: Date.now() } : {}),
-    ...(targetStatus === "shipped" && !order.shippedAt ? { shippedAt: Date.now() } : {}),
-    ...(targetStatus === "delivered" && !order.deliveredAt ? { deliveredAt: Date.now() } : {}),
-  };
-
-  if (opts.carrier !== undefined) patchData.carrier = opts.carrier;
-  if (opts.trackingNumber !== undefined) patchData.trackingNumber = opts.trackingNumber;
-  if (opts.trackingUrl !== undefined) patchData.trackingUrl = opts.trackingUrl;
-
-  await ctx.db.patch(id, patchData);
-
-  const wasRevenue = isRevenueOrder(order);
-  const isRevenue = isRevenueOrder({ status: targetStatus, paymentStatus: targetPaymentStatus });
-  if (wasRevenue !== isRevenue) {
-    await syncSoldCount(ctx, order, isRevenue ? 1 : -1);
-  }
-
-  if (statusChanged || paymentStatusChanged) {
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "payment_confirmed" });
-  }
-  if (statusChanged && targetStatus === "shipped") {
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_shipped" });
-  }
-  if (statusChanged && targetStatus === "cancelled") {
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_cancelled" });
-  }
-  if (statusChanged && targetStatus === "delivered") {
-    await ctx.scheduler.runAfter(0, internal.notifications.sendForOrderScheduled, { orderId: id, event: "order_delivered" });
-  }
-  return null;
-}
 
 export const updateStatus = mutation({
   args: {

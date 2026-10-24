@@ -1,5 +1,10 @@
 import { api } from "@/convex/_generated/api";
-import { ANALYTICS_CONSENT_COOKIE, ANALYTICS_CONSENT_MAX_AGE_SECONDS, createAnalyticsConsentToken } from "@/lib/analytics-consent-server";
+import {
+  ANALYTICS_CONSENT_COOKIE,
+  ANALYTICS_CONSENT_MAX_AGE_SECONDS,
+  createAnalyticsConsentToken,
+  hasValidAnalyticsConsentToken,
+} from "@/lib/analytics-consent-server";
 import { getAdminBackend } from "@/lib/admin/backend";
 import { isSameOriginRequest } from "@/lib/admin/session";
 import { readJsonLimited } from "@/lib/http/read-json-limited";
@@ -40,6 +45,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const { adminSecret } = getAdminBackend();
+    const existingToken = request.cookies.get(ANALYTICS_CONSENT_COOKIE)?.value;
+    if (hasValidAnalyticsConsentToken(existingToken, adminSecret)) {
+      return NextResponse.json({ enabled: true }, { headers: { "Cache-Control": "no-store" } });
+    }
     const response = NextResponse.json({ enabled: true }, { headers: { "Cache-Control": "no-store" } });
     response.cookies.set(ANALYTICS_CONSENT_COOKIE, createAnalyticsConsentToken(adminSecret), {
       httpOnly: true,

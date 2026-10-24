@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { matchesVariantOption } from "@/lib/catalog/variants";
+import { matchesVariantOption, optionQueryKey } from "@/lib/catalog/variants";
 import { ProductOption, ProductVariant } from "@/lib/catalog/types";
 import { useSearchParams } from "next/navigation";
 
@@ -24,16 +24,16 @@ export function VariantSelector({
   }
 
   const selectedValue = (option: ProductOption) =>
-    searchParams.get(option.name.toLocaleLowerCase("tr-TR")) ??
+    searchParams.get(optionQueryKey(option.name)) ??
     selectedVariant?.selectedOptions.find((selected) => selected.name === option.name)?.value ??
     (option.values.length === 1 ? option.values[0] : null);
 
   const updateOption = (name: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    const key = name.toLocaleLowerCase("tr-TR");
+    const key = optionQueryKey(name);
     params.set(key, value);
     for (const option of options) {
-      const optionKey = option.name.toLocaleLowerCase("tr-TR");
+      const optionKey = optionQueryKey(option.name);
       const selected = params.get(optionKey);
       if (optionKey !== key && selected && !matchesVariantOption({ options, variants }, params, option.name, selected)) {
         params.delete(optionKey);
@@ -45,7 +45,7 @@ export function VariantSelector({
 
   return options.map((option) => {
     const activeValue = selectedValue(option);
-    const optionKey = option.name.toLocaleLowerCase("tr-TR");
+    const optionKey = optionQueryKey(option.name);
 
     return (
       <div key={option.id}>

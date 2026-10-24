@@ -1,21 +1,14 @@
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id, TableNames } from "./_generated/dataModel";
+import type { TableNames } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { assertAdminApiSecret } from "./adminAuth";
 import { DEFAULT_LOW_STOCK_THRESHOLD, MAX_LOW_STOCK_THRESHOLD } from "../lib/catalog/low-stock";
 import { DEFAULT_NEW_BADGE_DAYS, MAX_NEW_BADGE_DAYS } from "../lib/catalog/new-badge";
 
-const defaultStoreName = "Mağaza";
-
 const settingsShape = v.object({
-  storeName: v.string(),
-  slogan: v.string(),
-  logoUrl: v.string(),
-  logoStorageId: v.union(v.id("_storage"), v.null()),
   phone: v.string(),
   email: v.string(),
-  address: v.string(),
   announcement: v.string(),
   isOpen: v.boolean(),
   lowStockThreshold: v.number(),
@@ -27,12 +20,8 @@ const settingsShape = v.object({
 });
 
 function withDefaults(settings?: {
-  storeName?: string;
-  slogan?: string;
-  logoStorageId?: Id<"_storage"> | null;
   phone?: string;
   email?: string;
-  address?: string;
   announcement?: string;
   isOpen?: boolean;
   lowStockThreshold?: number;
@@ -43,13 +32,8 @@ function withDefaults(settings?: {
   shippingEstimate?: string;
 } | null) {
   return {
-    storeName: settings?.storeName?.trim() || defaultStoreName,
-    slogan: settings?.slogan ?? "",
-    logoUrl: "",
-    logoStorageId: settings?.logoStorageId ?? null,
     phone: settings?.phone ?? "",
     email: settings?.email ?? "",
-    address: settings?.address ?? "",
     announcement: settings?.announcement ?? "",
     isOpen: settings?.isOpen ?? true,
     lowStockThreshold: settings?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD,
@@ -81,13 +65,7 @@ export async function readStoreSettings(ctx: QueryCtx | MutationCtx) {
 export const getStoreSettings = query({
   args: {},
   returns: settingsShape,
-  handler: async (ctx) => {
-    const base = await readStoreSettings(ctx);
-    if (base.logoStorageId) {
-      base.logoUrl = (await ctx.storage.getUrl(base.logoStorageId)) ?? "";
-    }
-    return base;
-  },
+  handler: async (ctx) => await readStoreSettings(ctx),
 });
 
 export const getBadgeSettings = query({
@@ -108,12 +86,8 @@ function clean(value: string, max: number) {
 export const updateStoreSettings = mutation({
   args: {
     adminSecret: v.string(),
-    storeName: v.string(),
-    slogan: v.string(),
-    logoStorageId: v.union(v.id("_storage"), v.null()),
     phone: v.string(),
     email: v.string(),
-    address: v.string(),
     announcement: v.string(),
     isOpen: v.boolean(),
     lowStockThreshold: v.number(),
@@ -127,18 +101,8 @@ export const updateStoreSettings = mutation({
   handler: async (ctx, args) => {
     assertAdminApiSecret(args.adminSecret);
 
-    const storeName = args.storeName.trim();
-    if (storeName.length < 2 || storeName.length > 80) {
-      throw new Error("Mağaza adı 2 ile 80 karakter arasında olmalı.");
-    }
     const email = clean(args.email, 120);
     if (email && !email.includes("@")) throw new Error("E-posta adresi geçersiz.");
-    if (args.logoStorageId) {
-      const metadata = await ctx.db.system.get("_storage", args.logoStorageId);
-      if (!metadata || !metadata.contentType?.startsWith("image/") || metadata.size <= 0) {
-        throw new Error("Logo görseli bulunamadı.");
-      }
-    }
     if (!Number.isSafeInteger(args.lowStockThreshold) || args.lowStockThreshold < 0 || args.lowStockThreshold > MAX_LOW_STOCK_THRESHOLD) {
       throw new Error(`Düşük stok eşiği 0 ile ${MAX_LOW_STOCK_THRESHOLD} arasında tam sayı olmalı.`);
     }
@@ -152,12 +116,8 @@ export const updateStoreSettings = mutation({
     }
     const shippingEstimate = clean(args.shippingEstimate ?? "", 80);
     const next = {
-      storeName,
-      slogan: clean(args.slogan, 140),
-      logoStorageId: args.logoStorageId,
       phone: clean(args.phone, 40),
       email,
-      address: clean(args.address, 300),
       announcement: clean(args.announcement, 160),
       isOpen: args.isOpen,
       lowStockThreshold: args.lowStockThreshold,
@@ -174,9 +134,6 @@ export const updateStoreSettings = mutation({
       .unique();
 
     if (existing) {
-      if (existing.logoStorageId && existing.logoStorageId !== args.logoStorageId) {
-        await ctx.storage.delete(existing.logoStorageId);
-      }
       await ctx.db.replace(existing._id, {
         key: "store",
         ...next,
@@ -188,12 +145,7 @@ export const updateStoreSettings = mutation({
       });
     }
 
-    return {
-      ...withDefaults(next),
-      logoUrl: args.logoStorageId
-        ? ((await ctx.storage.getUrl(args.logoStorageId)) ?? "")
-        : "",
-    };
+    return withDefaults(next);
   },
 });
 

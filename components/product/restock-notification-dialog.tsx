@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { routes } from "@/lib/storefront-routes";
+import { COOKIE_CONSENT_POLICY_VERSION } from "@/lib/privacy/consent";
 import type { Id } from "@/convex/_generated/dataModel";
 import { BellIcon, CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,7 @@ export function RestockNotificationDialog({
 }: RestockNotificationDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -39,6 +43,11 @@ export function RestockNotificationDialog({
       setMessage("Lütfen geçerli bir e-posta adresi girin.");
       return;
     }
+    if (!consent) {
+      setStatus("error");
+      setMessage("Bildirim oluşturmak için gizlilik politikasını kabul etmeniz gerekir.");
+      return;
+    }
 
     setLoading(true);
     setStatus("idle");
@@ -49,6 +58,8 @@ export function RestockNotificationDialog({
         productId: productId as Id<"products">,
         variantId,
         email,
+        consentVersion: COOKIE_CONSENT_POLICY_VERSION,
+        consentedAt: Date.now(),
       });
 
       setStatus("success");
@@ -102,8 +113,8 @@ export function RestockNotificationDialog({
           </DialogHeader>
 
           {status === "success" ? (
-            <div className="py-4 text-center space-y-3">
-              <div className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 mx-auto">
+            <div role="status" className="py-4 text-center space-y-3">
+              <div className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 mx-auto">
                 <CheckCircleIcon className="size-7" />
               </div>
               <h4 className="text-sm font-semibold text-foreground">
@@ -137,6 +148,7 @@ export function RestockNotificationDialog({
                 <Input
                   id="restock-email-input"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ornek@alanadi.com"
@@ -145,8 +157,26 @@ export function RestockNotificationDialog({
                 />
               </div>
 
+              <label htmlFor="restock-consent" className="flex items-start gap-2 text-[11px] leading-4 text-muted-foreground">
+                <input
+                  id="restock-consent"
+                  type="checkbox"
+                  required
+                  checked={consent}
+                  onChange={(event) => setConsent(event.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                />
+                <span>
+                  E-posta adresimin yalnızca bu ürünün stok bildirimi için{" "}
+                  <Link href={routes.privacyPolicy} className="text-foreground underline underline-offset-2">
+                    Gizlilik Politikası
+                  </Link>{" "}
+                  kapsamında işlenmesini kabul ediyorum.
+                </span>
+              </label>
+
               {status === "error" && (
-                <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   <ExclamationCircleIcon className="size-4 shrink-0" />
                   <span>{message}</span>
                 </div>
@@ -172,8 +202,8 @@ export function RestockNotificationDialog({
                 </Button>
               </div>
 
-              <p className="text-[11px] text-muted-foreground/80 text-center">
-                Bildirim talebinizi dilediğiniz zaman e-postadaki bağlantıdan tek tıkla iptal edebilirsiniz.
+              <p className="text-[11px] text-muted-foreground text-center">
+                Bildirim talebinizi dilediğiniz zaman e-postadaki bağlantıdan iptal edebilirsiniz.
               </p>
             </form>
           )}

@@ -1,35 +1,47 @@
-import type { Category, Menu, Product } from "./types";
 import type { FunctionReturnType } from "convex/server";
+import { routes } from "../storefront-routes";
+import type { Category, Menu, Product } from "./types";
 import { fetchQuery } from "convex/nextjs";
 import { cacheTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
-import { getProductSearchFields, rankSearchItems } from "./smart-search";
 import { getSimilarProducts } from "./recommendations";
 
-type ProductFilters = {
-  category?: string;
-  query?: string;
-  sortKey?: string;
-  reverse?: boolean;
+type CategorySource = {
+  slug: string;
+  title: string;
+  description: string;
+  updatedAt: string;
+  imageUrl?: string | null;
+  attributes?: Category["attributes"];
 };
 
-export type StoreSettings = {
-  storeName: string;
-  slogan: string;
-  logoUrl: string;
-  logoStorageId: string | null;
-  phone: string;
-  email: string;
-  address: string;
-  announcement: string;
-  isOpen: boolean;
-  lowStockThreshold: number;
-  newBadgeDays: number;
-  freeShippingThreshold: number;
-  shippingFee: number;
-  shippingCutoffHour: number;
-  shippingEstimate: string;
-};
+function toCategory(item: CategorySource): Category {
+  return {
+    slug: item.slug,
+    title: item.title,
+    description: item.description,
+    path: routes.category(item.slug),
+    seo: { title: item.title, description: item.description || `${item.title} ürünleri` },
+    updatedAt: item.updatedAt,
+    imageUrl: item.imageUrl,
+    attributes: item.attributes,
+  };
+}
+
+async function collectPages<T>(
+  fetchPage: (cursor: string | null) => Promise<{ page: T[]; continueCursor: string; isDone: boolean }>,
+) {
+  const items: T[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const result = await fetchPage(cursor);
+    items.push(...result.page);
+    if (result.isDone) return items;
+    cursor = result.continueCursor;
+  }
+}
+
+export type StoreSettings = FunctionReturnType<typeof api.settings.getStoreSettings>;
 
 export async function getStoreSettings(): Promise<StoreSettings> {
   "use cache";
@@ -37,65 +49,26 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   return await fetchQuery(api.settings.getStoreSettings, {});
 }
 
-export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
+async function getProducts(): Promise<Product[]> {
   "use cache";
   cacheTag("products");
-  // ponytail: keep fuzzy matching inside the existing 100-product window; add indexed search if that limit grows.
-  const items = await fetchQuery(api.products.list, { limit: 100, ...(filters.category ? { categorySlug: filters.category } : {}) });
-
-  const query = filters.query?.trim();
-  const result = query
-    ? rankSearchItems(items, query, getProductSearchFields)
-    : items;
-
-  if (filters.sortKey === "PRICE") {
-    result.sort((a, b) => Number(a.price) - Number(b.price));
-  }
-
-  return filters.reverse ? result.reverse() : result;
+  return await fetchQuery(api.products.list, { limit: 100 });
 }
 
 export async function getSitemapProducts() {
   "use cache";
   cacheTag("products");
-  const products: { slug: string; updatedAt: string }[] = [];
-  let cursor: string | null = null;
-  let isDone = false;
-
-  while (!isDone) {
-    const result: {
-      page: { slug: string; updatedAt: string }[];
-      continueCursor: string;
-      isDone: boolean;
-    } = await fetchQuery(api.products.listForSitemap, { cursor });
-    products.push(...result.page);
-    cursor = result.continueCursor;
-    isDone = result.isDone;
-  }
-
-  return products;
+  return await collectPages((cursor) => fetchQuery(api.products.listForSitemap, { cursor }));
 }
 
 export async function getGoogleShoppingProducts(): Promise<Product[]> {
   "use cache";
   cacheTag("products");
-  const products: Product[] = [];
-  let cursor: string | null = null;
-  let isDone = false;
-
-  while (!isDone) {
-    const result: FunctionReturnType<typeof api.products.listForGoogleShoppingFeed> = await fetchQuery(api.products.listForGoogleShoppingFeed, {
-      paginationOpts: {
-        numItems: 100,
-        cursor,
-      },
-    });
-    products.push(...result.page);
-    cursor = result.continueCursor;
-    isDone = result.isDone;
-  }
-
-  return products;
+  return await collectPages((cursor) =>
+    fetchQuery(api.products.listForGoogleShoppingFeed, {
+      paginationOpts: { numItems: 100, cursor },
+    }),
+  );
 }
 
 export async function getProduct(slug: string): Promise<Product | undefined> {
@@ -118,16 +91,7 @@ export async function getCategories(): Promise<Category[]> {
   "use cache";
   cacheTag("categories");
   const items = await fetchQuery(api.categories.list, {});
-  const dynamicCategories: Category[] = (items || []).map((c) => ({
-    slug: c.slug,
-    title: c.title,
-    description: c.description,
-    path: `/search/${c.slug}`,
-    seo: { title: c.title, description: c.description || `${c.title} ürünleri` },
-    updatedAt: c.updatedAt,
-    imageUrl: c.imageUrl,
-    attributes: c.attributes,
-  }));
+  const dynamicCategories: Category[] = (items || []).map(toCategory);
 
   return [
     {
@@ -138,7 +102,7 @@ export async function getCategories(): Promise<Category[]> {
         title: "Tüm Ürünler",
         description: "Tüm ürünler",
       },
-      path: "/search",
+      path: routes.search,
       updatedAt: dynamicCategories.map((category) => category.updatedAt).sort().at(-1) ?? "1970-01-01T00:00:00.000Z",
     },
     ...dynamicCategories,
@@ -149,16 +113,7 @@ export async function getCategory(slug: string): Promise<Category | undefined> {
   "use cache";
   cacheTag("categories");
   const item = await fetchQuery(api.categories.getBySlug, { slug });
-  if (!item) return undefined;
-  return {
-    slug: item.slug,
-    title: item.title,
-    description: item.description,
-    path: `/search/${item.slug}`,
-    seo: { title: item.title, description: item.description || `${item.title} ürünleri` },
-    updatedAt: item.updatedAt,
-    attributes: item.attributes,
-  };
+  return item ? toCategory(item) : undefined;
 }
 
 export async function getMenu(): Promise<Menu[]> {

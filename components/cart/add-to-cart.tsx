@@ -5,7 +5,7 @@ import type { Product, ProductVariant } from "@/lib/catalog/types";
 import { useEffect, useRef, useState } from "react";
 import { ShoppingBagIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
-import { getSelectedVariant, getVariantProduct } from "@/lib/catalog/variants";
+import { getProductPurchaseState } from "@/lib/catalog/variants";
 import { burstCartConfetti } from "./cart-confetti";
 import { RestockNotificationDialog } from "@/components/product/restock-notification-dialog";
 
@@ -26,16 +26,13 @@ export function AddToCart({
   const [added, setAdded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  const selectedVariant = variant ?? getSelectedVariant(product, new URLSearchParams());
-  const needsSelection = Boolean(product.variants?.length && !selectedVariant);
-  const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
+  const { selectedVariant, selectedProduct, needsSelection, isAvailable } = getProductPurchaseState(product, variant);
   const cartQuantity = items.find(
     (i) => i.product.id === product.id && i.variantId === selectedVariant?.id
   )?.quantity ?? 0;
   const stockLimit = getItemMaxStock(product.id, selectedVariant?.id);
   const isMaxStockReached = cartQuantity >= stockLimit;
   const canAdd = isAvailable && !isMaxStockReached;
-  const selectedProduct = selectedVariant ? getVariantProduct(product, selectedVariant) : product;
 
   const handleAdd = (origin?: HTMLElement) => {
     if (!canAdd) return;

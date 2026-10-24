@@ -1,16 +1,29 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import {
   ensureAnalyticsConsentCookie,
-  hasAnalyticsConsent,
   revokeAnalyticsConsent,
   trackAnalyticsEvent,
 } from "@/lib/analytics-client";
+import { hasAnalyticsConsent } from "@/lib/privacy/consent";
+
+const productPathPrefix = routes.product("");
 
 function isExcludedPath(pathname: string) {
-  return pathname.startsWith("/admin") || pathname.startsWith("/account") || pathname.startsWith("/api/");
+  return (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith(routes.account) ||
+    pathname.startsWith(routes.checkoutSuccess("")) ||
+    pathname.startsWith("/api/")
+  );
+}
+
+function isProductPath(pathname: string) {
+  return pathname.startsWith(productPathPrefix) && !pathname.slice(productPathPrefix.length).includes("/");
 }
 
 export function AnalyticsProvider() {
@@ -30,7 +43,7 @@ export function AnalyticsProvider() {
     lastTrackedPath.current = path;
     void trackAnalyticsEvent("page_view");
 
-    if (/^\/product\/[^/]+$/.test(path)) void trackAnalyticsEvent("product_view");
+    if (isProductPath(path)) void trackAnalyticsEvent("product_view");
   };
 
   useEffect(() => {

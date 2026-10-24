@@ -30,8 +30,9 @@ async function adminRequest<T>(url: string, options: RequestInit, fallback: stri
 export function useAdminResource<T>(resource: string, params: Record<string, string> = {}): ResourceState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedParamsKey, setLoadedParamsKey] = useState<string | null>(null);
   const paramsKey = JSON.stringify(params);
+  const loading = loadedParamsKey !== paramsKey;
 
   useEffect(() => {
     let ignore = false;
@@ -49,15 +50,14 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
         if (!ignore) {
           setData(payload);
           setError(null);
+          setLoadedParamsKey(paramsKey);
         }
       } catch (cause: unknown) {
         if (!ignore) {
           setData(null);
           setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
+          setLoadedParamsKey(paramsKey);
         }
-      }
-      if (!ignore) {
-        setLoading(false);
       }
     }
 
@@ -70,7 +70,7 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
   }, [resource, paramsKey]);
 
   const refresh = async () => {
-    setLoading(true);
+    setLoadedParamsKey(null);
     try {
       const parsedParams = JSON.parse(paramsKey) as Record<string, string>;
       const search = new URLSearchParams({ resource, ...parsedParams });
@@ -85,7 +85,7 @@ export function useAdminResource<T>(resource: string, params: Record<string, str
       setData(null);
       setError(cause instanceof Error ? cause.message : "Veriler yüklenemedi.");
     }
-    setLoading(false);
+    setLoadedParamsKey(paramsKey);
   };
 
   return { data, error, loading, refresh };

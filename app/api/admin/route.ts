@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
             threshold: lowStock.threshold,
             productCount: lowStock.productCount,
             variantCount: lowStock.variantCount,
+            truncated: lowStock.truncated,
           },
           { headers: { "Cache-Control": "no-store" } },
         );
@@ -179,6 +180,7 @@ export async function GET(request: NextRequest) {
             threshold: lowStock.threshold,
             productCount: lowStock.productCount,
             variantCount: lowStock.variantCount,
+            truncated: lowStock.truncated,
             items: lowStock.page.slice(0, 5),
           },
         },
@@ -359,13 +361,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "settings.update": {
-        const storeName = stringValue(input.storeName, "Mağaza adı");
-        if (storeName.length < 2 || storeName.length > 80) {
-          throw new Error("Mağaza adı 2 ile 80 karakter arasında olmalı.");
-        }
         const text = (value: unknown) =>
           typeof value === "string" ? value : "";
-        const logoStorageId = text(input.logoStorageId);
         const lowStockThreshold = Number(input.lowStockThreshold);
         const newBadgeDays = Number(input.newBadgeDays);
         const freeShippingThreshold = Number(input.freeShippingThreshold);
@@ -378,12 +375,8 @@ export async function POST(request: NextRequest) {
         const shippingEstimate = text(input.shippingEstimate);
         const result = await client.mutation(api.settings.updateStoreSettings, {
           adminSecret,
-          storeName,
-          slogan: text(input.slogan),
-          logoStorageId: (logoStorageId || null) as Id<"_storage"> | null,
           phone: text(input.phone),
           email: text(input.email),
-          address: text(input.address),
           announcement: text(input.announcement),
           isOpen: input.isOpen !== false,
           lowStockThreshold: Number.isSafeInteger(lowStockThreshold) ? lowStockThreshold : DEFAULT_LOW_STOCK_THRESHOLD,
@@ -395,7 +388,6 @@ export async function POST(request: NextRequest) {
         });
         revalidateTag("store-settings", { expire: 0 });
         revalidatePath("/", "layout");
-        revalidatePath("/opengraph-image");
         return NextResponse.json({ success: true, ...result });
       }
       case "payments.update": {

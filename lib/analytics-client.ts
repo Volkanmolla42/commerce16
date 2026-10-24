@@ -1,4 +1,4 @@
-import { COOKIE_CONSENT_POLICY_VERSION, COOKIE_CONSENT_STORAGE_KEY } from "@/lib/privacy/consent";
+import { hasAnalyticsConsent } from "@/lib/privacy/consent";
 
 type AnalyticsEventType =
   | "page_view"
@@ -24,30 +24,6 @@ const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 let consentCookieReady = false;
 let consentCookieSync: Promise<boolean> | null = null;
-
-function hasPrivacySignal() {
-  const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
-  return nav.globalPrivacyControl === true || nav.doNotTrack === "1";
-}
-
-export function hasAnalyticsConsent() {
-  if (typeof window === "undefined" || hasPrivacySignal()) return false;
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY) || "null");
-    return Boolean(
-      value && typeof value === "object" &&
-      "analytics" in value && value.analytics === true &&
-      "policyVersion" in value && value.policyVersion === COOKIE_CONSENT_POLICY_VERSION &&
-      "updatedAt" in value && typeof value.updatedAt === "number",
-    );
-  } catch {
-    return false;
-  }
-}
-
-function createId() {
-  return crypto.randomUUID();
-}
 
 function cleanAttributionValue(value: string | null, maxLength = 100) {
   const cleaned = (value ?? "").trim().replace(/[^\p{L}\p{N}._ -]/gu, "").slice(0, maxLength);
@@ -102,7 +78,7 @@ function getContext(): AnalyticsContext | null {
   if (!hasAnalyticsConsent()) return null;
 
   try {
-    const visitorId = localStorage.getItem(VISITOR_KEY) || createId();
+    const visitorId = localStorage.getItem(VISITOR_KEY) || crypto.randomUUID();
     localStorage.setItem(VISITOR_KEY, visitorId);
 
     const now = Date.now();
@@ -118,7 +94,7 @@ function getContext(): AnalyticsContext | null {
     } catch {
       sessionId = "";
     }
-    if (!sessionId) sessionId = createId();
+    if (!sessionId) sessionId = crypto.randomUUID();
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: sessionId, lastSeenAt: now }));
 
     return { visitorId, sessionId, ...readFirstTouch() };

@@ -1,4 +1,4 @@
-export const FAVORITES_STORAGE_KEY = "commerce16:favorites";
+const FAVORITES_STORAGE_KEY = "commerce16:favorites";
 const MAX_FAVORITES = 100;
 const EMPTY_FAVORITES: string[] = [];
 

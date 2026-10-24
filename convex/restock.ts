@@ -1,3 +1,4 @@
+import { routes } from "../lib/storefront-routes";
 import { RateLimiter } from "@convex-dev/rate-limiter";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
@@ -5,7 +6,7 @@ import { internalAction, internalMutation, mutation, query } from "./_generated/
 import { siteLink } from "./emails/config";
 import { renderRestockEmail } from "./emails/templates/marketing";
 import { sendEmail } from "./emails/send";
-import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   restockSubscribe: { kind: "fixed window", rate: 10, period: 60 * 60 * 1000 },
@@ -32,6 +33,8 @@ export const subscribe = mutation({
     productId: v.id("products"),
     variantId: v.optional(v.string()),
     email: v.string(),
+    consentVersion: v.string(),
+    consentedAt: v.number(),
   },
   returns: v.object({
     ok: v.boolean(),
@@ -40,6 +43,10 @@ export const subscribe = mutation({
   }),
   handler: async (ctx, args) => {
     const email = cleanEmail(args.email);
+    const consentVersion = args.consentVersion.trim();
+    if (!consentVersion || consentVersion.length > 40 || !Number.isFinite(args.consentedAt)) {
+      throw new Error("Gizlilik onayı kaydedilemedi. Lütfen formu yenileyip tekrar deneyin.");
+    }
     const emailHash = await hash(`restock:${email}`);
     await rateLimiter.limit(ctx, "restockSubscribe", { key: emailHash, throws: true });
 
@@ -95,6 +102,9 @@ export const subscribe = mutation({
       variantId: args.variantId,
       status: "pending",
       unsubscribeToken,
+      consentVersion,
+      consentedAt: args.consentedAt,
+      consentSource: "restock_dialog",
     });
 
     return {
@@ -216,8 +226,8 @@ export const sendRestockEmailAction = internalAction({
         productTitle: data.productTitle,
         variantTitle: data.variantTitle,
         price: data.price,
-        productUrl: siteLink(`/product/${data.productSlug}`),
-        unsubscribeUrl: siteLink("/restock/unsubscribe", { token: data.sub.unsubscribeToken }),
+        productUrl: siteLink(routes.product(data.productSlug)),
+        unsubscribeUrl: siteLink(routes.restockUnsubscribe, { token: data.sub.unsubscribeToken }),
       }),
       idempotencyKey: `restock/${data.sub._id}`,
       metadata: { subscriptionId: data.sub._id, productId: data.productId },
@@ -263,7 +273,6 @@ export const claimForNotification = internalMutation({
       ? product.variants?.find((candidate) => candidate.id === sub.variantId) ?? null
       : null;
 
-    const { storeName } = await readStoreSettings(ctx);
     await ctx.db.patch(sub._id, { status: "sending" });
 
     return {
@@ -277,7 +286,7 @@ export const claimForNotification = internalMutation({
       productSlug: product.slug,
       variantTitle: variant?.title && variant.title !== "Default Title" ? variant.title : null,
       price: variant?.price ?? product.variants?.[0]?.price ?? String(product.priceValue),
-      storeName,
+      storeName: storeConfig.name,
     };
   },
 });

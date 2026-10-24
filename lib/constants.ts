@@ -1,4 +1,4 @@
-export type SortFilterItem = {
+type SortFilterItem = {
   title: string;
   slug: string | null;
   sortKey: "RELEVANCE" | "BEST_SELLING" | "CREATED_AT" | "PRICE";
@@ -19,7 +19,7 @@ export const sorting: SortFilterItem[] = [
     slug: "trending-desc",
     sortKey: "BEST_SELLING",
     reverse: false,
-  }, // asc
+  },
   {
     title: "En yeniler",
     slug: "latest-desc",
@@ -31,7 +31,7 @@ export const sorting: SortFilterItem[] = [
     slug: "price-asc",
     sortKey: "PRICE",
     reverse: false,
-  }, // asc
+  },
   {
     title: "Fiyat: Yüksekten düşüğe",
     slug: "price-desc",

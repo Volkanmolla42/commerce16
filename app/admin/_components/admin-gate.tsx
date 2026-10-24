@@ -3,13 +3,11 @@
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { storeConfig } from "@/lib/store-config";
 
 export function AdminGate() {
-  const storeSettings = useQuery(api.settings.getStoreSettings, {});
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +50,7 @@ export function AdminGate() {
               <LockClosedIcon className="size-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">{storeSettings?.storeName || "Mağaza"}</p>
+              <p className="text-sm font-semibold text-foreground">{storeConfig.name}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">Yönetim paneli</p>
             </div>
           </div>

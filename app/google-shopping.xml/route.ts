@@ -1,5 +1,7 @@
-import { getGoogleShoppingProducts, getStoreSettings } from "@/lib/catalog";
+import { routes } from "@/lib/storefront-routes";
+import { getGoogleShoppingProducts } from "@/lib/catalog";
 import { formatMoney } from "@/lib/format-money";
+import { storeConfig } from "@/lib/store-config";
 import { baseUrl } from "@/lib/utils";
 
 function cleanCdata(text: string): string {
@@ -24,16 +26,13 @@ function getProductDescription(title: string, price: string, attributes?: { key:
 }
 
 export async function GET() {
-  const [settings, products] = await Promise.all([
-    getStoreSettings(),
-    getGoogleShoppingProducts(),
-  ]);
+  const products = await getGoogleShoppingProducts();
 
-  const storeName = settings.storeName;
+  const storeName = storeConfig.name;
   const storeUrl = baseUrl;
 
   const itemsXml = products.map((product) => {
-    const productUrl = new URL(`/product/${product.slug}`, baseUrl).toString();
+    const productUrl = new URL(routes.product(product.slug), baseUrl).toString();
     const images = product.images.map((img) => img.url).filter(Boolean);
     const mainImage = images[0] || "";
     const additionalImages = images.slice(1, 10);
@@ -67,7 +66,7 @@ ${barcode ? `      <g:gtin>${barcode}</g:gtin>\n` : ""}${sku ? `      <g:mpn>${s
   <channel>
     <title><![CDATA[${cleanCdata(storeName)}]]></title>
     <link>${storeUrl}</link>
-    <description><![CDATA[${cleanCdata(settings.slogan || `${storeName} Ürün Kataloğu`)}]]></description>
+    <description><![CDATA[${cleanCdata(storeConfig.description)}]]></description>
 ${itemsXml}
   </channel>
 </rss>`;

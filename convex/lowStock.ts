@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
-import { readStoreSettings, resolveLowStockThreshold } from "./settings";
+import { resolveLowStockThreshold } from "./settings";
+import { storeConfig } from "../lib/store-config";
 import { adminAlertTo, adminLink } from "./emails/config";
 import { renderLowStockEmail } from "./emails/templates/alerts";
 import { sendEmail } from "./emails/send";
@@ -72,7 +73,7 @@ export const sendLowStockAlertAction = internalAction({
         variantTitle,
         currentStock: args.currentStock,
         threshold: args.threshold,
-        adminInventoryUrl: adminLink("inventory"),
+        adminInventoryUrl: adminLink("stok"),
       }),
       idempotencyKey: `low-stock/${args.productId}/${args.variantId ?? "default"}/${args.currentStock}`,
       metadata: { productId: args.productId, variantId: args.variantId ?? null },
@@ -113,12 +114,10 @@ export const getAlertDetails = internalQuery({
       ? product.variants?.find((candidate) => candidate.id === args.variantId) || null
       : null;
 
-    const { storeName } = await readStoreSettings(ctx);
-
     return {
       productTitle: product.title,
       variantTitle: variant?.title && variant.title !== "Default Title" ? variant.title : null,
-      storeName,
+      storeName: storeConfig.name,
     };
   },
 });

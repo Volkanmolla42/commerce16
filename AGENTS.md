@@ -97,6 +97,7 @@ For multi-step tasks, state a brief plan:
 - **Barrel Exports (Re-exports) are FORBIDDEN:** Import components and modules directly from their source files; never use index re-export files (`index.ts`).
 - **Passthrough / Trampoline Wrappers are FORBIDDEN:** Never create intermediate wrappers whose sole purpose is forwarding props/arguments to another function or component; call the underlying function or component directly.
 - **Non-Functional / Empty UI Elements are FORBIDDEN:** Every letter, word, button, div, card, and UI component shown to the user must serve a concrete purpose and function. Never add empty decorative elements, filler copy, or non-functional widgets; everything displayed must provide clear user value.
+- **Lazy Removals & "Optional" Hacks are STRICTLY FORBIDDEN:** When removing a feature, prop, type definition, schema field, or database column, NEVER choose the lazy path of making it optional (`?`) or nullable to avoid updating callers. If something is to be removed, fully eradicate it across all schemas, types, components, and callers. Never leave behind temporary workarounds, zombie code, or technical debt.
 
 ### Operational Safety & Git Rules
 - **Destructive Git Commands are FORBIDDEN:** Never run commands like `git checkout`, `git add -u`, or anything that blindly affects the entire workspace.

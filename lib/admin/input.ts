@@ -114,6 +114,9 @@ function productOptionsValue(value: unknown) {
   });
   if (options.length > 3) throw new Error("En fazla 3 varyant seçeneği eklenebilir.");
   if (options.some((option) => !option.name || option.name.length > 40)) throw new Error("Seçenek adı 1-40 karakter olmalı.");
+  if (new Set(options.map((option) => option.id)).size !== options.length) {
+    throw new Error("Varyant seçeneği kimlikleri birbirinden farklı olmalı.");
+  }
   if (new Set(options.map((option) => option.name.toLocaleLowerCase("tr-TR"))).size !== options.length) {
     throw new Error("Varyant seçeneklerinin adları birbirinden farklı olmalı.");
   }
@@ -173,11 +176,12 @@ function validateProductVariants(
   if (options.length > 0 && variants.length === 0) throw new Error("En az bir satılabilir varyant kombinasyonu ekleyin.");
   const combinations = new Set<string>();
   const skus = new Set<string>();
+  const ids = new Set<string>();
   for (const variant of variants) {
-    priceValue(variant.price, "Varyant fiyatı");
-    const sku = productSkuValue(variant.sku);
-    if (!sku) throw new Error("Her varyant için ayrı bir SKU girin.");
-    const normalizedSku = sku.toLocaleUpperCase("en-US");
+    if (ids.has(variant.id)) throw new Error("Varyant kimlikleri birbirinden farklı olmalı.");
+    ids.add(variant.id);
+    if (!variant.sku) throw new Error("Her varyant için ayrı bir SKU girin.");
+    const normalizedSku = variant.sku.toLocaleUpperCase("en-US");
     if (skus.has(normalizedSku)) throw new Error("Her varyantın SKU kodu birbirinden farklı olmalı.");
     skus.add(normalizedSku);
     if (variant.selectedOptions.length !== options.length || new Set(variant.selectedOptions.map((selected) => selected.name.toLocaleLowerCase("tr-TR"))).size !== options.length) throw new Error("Varyant seçenekleri eksik.");

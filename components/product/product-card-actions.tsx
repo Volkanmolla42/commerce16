@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { EyeIcon } from "@heroicons/react/24/outline";
 import { QuickViewDialog } from "./quick-view-dialog";
 import { useCart } from "@/components/cart/cart-context";
-import { setQuickBuyItem } from "@/components/cart/quick-buy-store";
+import { useQuickBuy } from "@/components/cart/quick-buy-store";
 import { burstCartConfetti } from "@/components/cart/cart-confetti";
 import { notifyProductAddedToCart } from "@/components/cart/product-cart-feedback";
 import { getVariantProduct } from "@/lib/catalog/variants";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 
 export function ProductCardActions({ product }: { product: Product }) {
-  const router = useRouter();
+  const startQuickBuy = useQuickBuy();
   const { addItem } = useCart();
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
 
@@ -58,12 +57,7 @@ export function ProductCardActions({ product }: { product: Product }) {
     }
 
     const { configuredProduct, itemVariant } = resolveConfiguredProduct(variant);
-    setQuickBuyItem({
-      product: configuredProduct,
-      quantity: 1,
-      variantId: itemVariant?.id,
-    });
-    router.push("/checkout?mode=quick-buy");
+    startQuickBuy(configuredProduct, itemVariant?.id);
   };
 
   return (

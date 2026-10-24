@@ -40,24 +40,28 @@ export function StarRating({
   }[size];
 
   return (
-    <div className="inline-flex items-center gap-1.5" aria-label={`Puan: ${rating} / ${maxRating}`}>
-      <div className="flex items-center gap-0.5">
+    <div className="inline-flex items-center gap-1.5">
+      <div
+        className="flex items-center gap-0.5"
+        role={interactive ? "group" : "img"}
+        aria-label={`Puan: ${rating} / ${maxRating}${reviewCount ? `, ${reviewCount} değerlendirme` : ""}`}
+      >
         {Array.from({ length: maxRating }, (_, index) => {
           const starValue = index + 1;
           const isFilled = activeRating >= starValue;
           const isHalf = !isFilled && activeRating >= starValue - 0.5;
 
           const starIcon = isFilled ? (
-            <StarSolid className={`${sizeClasses} text-amber-400`} />
+            <StarSolid className={`${sizeClasses} text-amber-600 dark:text-amber-400`} />
           ) : isHalf ? (
             <span className="relative inline-block">
-              <StarOutline className={`${sizeClasses} text-neutral-300 dark:text-neutral-600`} />
+              <StarOutline className={`${sizeClasses} text-neutral-500 dark:text-neutral-400`} />
               <span className="absolute inset-0 overflow-hidden w-1/2">
-                <StarSolid className={`${sizeClasses} text-amber-400`} />
+                <StarSolid className={`${sizeClasses} text-amber-600 dark:text-amber-400`} />
               </span>
             </span>
           ) : (
-            <StarOutline className={`${sizeClasses} text-neutral-300 dark:text-neutral-600`} />
+            <StarOutline className={`${sizeClasses} text-neutral-500 dark:text-neutral-400`} />
           );
 
           if (!interactive) {

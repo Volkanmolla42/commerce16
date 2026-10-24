@@ -1,10 +1,13 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import {
   getMetaPixelId,
   initMetaPixel,
+  revokeMarketingConsent,
   trackPixelPageView,
 } from "@/lib/analytics/meta-pixel";
 import { hasMarketingConsent } from "@/lib/privacy/consent";
@@ -12,7 +15,12 @@ import { hasMarketingConsent } from "@/lib/privacy/consent";
 function isExcludedPath(pathname: string) {
   return (
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/account") ||
+    pathname.startsWith(routes.account) ||
+    pathname.startsWith(routes.checkoutSuccess("")) ||
+    pathname.startsWith(routes.search) ||
+    pathname.startsWith(routes.cart) ||
+    pathname.startsWith("/sepet-hatirlatmalari") ||
+    pathname.startsWith("/stok-bildirimi") ||
     pathname.startsWith("/api/")
   );
 }
@@ -22,6 +30,7 @@ function trackCurrentPath(path: string | null, lastTrackedRef: { current: string
   if (!pixelId || !path || isExcludedPath(path)) return;
   if (!hasMarketingConsent()) {
     lastTrackedRef.current = null;
+    revokeMarketingConsent();
     return;
   }
   if (lastTrackedRef.current === path) return;
@@ -48,6 +57,7 @@ export function MetaPixelProvider() {
         trackCurrentPath(pathname, lastTrackedPath);
       } else {
         lastTrackedPath.current = null;
+        revokeMarketingConsent();
       }
     };
 

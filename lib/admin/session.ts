@@ -1,6 +1,6 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
+import { hmacSha256, safeEqual } from "../crypto";
 
 export const ADMIN_COOKIE_NAME = "commerce_admin_session";
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
@@ -21,19 +21,8 @@ export function isAdminAuthConfigured() {
   );
 }
 
-function constantTimeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  return (
-    leftBuffer.length === rightBuffer.length &&
-    timingSafeEqual(leftBuffer, rightBuffer)
-  );
-}
-
 function signAdminSession(expiresAt: number) {
-  return createHmac("sha256", adminApiSecret())
-    .update(`commerce-admin-session:v1:${adminPin()}:${expiresAt}`)
-    .digest("hex");
+  return hmacSha256(adminApiSecret(), `commerce-admin-session:v1:${adminPin()}:${expiresAt}`);
 }
 
 export function getAdminSessionToken(now = Date.now()) {
@@ -53,7 +42,7 @@ function isValidAdminSessionToken(value: string, now = Date.now()) {
     !Number.isSafeInteger(expiresAt) || expiresAt <= now ||
     expiresAt > now + ADMIN_SESSION_MAX_AGE_SECONDS * 1000 + 60_000 ||
     !/^[a-f0-9]{64}$/.test(signature ?? "")) return false;
-  return constantTimeEqual(signature, signAdminSession(expiresAt));
+  return safeEqual(signature, signAdminSession(expiresAt));
 }
 
 export function isValidAdminPin(value: unknown) {
@@ -61,7 +50,7 @@ export function isValidAdminPin(value: unknown) {
     isAdminAuthConfigured() &&
     typeof value === "string" &&
     /^\d{6}$/.test(value) &&
-    constantTimeEqual(value, adminPin())
+    safeEqual(value, adminPin())
   );
 }
 

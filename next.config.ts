@@ -1,12 +1,17 @@
+import { routes } from "./lib/storefront-routes";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.104", "192.168.1.*"],
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    agentUpgrade: "security",
+  },
   reactCompiler: true,
   images: {
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 31536000,
     remotePatterns: [
       {
         protocol: "https",
@@ -21,8 +26,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/account",
-        destination: "/account/orders",
+        source: routes.account,
+        destination: routes.accountOrders,
         permanent: false,
       },
     ];

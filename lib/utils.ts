@@ -16,7 +16,7 @@ interface SiteUrlSource {
  * Tüm mutlak site adreslerinin tek kaynağı. Vercel, `VERCEL_PROJECT_PRODUCTION_URL`
  * değişkenini kendisi verdiği için env tanımlanmasa bile üretim domain'i bulunur.
  */
-export function resolveBaseUrl(source: SiteUrlSource): string {
+function resolveBaseUrl(source: SiteUrlSource): string {
   const configured =
     source.NEXT_PUBLIC_SITE_URL?.trim() ||
     source.SITE_URL?.trim() ||

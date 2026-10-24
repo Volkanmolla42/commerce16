@@ -11,9 +11,9 @@ import {
   PhotoIcon,
 } from "@heroicons/react/24/outline";
 import { ProductBadges } from "./product-badges";
-import { ProductImageTransition } from "./product-image-transition";
 import { productGalleryClassName } from "./product-layout";
-import { getSelectedVariant, getVariantForImage } from "@/lib/catalog/variants";
+import { cn } from "@/lib/utils";
+import { getSelectedVariant, getVariantForImage, optionQueryKey } from "@/lib/catalog/variants";
 import type { Product, ProductVariant } from "@/lib/catalog/types";
 
 const ProductLightbox = dynamic(() => import("./product-lightbox"), { ssr: false });
@@ -23,6 +23,7 @@ interface GalleryProps {
   defaultVariant?: ProductVariant;
   selectedVariant?: ProductVariant;
   onSelectVariant?: (variant: ProductVariant) => void;
+  sizes?: string;
 }
 
 export function Gallery({
@@ -30,6 +31,7 @@ export function Gallery({
   defaultVariant,
   selectedVariant,
   onSelectVariant,
+  sizes,
 }: GalleryProps) {
   const searchParams = useSearchParams();
   const images = product.images ?? [];
@@ -74,7 +76,7 @@ export function Gallery({
     const matched = getVariantForImage(product, images[newIndex]);
     if (matched) {
       const params = new URLSearchParams(window.location.search);
-      matched.selectedOptions.forEach((opt) => params.set(opt.name.toLocaleLowerCase("tr-TR"), opt.value));
+      matched.selectedOptions.forEach((opt) => params.set(optionQueryKey(opt.name), opt.value));
       window.history.replaceState(null, "", `?${params.toString()}`);
       onSelectVariant?.(matched);
     }
@@ -102,17 +104,24 @@ export function Gallery({
             className="group absolute inset-0 cursor-zoom-in"
             aria-label="Görseli büyüt"
           >
-            <ProductImageTransition productId={product.id}>
+            {images.map((image, index) => (
               <Image
-                data-product-gallery-image
-                src={activeImage.url}
-                alt={product.title}
+                key={image.url}
+                data-product-gallery-image={index === activeIndex ? "" : undefined}
+                src={image.url}
+                alt={index === activeIndex ? product.title : ""}
                 fill
-                sizes="(min-width: 1024px) 45vw, 100vw"
-                className="object-contain"
-                preload={true}
+                sizes={sizes ?? "(min-width: 1024px) 540px, (min-width: 768px) 50vw, 100vw"}
+                className={cn(
+                  "object-contain transition-opacity duration-200 ease-out",
+                  index === activeIndex
+                    ? "opacity-100 z-10"
+                    : "opacity-0 pointer-events-none z-0"
+                )}
+                preload={index === 0}
+                loading={index === 0 ? undefined : "eager"}
               />
-            </ProductImageTransition>
+            ))}
 
             {/* Büyüteç Lensi */}
             {zoomActive ? (

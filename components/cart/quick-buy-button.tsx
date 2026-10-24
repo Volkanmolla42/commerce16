@@ -1,30 +1,22 @@
 "use client";
 
 import type { Product, ProductVariant } from "@/lib/catalog/types";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
-import { setQuickBuyItem } from "./quick-buy-store";
-import { getSelectedVariant, getVariantProduct } from "@/lib/catalog/variants";
+import { useQuickBuy } from "./quick-buy-store";
+import { getProductPurchaseState } from "@/lib/catalog/variants";
 
 export function QuickBuyButton({ product, variant, buttonVariant = "default" }: { product: Product; variant?: ProductVariant; buttonVariant?: "default" | "outline" }) {
-  const router = useRouter();
+  const startQuickBuy = useQuickBuy();
   const [isNavigating, setIsNavigating] = useState(false);
-  const selectedVariant = variant ?? getSelectedVariant(product, new URLSearchParams());
-  const needsSelection = Boolean(product.variants?.length && !selectedVariant);
-  const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
+  const { selectedVariant, selectedProduct, needsSelection, isAvailable } = getProductPurchaseState(product, variant);
 
   const handleQuickBuy = () => {
     if (!isAvailable || isNavigating) return;
 
-    setQuickBuyItem({
-      product: selectedVariant ? getVariantProduct(product, selectedVariant) : product,
-      quantity: 1,
-      variantId: selectedVariant?.id,
-    });
     setIsNavigating(true);
-    router.push("/checkout?mode=quick-buy");
+    startQuickBuy(selectedProduct, selectedVariant?.id);
   };
 
   return (

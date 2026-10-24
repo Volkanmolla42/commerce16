@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useConvexAuth } from "@convex-dev/auth/react";
@@ -110,11 +112,11 @@ export function ProductQuestions({ productId }: { productId: string }) {
               Sorular hesabınıza bağlanır; adınız ve e-posta adresiniz otomatik olarak kullanılır.
             </p>
             <Button asChild variant="outline" size="sm" className="mt-4">
-              <Link href="/login">Giriş Yap</Link>
+              <Link href={routes.login}>Giriş Yap</Link>
             </Button>
           </div>
         ) : success ? (
-          <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+          <div role="status" className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
               <CheckCircleIcon className="size-5" aria-hidden="true" />
               Sorunuz alındı
@@ -145,7 +147,11 @@ export function ProductQuestions({ productId }: { productId: string }) {
               </div>
             </div>
             <p className="text-[11px] leading-4 text-muted-foreground">
-              Adınız ve e-postanız hesabınızdan alınır; e-posta adresiniz yayınlanmaz.
+              Adınız ve e-postanız hesabınızdan alınır; e-posta adresiniz yayınlanmaz. Verilerinizin işlenmesi hakkında{" "}
+              <Link href={routes.privacyPolicy} className="text-foreground underline underline-offset-2">
+                Gizlilik Politikası
+              </Link>{" "}
+              geçerlidir.
             </p>
 
             <div className="space-y-1.5">
@@ -161,7 +167,7 @@ export function ProductQuestions({ productId }: { productId: string }) {
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="Ürünle ilgili merak ettiğinizi yazın..."
-                className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
 

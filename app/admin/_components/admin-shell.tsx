@@ -34,11 +34,9 @@ import {
   ChevronDownIcon,
   ArrowRightStartOnRectangleIcon,
 } from "@heroicons/react/24/outline";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { ADMIN_BASE_PATH, adminPath } from "@/lib/admin/routes";
 import { AdminHeaderContext } from "./admin-header-action";
-import StoreInitial from "@/components/store-initial";
+import { storeConfig } from "@/lib/store-config";
 
 type NavLink = {
   label: string;
@@ -184,7 +182,7 @@ function AdminNavLinks({
               aria-expanded={isOpen}
               className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer ${!isOpen && hasActiveChild
                 ? "text-primary bg-accent/40"
-                : "text-muted-foreground/80 hover:bg-accent/40 hover:text-foreground"
+                : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                 }`}
             >
               <span className="flex items-center gap-2">
@@ -193,7 +191,7 @@ function AdminNavLinks({
               </span>
               <ChevronDownIcon
                 aria-hidden="true"
-                className={`size-3.5 text-muted-foreground/70 transition-transform duration-200 ${isOpen ? "rotate-0" : "-rotate-90"
+                className={`size-3.5 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-0" : "-rotate-90"
                   }`}
               />
             </button>
@@ -264,9 +262,6 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
   const pageTitle = pathname === adminPath("products/import")
     ? "İçe Aktar"
     : allNavItems.find((item) => isActive(pathname, item.href))?.label ?? "Yönetim paneli";
-  const storeSettings = useQuery(api.settings.getStoreSettings, {});
-  const storeName = storeSettings?.storeName || "Mağaza";
-  const logoUrl = storeSettings?.logoUrl || "";
 
   const [lastPathname, setLastPathname] = useState(pathname);
   if (pathname !== lastPathname) {
@@ -283,8 +278,8 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
   }, []);
 
   const logoBadge = (
-    <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-      {logoUrl ? <Image src={logoUrl} alt={storeName} width={32} height={32} unoptimized className="size-8 object-contain" /> : <StoreInitial storeName={storeName} size="xs" />}
+    <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white">
+      <Image src={storeConfig.logo} alt={storeConfig.name} width={32} height={32} className="size-8 object-contain" />
     </span>
   );
 
@@ -349,7 +344,7 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
               {logoBadge}
             </Link>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-foreground">{storeName}</span>
+              <span className="block truncate text-sm font-semibold text-foreground">{storeConfig.name}</span>
               <Link
                 href="/"
                 target="_blank"
@@ -417,7 +412,7 @@ export function AdminShell({ children, initialTheme }: { children: ReactNode; in
                   <span className="flex min-w-0 items-center gap-2">
                     {logoBadge}
                     <span className="min-w-0">
-                      <DialogTitle className="truncate text-sm font-semibold text-foreground">{storeName}</DialogTitle>
+                      <DialogTitle className="truncate text-sm font-semibold text-foreground">{storeConfig.name}</DialogTitle>
                       <Link
                         href="/"
                         target="_blank"

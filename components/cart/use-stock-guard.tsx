@@ -10,7 +10,7 @@ import { cartLineKey, type CartItem, type CartStore } from "./cart-store";
 
 /**
  * Sepetteki her satırı canlı stokla doğrular: tükenenleri kaldırır, aşan adetleri kırpıp
- * kullanıcıyı modal ile uyarır.getItemMaxStock; buton ve sepet adet kontrollerinin ortak kaynağıdır.
+ * kullanıcıyı modal ile uyarır. Buton ve sepet adet kontrollerinin ortak kaynağıdır.
  */
 export function useStockGuard(items: CartItem[], store: CartStore) {
   const [alertItems, setAlertItems] = useState<RemovedCartItem[]>([]);

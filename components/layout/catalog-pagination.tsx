@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -7,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { createUrl } from "@/lib/utils";
 
 export function CatalogPagination({ continueCursor, isDone, count }: { continueCursor: string; isDone: boolean; count: number }) {
-  const pathname = usePathname() ?? "/search";
+  const pathname = usePathname() ?? routes.search;
   const searchParams = useSearchParams();
   const [previousPages, setPreviousPages] = useState(() => new Map<string, string>());
   const cursor = searchParams.get("cursor");

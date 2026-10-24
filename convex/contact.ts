@@ -4,7 +4,7 @@ import { internalAction, internalQuery, mutation } from "./_generated/server";
 import { adminAlertTo } from "./emails/config";
 import { renderContactEmail } from "./emails/templates/alerts";
 import { sendEmail } from "./emails/send";
-import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -18,6 +18,8 @@ export const submitContactMessage = mutation({
     phone: v.optional(v.string()),
     subject: v.string(),
     message: v.string(),
+    consentVersion: v.string(),
+    consentedAt: v.number(),
   },
   returns: v.object({
     success: v.boolean(),
@@ -45,6 +47,10 @@ export const submitContactMessage = mutation({
     if (cleanMessage.length < 5 || cleanMessage.length > 3000) {
       throw new Error("Lütfen en az 5 karakterlik bir mesaj yazınız (maksimum 3000 karakter).");
     }
+    const consentVersion = args.consentVersion.trim();
+    if (!consentVersion || consentVersion.length > 40 || !Number.isFinite(args.consentedAt)) {
+      throw new Error("Gizlilik onayı kaydedilemedi. Lütfen formu yenileyip tekrar deneyin.");
+    }
 
     // Basit spam önleme: son 60 saniye içinde aynı e-postadan mesaj varsa beklet
     const now = Date.now();
@@ -64,6 +70,8 @@ export const submitContactMessage = mutation({
       subject: cleanSubject,
       message: cleanMessage,
       status: "new",
+      consentVersion,
+      consentedAt: args.consentedAt,
     });
 
     // Yöneticiye anlık e-posta uyarısı tetikle
@@ -101,8 +109,6 @@ export const getContactMessageDetails = internalQuery({
     const message = await ctx.db.get(args.messageId);
     if (!message) return null;
 
-    const { storeName } = await readStoreSettings(ctx);
-
     return {
       message: {
         name: message.name,
@@ -112,7 +118,7 @@ export const getContactMessageDetails = internalQuery({
         message: message.message,
         _creationTime: message._creationTime,
       },
-      storeName,
+      storeName: storeConfig.name,
     };
   },
 });

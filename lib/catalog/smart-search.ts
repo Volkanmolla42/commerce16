@@ -1,20 +1,24 @@
+import { normalizeSearchText } from "../text";
 import type { Product } from "./types";
 
 const SYNONYM_GROUPS = [
-  ["fincan", "kupa", "mug", "cup"],
-  ["kahve", "coffee"],
-  ["ayakkabi", "shoe", "shoes", "footwear", "sneaker"],
-  ["giyim", "clothing", "apparel"],
-  ["canta", "bag", "handbag"],
-  ["tisort", "tshirt", "tee"],
-  ["pantolon", "trousers", "pants"],
-  ["ceket", "jacket", "coat"],
-  ["kapuson", "kapusonlu", "hoodie", "hoodies", "sweatshirt", "sweatshirts"],
-  ["elbise", "dress"],
-  ["etek", "skirt"],
-  ["bot", "boot", "boots"],
+  ["kolye", "necklace", "pendant"],
+  ["yüzük", "ring", "rings"],
+  ["küpe", "earring", "earrings"],
+  ["bileklik", "bracelet"],
+  ["bilezik", "bangle", "cuff"],
+  ["broş", "brooch"],
+  ["halhal", "anklet"],
+  ["takı", "jewelry", "jewellery"],
+  ["gümüş", "silver"],
+  ["altın", "gold"],
+  ["çelik", "steel"],
+  ["taş", "stone", "gemstone"],
+  ["inci", "pearl"],
+  ["zirkon", "zircon"],
+  ["set", "takım"],
   ["aksesuar", "accessory", "accessories"],
-  ["seramik", "ceramic"],
+  ["hediye", "gift"],
 ];
 
 const SUFFIXES = [
@@ -22,17 +26,6 @@ const SUFFIXES = [
   "dan", "den", "tan", "ten", "ina", "ine", "una", "une", "si", "su", "yi", "yu",
   "in", "un", "de", "da",
 ];
-
-export function normalizeSearchText(value: string) {
-  return value
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\bt[-\s]+shirt\b/g, "tshirt")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
 
 function stemToken(token: string) {
   for (const suffix of SUFFIXES) {

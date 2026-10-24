@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import {
   getProductPriceRange,
   getSelectedVariant,
+  optionQueryKey,
 } from "@/lib/catalog/variants";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { DeliveryEstimate } from "./delivery-estimate";
@@ -49,7 +50,7 @@ export function ProductDescription({
     )
     : undefined;
   const hasPartialSelection = (product.options ?? []).some((option) =>
-    searchParams.get(option.name.toLocaleLowerCase("tr-TR")) !== null);
+    searchParams.get(optionQueryKey(option.name)) !== null);
   const selectedVariant = getSelectedVariant(product, searchParams) ?? (hasPartialSelection ? undefined : defaultVariant);
   const availability = useQuery(api.products.getAvailability, {
     productId: product.id as Id<"products">,

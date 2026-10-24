@@ -35,7 +35,7 @@ type ProductPriceSource = {
   }[];
 };
 
-function optionQueryKey(name: string) {
+export function optionQueryKey(name: string) {
   return name.toLocaleLowerCase("tr-TR");
 }
 
@@ -99,6 +99,22 @@ export function getDefaultVariant(product: Product): ProductVariant | undefined 
   const candidates = sellable.length > 0 ? sellable : available.length > 0 ? available : variants;
   return candidates.reduce((cheapest, variant) =>
     Number(variant.price) < Number(cheapest.price) ? variant : cheapest);
+}
+
+export function getProductPurchaseState(
+  product: Product,
+  variant?: ProductVariant,
+  params: Pick<URLSearchParams, "get"> = new URLSearchParams(),
+) {
+  const selectedVariant = variant ?? getSelectedVariant(product, params);
+  const needsSelection = Boolean(product.variants?.length && !selectedVariant);
+  const isAvailable = product.availableForSale && !needsSelection && (selectedVariant?.availableForSale ?? true);
+  return {
+    selectedVariant,
+    selectedProduct: selectedVariant ? getVariantProduct(product, selectedVariant) : product,
+    needsSelection,
+    isAvailable,
+  };
 }
 
 export function getProductUnitPrice(product: Product, variantId?: string): string {

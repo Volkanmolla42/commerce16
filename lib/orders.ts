@@ -1,4 +1,6 @@
-export const ORDER_STATUS_CONFIG = {
+import { turkishPhoneDigits } from "./phone";
+
+const ORDER_STATUS_CONFIG = {
   received: {
     label: "Sipariş Alındı",
     step: 0,
@@ -20,7 +22,7 @@ export const ORDER_STATUS_CONFIG = {
 export type OrderStatus = keyof typeof ORDER_STATUS_CONFIG;
 export const ORDER_STATUS_KEYS = Object.keys(ORDER_STATUS_CONFIG) as OrderStatus[];
 
-export const ORDER_PAYMENT_STATUS_CONFIG = {
+const ORDER_PAYMENT_STATUS_CONFIG = {
   pending: {
     label: "Ödeme Bekliyor",
   },
@@ -88,29 +90,16 @@ export const CARRIER_OPTIONS = [
 ] as const;
 
 /**
- * Verilen sipariş kimliğinden (Convex _id veya string) kullanıcı dostu
- * 8 haneli büyük harfli kısa sipariş kodunu türetir (Örn: "258G7TBY" veya "#258G7TBY").
+ * Verilen sipariş kimliğinden kullanıcı dostu 8 haneli büyük harfli kısa
+ * sipariş kodunu türetir (Örn: "258G7TBY" veya "#258G7TBY").
  */
-export function formatOrderCode(orderId?: string | null, prefix = false): string {
-  if (!orderId) return "";
-  const cleaned = String(orderId).trim();
+export function formatOrderCode(order?: { _id: string } | string | null, prefix = false): string {
+  if (!order) return "";
+  const value = typeof order === "string" ? order : order._id;
+  const cleaned = value.trim();
   if (!cleaned) return "";
   const code = cleaned.slice(-8).toUpperCase();
   return prefix ? `#${code}` : code;
-}
-
-/**
- * Sipariş ID'sinden görüntülenecek sipariş kodunu üretir.
- */
-export function getOrderCode(
-  order?: { _id: string } | string | null,
-  prefix = false
-): string {
-  if (!order) return "";
-  if (typeof order === "string") {
-    return formatOrderCode(order, prefix);
-  }
-  return formatOrderCode(order._id, prefix);
 }
 
 /**
@@ -133,16 +122,9 @@ export function getOrderPaymentMethodTitle(
  * Telefon numarasını Türkiye/uluslararası standarda normalize edip WhatsApp doğrudan sohbet bağlantısı üretir.
  */
 export function formatWhatsAppUrl(phone?: string | null, message?: string): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "").replace(/^00/, "");
-  if (!digits) return null;
-  const formatted = digits.startsWith("0")
-    ? `90${digits.slice(1)}`
-    : digits.startsWith("90")
-      ? digits
-      : `90${digits}`;
-  if (!/^90\d{10}$/.test(formatted)) return null;
-  const base = `https://wa.me/${formatted}`;
+  const digits = turkishPhoneDigits(phone);
+  if (digits.length !== 10) return null;
+  const base = `https://wa.me/90${digits}`;
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
 
@@ -153,19 +135,13 @@ export function formatWhatsAppUrl(phone?: string | null, message?: string): stri
  */
 export function formatPhone(phone?: string | null): string {
   if (!phone) return "";
-  const trimmed = phone.trim();
-  const digits = trimmed.replace(/\D/g, "");
+  const raw = phone.trim();
+  const rawDigits = raw.replace(/\D/g, "");
+  const digits = turkishPhoneDigits(raw);
+  if (digits.length !== 10) return raw;
 
-  if (digits.length === 10) {
-    return `0 (${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
-  }
-  if (digits.length === 11 && digits.startsWith("0")) {
-    return `0 (${digits.slice(1, 4)}) ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9, 11)}`;
-  }
-  if (digits.length === 12 && digits.startsWith("90")) {
-    return `+90 (${digits.slice(2, 5)}) ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10, 12)}`;
-  }
-  return trimmed;
+  const prefix = rawDigits.length === 12 && rawDigits.startsWith("90") ? "+90" : "0";
+  return `${prefix} (${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
 }
 
 
@@ -207,7 +183,7 @@ export function resolveCarrierTrackingUrl(
   return null;
 }
 
-export interface OrderPriceBreakdown {
+interface OrderPriceBreakdown {
   itemsSubtotal: number;
   couponDiscount: number;
   promotionDiscount: number;
@@ -267,7 +243,7 @@ export function getOrderPriceBreakdown(order?: {
   };
 }
 
-export const BILLING_TYPE_CONFIG = {
+const BILLING_TYPE_CONFIG = {
   individual: {
     label: "Bireysel",
   },
@@ -276,14 +252,13 @@ export const BILLING_TYPE_CONFIG = {
   },
 } as const;
 
-export type BillingType = keyof typeof BILLING_TYPE_CONFIG;
+type BillingType = keyof typeof BILLING_TYPE_CONFIG;
 export const BILLING_TYPE_KEYS = Object.keys(BILLING_TYPE_CONFIG) as BillingType[];
-export const billingTypeLabels = toLabelMap(BILLING_TYPE_CONFIG);
 
 /**
  * 11 haneli T.C. Kimlik Numarası (TCKN) doğrulaması.
  */
-export function isValidTCKN(tckn: string): boolean {
+function isValidTCKN(tckn: string): boolean {
   const clean = tckn.trim();
   if (!/^[1-9]\d{10}$/.test(clean)) return false;
   const digits = clean.split("").map(Number);
@@ -298,7 +273,7 @@ export function isValidTCKN(tckn: string): boolean {
 /**
  * 10 haneli Vergi Kimlik Numarası (VKN) doğrulaması (GİB algoritması).
  */
-export function isValidVKN(vkn: string): boolean {
+function isValidVKN(vkn: string): boolean {
   const clean = vkn.trim();
   if (!/^\d{10}$/.test(clean)) return false;
   const digits = clean.split("").map(Number);

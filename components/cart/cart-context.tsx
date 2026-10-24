@@ -4,7 +4,9 @@ import { createContext, useContext, useEffect, useRef, useState, useSyncExternal
 import { useMutation } from "convex/react";
 import { cartStore, type CartItem, type CartStore } from "./cart-store";
 import { getProductUnitPrice } from "@/lib/catalog/variants";
+import { toKurus } from "@/lib/format-money";
 import { getCartRecoverySessionKey } from "./recovery-store";
+import { hasFunctionalConsent } from "@/lib/privacy/consent";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useStockGuard } from "./use-stock-guard";
@@ -67,9 +69,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalAmount = items.reduce((sum, item) => sum + Math.round(Number(getProductUnitPrice(item.product, item.variantId)) * 100) * item.quantity, 0) / 100;
+  const totalAmount = items.reduce(
+    (sum, item) => sum + toKurus(getProductUnitPrice(item.product, item.variantId)) * item.quantity,
+    0,
+  ) / 100;
 
   useEffect(() => {
+    if (!hasFunctionalConsent()) return;
     let sessionKey: string | null;
     try {
       sessionKey = getCartRecoverySessionKey(items.length > 0) ?? lastSessionKey.current;
@@ -106,7 +112,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CartContext.Provider value={{ ...store, addItem, replaceItem, removeItem, clearCart, updateQuantity, getItemMaxStock, items, totalCount, totalAmount, removedItem, restoreLastRemoved }}>
+    <CartContext.Provider
+      value={{
+        addItem,
+        replaceItem,
+        removeItem,
+        clearCart,
+        updateQuantity,
+        getItemMaxStock,
+        items,
+        totalCount,
+        totalAmount,
+        removedItem,
+        restoreLastRemoved,
+      }}
+    >
       {children}
       {alert}
     </CartContext.Provider>

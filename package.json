@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "generate:brand": "node scripts/generate-brand-assets.mjs",
     "doctor": "npx -y react-doctor@latest --json --json-out react-doctor-report.json --yes --no-score --blocking none ."
   },
   "dependencies": {
@@ -28,9 +29,10 @@
     "clsx": "^2.1.1",
     "convex": "^1.47.0",
     "geist": "^1.7.2",
-    "next": "^16.4.0",
+    "next": "^16.4.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "sharp": "^0.35.5",
     "tailwind-merge": "^3.7.0",
     "xlsx": "^0.18.5",
     "yet-another-react-lightbox": "^3.32.2"

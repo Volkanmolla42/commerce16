@@ -10,11 +10,11 @@ export type CatalogFilters = {
 export type CategoryAttributeFilter = { values: string[]; min: string; max: string };
 export type CategoryAttributeFilters = Record<string, CategoryAttributeFilter>;
 
-export function getProductAttributeValue(product: Product, key: string) {
+function getProductAttributeValue(product: Product, key: string) {
   return product.attributes?.find((attribute) => attribute.key === key)?.value;
 }
 
-export function getProductAttributeValues(product: Product, definition: CategoryAttributeDefinition) {
+function getProductAttributeValues(product: Product, definition: CategoryAttributeDefinition) {
   const value = getProductAttributeValue(product, definition.key);
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) return value.map(String);
@@ -59,9 +59,9 @@ function getProductPrice(product: Product) {
   return Number.isFinite(price) ? price : null;
 }
 
-export function matchesOptionFilters(product: Product, options?: Record<string, string[]>) {
+function matchesOptionFilters(product: Product, options?: Record<string, string[]>) {
   if (!options) return true;
-  const activeEntries = Object.entries(options).filter(([, vals]) => Array.isArray(vals) && vals.length > 0);
+  const activeEntries = Object.entries(options).filter(([, vals]) => vals.length > 0);
   if (activeEntries.length === 0) return true;
 
   const variants = product.variants ?? [];
@@ -77,8 +77,7 @@ export function matchesOptionFilters(product: Product, options?: Record<string, 
   // A product matches if it has at least one in-stock / available variant matching every selected option dimension
   return variants.some((variant) => {
     if (variant.availableForSale === false) return false;
-    const rawStock = (variant as unknown as { stockQuantity?: number }).stockQuantity;
-    if (typeof rawStock === "number" && rawStock <= 0) return false;
+    if (typeof variant.stockQuantity === "number" && variant.stockQuantity <= 0) return false;
 
     return activeEntries.every(([name, selectedValues]) => {
       const match = variant.selectedOptions.find(
@@ -103,9 +102,7 @@ export function matchesCatalogFilters(product: Product, filters: CatalogFilters)
 }
 
 export function getActiveCatalogFilterCount(filters: CatalogFilters) {
-  const optionsCount = filters.options
-    ? Object.values(filters.options).reduce((sum, vals) => sum + (Array.isArray(vals) ? vals.length : 0), 0)
-    : 0;
+  const optionsCount = Object.values(filters.options ?? {}).reduce((sum, vals) => sum + vals.length, 0);
   return (
     Number(filters.minPrice !== "") +
     Number(filters.maxPrice !== "") +
@@ -113,7 +110,7 @@ export function getActiveCatalogFilterCount(filters: CatalogFilters) {
   );
 }
 
-export type OptionKind = "size" | "color" | "general";
+type OptionKind = "size" | "color" | "general";
 
 const SIZE_OPTION_REGEX = /^(beden|size|numara|boyut|ebat)$/i;
 const COLOR_OPTION_REGEX = /^(renk|color)$/i;
@@ -125,7 +122,7 @@ export function getOptionKind(name: string): OptionKind {
   return "general";
 }
 
-export const STANDARD_SIZES = [
+const STANDARD_SIZES = [
   "xxs", "xs", "s", "m", "l", "xl", "2xl", "xxl", "3xl", "xxxl", "4xl", "5xl",
 ];
 

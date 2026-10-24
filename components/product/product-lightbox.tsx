@@ -1,14 +1,11 @@
 "use client";
 
 import Lightbox from "yet-another-react-lightbox";
-import Zoom from "yet-another-react-lightbox/plugins/zoom";
-import Counter from "yet-another-react-lightbox/plugins/counter";
 import type { Product, ProductImage } from "@/lib/catalog/types";
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { BoltIcon, ShoppingBagIcon } from "@heroicons/react/24/outline";
 import { useCart } from "@/components/cart/cart-context";
-import { setQuickBuyItem } from "@/components/cart/quick-buy-store";
+import { useQuickBuy } from "@/components/cart/quick-buy-store";
 import {
   getVariantForImage,
   getVariantProduct,
@@ -16,6 +13,7 @@ import {
 } from "@/lib/catalog/variants";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/counter.css";
+import { lightboxOptions } from "./lightbox-options";
 
 export default function ProductLightbox({
   images,
@@ -32,7 +30,7 @@ export default function ProductLightbox({
 }) {
   const activeIndex = useRef(index);
   const [currentIndex, setCurrentIndex] = useState(index);
-  const router = useRouter();
+  const startQuickBuy = useQuickBuy();
   const { addItem } = useCart();
 
   return (
@@ -41,27 +39,12 @@ export default function ProductLightbox({
       close={() => onClose(activeIndex.current)}
       index={index}
       slides={images.map((image) => ({ src: image.url, alt: title }))}
-      plugins={[Zoom, Counter]}
-      zoom={{ scrollToZoom: true, maxZoomPixelRatio: 3 }}
-      carousel={{ finite: images.length === 1, preload: 1, padding: 16 }}
-      controller={{ closeOnBackdropClick: true, aria: true }}
+      {...lightboxOptions(images.length, "Ürün görselleri")}
       on={{
         view: ({ index }) => {
           activeIndex.current = index;
           setCurrentIndex(index);
         },
-      }}
-      labels={{
-        Close: "Görseli kapat",
-        Next: "Sonraki görsel",
-        Previous: "Önceki görsel",
-        "Zoom in": "Yakınlaştır",
-        "Zoom out": "Uzaklaştır",
-        Lightbox: "Ürün görselleri",
-        "Photo gallery": "Ürün görselleri",
-        Slide: "Görsel",
-        Carousel: "Galeri",
-        "{index} of {total}": "{index} / {total}",
       }}
       render={{
         iconError: () => <span className="text-sm text-neutral-300">Görsel yüklenemedi</span>,
@@ -83,8 +66,7 @@ export default function ProductLightbox({
 
           const quickBuy = () => {
             if (!available) return;
-            setQuickBuyItem({ product: selectedProduct, quantity: 1, variantId: variant.id });
-            router.push("/checkout?mode=quick-buy");
+            startQuickBuy(selectedProduct, variant.id);
           };
 
           return (
@@ -118,7 +100,6 @@ export default function ProductLightbox({
           );
         },
       }}
-      styles={{ container: { backgroundColor: "rgba(10, 10, 10, 0.98)" } }}
     />
   );
 }

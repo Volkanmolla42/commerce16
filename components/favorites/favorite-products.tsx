@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
@@ -41,7 +43,7 @@ export function FavoriteProducts() {
             size="lg"
             className="mt-6 rounded-2xl font-semibold shadow-md"
           >
-            <Link href="/search">Ürünlere göz at</Link>
+            <Link href={routes.search}>Ürünlere göz at</Link>
           </Button>
         </Card>
       )}

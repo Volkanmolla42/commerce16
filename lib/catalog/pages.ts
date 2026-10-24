@@ -58,8 +58,15 @@ export async function getAdminProductPage(params: CatalogSearchParams) {
     adminSecret,
     availability: availability === "active" || availability === "inactive" ? availability : "all",
   });
-  return { items: result.page.map(({ id, ...item }) => ({ _id: id, ...item, images: item.images.map(({ url }) => url) })),
-    continueCursor: result.continueCursor, isDone: result.isDone };
+  return {
+    items: result.page.map(({ id, ...item }) => ({
+      _id: id,
+      ...item,
+      images: item.images.map(({ url }) => url),
+    })),
+    continueCursor: result.continueCursor,
+    isDone: result.isDone,
+  };
 }
 
 export async function getAdminProductStats() {

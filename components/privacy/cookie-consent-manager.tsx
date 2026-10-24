@@ -1,23 +1,25 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
-import { COOKIE_CONSENT_POLICY_VERSION, COOKIE_CONSENT_STORAGE_KEY } from "@/lib/privacy/consent";
-
-type Consent = {
-  necessary: true;
-  preferences: boolean;
-  analytics: boolean;
-  marketing: boolean;
-  policyVersion: string;
-  updatedAt: number;
-};
+import { clearRecentProducts } from "@/lib/catalog/recommendations";
+import { clearRecentSearches } from "@/lib/catalog/search-history";
+import {
+  COOKIE_CONSENT_POLICY_VERSION,
+  COOKIE_CONSENT_STORAGE_KEY,
+  parseConsent,
+  readConsentRaw,
+  setConsentMemory,
+  type CookieConsent,
+} from "@/lib/privacy/consent";
 
 const categories = [
-  { key: "preferences", title: "İşlevsel", description: "Dil ve benzeri tercihleri hatırlar." },
-  { key: "analytics", title: "Analitik", description: "Mağaza kullanımını ölçmeye yardımcı olur." },
-  { key: "marketing", title: "Pazarlama", description: "İlgi alanlarına uygun kampanya ölçümü sağlar." },
+  { key: "functional", title: "İşlevsel", description: "Son görüntülenen ürünleri ve aramaları hatırlar." },
+  { key: "analytics", title: "Analitik", description: "Mağaza kullanımını takma adlı kimliklerle ölçmeye yardımcı olur." },
+  { key: "marketing", title: "Pazarlama", description: "Meta Pixel ile reklam ölçümü yapılmasını sağlar." },
 ] as const;
 
 const CONSENT_NOT_READ = undefined;
@@ -31,47 +33,19 @@ function subscribeConsent(onChange: () => void) {
   };
 }
 
-function readStoredConsent() {
-  try {
-    return localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function decodeConsent(rawValue: string | null): Consent | null {
-  try {
-    const value: unknown = JSON.parse(rawValue || "null");
-    if (!value || typeof value !== "object") return null;
-    const consent = value as Partial<Consent>;
-    if (consent.policyVersion !== COOKIE_CONSENT_POLICY_VERSION || typeof consent.updatedAt !== "number") return null;
-    if ([consent.preferences, consent.analytics, consent.marketing].some((item) => typeof item !== "boolean")) return null;
-    return {
-      necessary: true,
-      preferences: consent.preferences!,
-      analytics: consent.analytics!,
-      marketing: consent.marketing!,
-      policyVersion: COOKIE_CONSENT_POLICY_VERSION,
-      updatedAt: consent.updatedAt,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export function CookieConsentManager() {
-  const storedConsent = useSyncExternalStore(subscribeConsent, readStoredConsent, () => CONSENT_NOT_READ);
+  const storedConsent = useSyncExternalStore(subscribeConsent, readConsentRaw, () => CONSENT_NOT_READ);
   const consentWasRead = storedConsent !== CONSENT_NOT_READ;
-  const [memoryConsent, setMemoryConsent] = useState<Consent | null>(null);
-  const consent = memoryConsent ?? (consentWasRead ? decodeConsent(storedConsent) : null);
+  const [memoryConsent, setMemoryConsent] = useState<CookieConsent | null>(null);
+  const consent = memoryConsent ?? (consentWasRead ? parseConsent(storedConsent) : null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [draft, setDraft] = useState({ preferences: false, analytics: false, marketing: false });
+  const [draft, setDraft] = useState({ functional: false, analytics: false, marketing: false });
 
   useEffect(() => {
     const openPreferences = () => {
-      const saved = memoryConsent ?? decodeConsent(readStoredConsent());
+      const saved = memoryConsent ?? parseConsent(readConsentRaw());
       setDraft({
-        preferences: saved?.preferences ?? false,
+        functional: saved?.functional ?? false,
         analytics: saved?.analytics ?? false,
         marketing: saved?.marketing ?? false,
       });
@@ -83,14 +57,19 @@ export function CookieConsentManager() {
   }, [memoryConsent]);
 
   const save = (next: typeof draft) => {
-    const saved: Consent = { necessary: true, ...next, policyVersion: COOKIE_CONSENT_POLICY_VERSION, updatedAt: Date.now() };
+    const saved: CookieConsent = { necessary: true, ...next, policyVersion: COOKIE_CONSENT_POLICY_VERSION, updatedAt: Date.now() };
+    setConsentMemory(saved);
+    setMemoryConsent(saved);
     try {
       localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(saved));
-      window.dispatchEvent(new Event("commerce-cookie-consent-change"));
     } catch {
-      // The selection remains active in this tab when browser storage is unavailable.
-      setMemoryConsent(saved);
+      // The in-memory consent keeps this tab functional when storage is unavailable.
     }
+    if (!next.functional) {
+      clearRecentProducts();
+      clearRecentSearches();
+    }
+    window.dispatchEvent(new Event("commerce-cookie-consent-change"));
     setDraft(next);
     setPreferencesOpen(false);
   };
@@ -103,26 +82,38 @@ export function CookieConsentManager() {
         <div className="max-w-xl space-y-1">
           <h2 className="text-sm font-semibold text-foreground">Çerez tercihleri</h2>
           <p className="text-xs leading-5 text-muted-foreground">
-            Zorunlu çerezler mağazanın çalışması için kullanılır. Diğer kategorileri seçebilir, tercihinizi daha sonra değiştirebilirsiniz. <Link href="/privacy-policy" className="underline underline-offset-4">Gizlilik politikası</Link>
+            Zorunlu çerezler mağazanın çalışması için kullanılır. İşlevsel, analitik ve pazarlama izinlerini seçebilir, tercihinizi daha sonra değiştirebilirsiniz.{" "}
+            <Link href={routes.privacyPolicy} className="underline underline-offset-4">Gizlilik politikası</Link>
+            {" · "}
+            <Link href={routes.cookiePolicy} className="underline underline-offset-4">Çerez politikası</Link>
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {!preferencesOpen ? (
-            <>
-              <Button type="button" size="sm" variant="outline" onClick={() => save({ preferences: false, analytics: false, marketing: false })}>Tümünü reddet</Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => {
-                setDraft({ preferences: consent?.preferences ?? false, analytics: consent?.analytics ?? false, marketing: consent?.marketing ?? false });
-                setPreferencesOpen(true);
-              }}>Tercihleri yönet</Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => save({ preferences: true, analytics: true, marketing: true })}>Tümünü kabul et</Button>
-            </>
-          ) : (
-            <Button type="button" size="sm" variant="outline" onClick={() => setPreferencesOpen(false)}>Kapat</Button>
-          )}
+            <Button type="button" size="sm" variant="outline" onClick={() => save({ functional: false, analytics: false, marketing: false })}>Tümünü reddet</Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-expanded={preferencesOpen}
+            aria-controls="cookie-preferences-panel"
+            onClick={() => {
+              if (!preferencesOpen) {
+                setDraft({ functional: consent?.functional ?? false, analytics: consent?.analytics ?? false, marketing: consent?.marketing ?? false });
+              }
+              setPreferencesOpen(!preferencesOpen);
+            }}
+          >
+            {preferencesOpen ? "Tercihleri kapat" : "Tercihleri yönet"}
+          </Button>
+          {!preferencesOpen ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => save({ functional: true, analytics: true, marketing: true })}>Tümünü kabul et</Button>
+          ) : null}
         </div>
       </div>
       {preferencesOpen && (
-        <div className="mt-4 space-y-3 border-t border-border pt-4">
+        <div id="cookie-preferences-panel" className="mt-4 space-y-3 border-t border-border pt-4">
           <label className="flex items-start justify-between gap-4 rounded-lg bg-muted/40 p-3 text-sm">
             <span><span className="block font-medium text-foreground">Zorunlu</span><span className="mt-1 block text-xs text-muted-foreground">Sepet ve güvenlik için gereklidir; kapatılamaz.</span></span>
             <input type="checkbox" checked readOnly aria-label="Zorunlu çerezler her zaman açık" className="mt-1 h-4 w-4 accent-primary" />
@@ -140,7 +131,7 @@ export function CookieConsentManager() {
             </label>
           ))}
           <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => save({ preferences: false, analytics: false, marketing: false })}>Tümünü reddet</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => save({ functional: false, analytics: false, marketing: false })}>Tümünü reddet</Button>
             <Button type="button" size="sm" onClick={() => save(draft)}>Seçimi kaydet</Button>
           </div>
         </div>

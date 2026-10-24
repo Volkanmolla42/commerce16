@@ -1,3 +1,5 @@
+import { normalizeTurkishText } from "../text";
+import { hasFunctionalConsent } from "../privacy/consent";
 import type { Product } from "./types";
 
 const RECENT_PRODUCTS_KEY = "commerce_recent_products_v1";
@@ -16,12 +18,12 @@ function readRecentProducts(): string[] {
 }
 
 export function getRecentProductSlugs(): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !hasFunctionalConsent()) return [];
   return readRecentProducts();
 }
 
 export function recordRecentProduct(slug: string) {
-  if (typeof window === "undefined" || !slug) return;
+  if (typeof window === "undefined" || !slug || !hasFunctionalConsent()) return;
   const recent = [slug, ...readRecentProducts().filter((item) => item !== slug)].slice(0, MAX_RECENT_PRODUCTS);
   try {
     localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(recent));
@@ -29,6 +31,14 @@ export function recordRecentProduct(slug: string) {
     // Recommendations still work from the current cart when storage is unavailable.
   }
   window.dispatchEvent(new Event(RECENT_PRODUCTS_EVENT));
+}
+
+export function clearRecentProducts() {
+  try {
+    localStorage.removeItem(RECENT_PRODUCTS_KEY);
+  } catch {
+    // Storage may be unavailable; nothing else to clear.
+  }
 }
 
 function similarity(source: Product, candidate: Product) {
@@ -44,7 +54,7 @@ function similarity(source: Product, candidate: Product) {
   }
 
   if (source.options?.length && candidate.options?.length) {
-    const normalize = (value: string) => value.trim().toLocaleLowerCase("tr-TR");
+    const normalize = (value: string) => normalizeTurkishText(value.trim());
     const sourceValues = new Set(source.options.flatMap((option) => option.values.map(normalize)));
     if (candidate.options.some((option) => option.values.some((value) => sourceValues.has(normalize(value))))) score += 1;
   }

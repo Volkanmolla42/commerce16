@@ -178,6 +178,7 @@ export default defineSchema({
         version: v.string(),
         body: v.string(),
       }),
+      termsVersion: v.optional(v.string()),
     })),
     paymentMethod: v.optional(v.union(
       v.literal("cash_on_delivery"),
@@ -283,12 +284,8 @@ export default defineSchema({
 
   storeSettings: defineTable({
     key: v.literal("store"),
-    storeName: v.string(),
-    slogan: v.optional(v.string()),
-    logoStorageId: v.optional(v.union(v.id("_storage"), v.null())),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
-    address: v.optional(v.string()),
     announcement: v.optional(v.string()),
     isOpen: v.optional(v.boolean()),
     lowStockThreshold: v.optional(v.number()),
@@ -321,6 +318,13 @@ export default defineSchema({
     .index("by_user_and_slug", ["userId", "productSlug"])
     .index("by_product_slug", ["productSlug"]),
 
+  legalAcceptances: defineTable({
+    userId: v.id("users"),
+    termsVersion: v.string(),
+    privacyVersion: v.string(),
+    acceptedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   passwordChangeCodes: defineTable({
     userId: v.id("users"),
     codeHash: v.string(),
@@ -334,6 +338,9 @@ export default defineSchema({
     variantId: v.optional(v.string()),
     status: v.union(v.literal("pending"), v.literal("sending"), v.literal("notified"), v.literal("cancelled")),
     unsubscribeToken: v.string(),
+    consentVersion: v.optional(v.string()),
+    consentedAt: v.optional(v.number()),
+    consentSource: v.optional(v.string()),
   })
     .index("by_product_and_variant", ["productId", "variantId"])
     .index("by_product_and_variant_and_status", ["productId", "variantId", "status"])
@@ -358,6 +365,8 @@ export default defineSchema({
     subject: v.string(),
     message: v.string(),
     status: v.union(v.literal("new"), v.literal("read"), v.literal("replied")),
+    consentVersion: v.optional(v.string()),
+    consentedAt: v.optional(v.number()),
   })
     .index("by_status", ["status"])
     .index("by_email", ["email"]),

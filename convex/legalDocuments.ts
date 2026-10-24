@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getLegalDocuments, type LegalDocument } from "../lib/legal-documents";
+import { getSellerInfo } from "../lib/store-config";
 import { readStoreSettings } from "./settings";
 
 const documentValidator = v.object({
@@ -21,8 +22,8 @@ export const getCheckoutDocuments = query({
     preInformationForm: documentValidator,
   }),
   handler: async (ctx) => {
-    const { storeName, address, email, phone } = await readStoreSettings(ctx);
-    const documents = getLegalDocuments({ storeName, address, email, phone });
+    const settings = await readStoreSettings(ctx);
+    const documents = getLegalDocuments(getSellerInfo(settings));
     return {
       distanceSalesAgreement: checkoutMeta(documents.distanceSalesAgreement),
       preInformationForm: checkoutMeta(documents.preInformationForm),

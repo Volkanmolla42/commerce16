@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -7,7 +9,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 import { StarRating } from "./star-rating";
 import { Button } from "@/components/ui/button";
-import { maskName } from "@/lib/mask-name";
 import {
   CheckBadgeIcon,
   ChatBubbleLeftRightIcon,
@@ -29,6 +30,7 @@ function formatDate(timestamp: number) {
 export function ProductReviews({ productId }: { productId: string }) {
   const reviewsData = useQuery(api.reviews.getByProduct, {
     productId: productId as Id<"products">,
+    limit: 100,
   });
   const eligibility = useQuery(api.reviews.getProductReviewEligibility, {
     productId: productId as Id<"products">,
@@ -52,19 +54,22 @@ export function ProductReviews({ productId }: { productId: string }) {
           <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Ürün Değerlendirmeleri
           </h2>
-          {eligibility?.canReview ? (
+          {eligibility?.canReview && eligibility.eligibleOrderId ? (
             <Button asChild size="sm" variant="outline" className="shrink-0 cursor-pointer rounded-xl text-xs font-semibold">
-              <Link href={`/account/orders/${eligibility.eligibleOrderId}`}>
-                <CheckBadgeIcon className="mr-1.5 size-3.5 text-emerald-500" />
+              <Link href={routes.accountOrder(eligibility.eligibleOrderId)}>
+                <CheckBadgeIcon className="mr-1.5 size-3.5 text-emerald-700 dark:text-emerald-400" />
                 {eligibility.alreadyReviewed ? "Değerlendirmemi Güncelle" : "Ürünü Değerlendir"}
               </Link>
             </Button>
           ) : null}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Değerlendirmeler yalnızca teslim edilmiş sipariş sahipleri tarafından yapılabilir; doğrulanmamış yorum yayınlanmaz.
+        </p>
 
         {reviewCount === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-10 text-center">
-            <ChatBubbleLeftRightIcon className="mx-auto size-9 text-muted-foreground/60" />
+            <ChatBubbleLeftRightIcon className="mx-auto size-9 text-muted-foreground/60" aria-hidden="true" />
             <h3 className="mt-3 text-sm font-semibold text-foreground">
               Henüz değerlendirme yapılmamış
             </h3>
@@ -84,7 +89,7 @@ export function ProductReviews({ productId }: { productId: string }) {
                   type="button"
                   onClick={() => setShowAll((current) => !current)}
                   aria-expanded={showAll}
-                  aria-label={showAll ? "Yorumları gizle" : "Tüm yorumları göster"}
+                  aria-label={showAll ? "Yorumları gizle" : "Yorumları göster"}
                   className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <ChevronDownIcon className={`size-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
@@ -109,9 +114,11 @@ export function ProductReviews({ productId }: { productId: string }) {
                   </div>
 
                   <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-foreground">
-                    <span>{maskName(review.authorName)}</span>
+                    <span>{review.authorName}</span>
                     {review.isVerifiedPurchase ? (
-                      <CheckBadgeIcon className="size-3.5 text-emerald-500" aria-label="Doğrulanmış Alıcı" />
+                      <span role="img" aria-label="Doğrulanmış Alıcı">
+                        <CheckBadgeIcon className="size-3.5 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
+                      </span>
                     ) : null}
                   </div>
 
@@ -136,7 +143,7 @@ export function ProductReviews({ productId }: { productId: string }) {
                   aria-expanded={showAll}
                   className="h-10 cursor-pointer rounded-full border-border px-6 text-[11px] font-semibold uppercase tracking-wider"
                 >
-                  {showAll ? "Yorumları Gizle" : "Tüm Yorumları Göster"}
+                  {showAll ? "Yorumları Gizle" : "Yorumları Göster"}
                   <ChevronDownIcon className={`ml-1.5 size-3.5 transition-transform ${showAll ? "rotate-180" : ""}`} />
                 </Button>
               </div>

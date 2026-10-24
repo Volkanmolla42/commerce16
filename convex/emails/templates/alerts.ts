@@ -6,6 +6,7 @@ import {
   field,
   fieldTable,
   ICONS,
+  mailtoLink,
   panel,
   renderEmail,
   renderText,
@@ -28,7 +29,7 @@ export function renderContactEmail(data: ContactEmailData): EmailContent {
 
   const senderRows = [
     field("Ad Soyad", `<strong>${escapeHtml(data.senderName)}</strong>`),
-    field("E-posta", `<a href="mailto:${escapeHtml(data.senderEmail)}" style="color:#09090b;font-weight:600;text-decoration:none;">${escapeHtml(data.senderEmail)}</a>`),
+    field("E-posta", mailtoLink(data.senderEmail)),
     data.senderPhone ? field("Telefon", escapeHtml(formatPhone(data.senderPhone))) : "",
     field("Konu", escapeHtml(data.messageSubject)),
     field("Tarih", escapeHtml(dateText)),
@@ -136,7 +137,7 @@ export function renderProductQuestionEmail(data: ProductQuestionEmailData): Emai
     field("Ürün", `<strong>${escapeHtml(productTitle)}</strong>`),
     field("Müşteri", escapeHtml(data.user.name)),
     data.user.email
-      ? field("E-posta", `<a href="mailto:${escapeHtml(data.user.email)}" style="color:#09090b;font-weight:600;text-decoration:none;">${escapeHtml(data.user.email)}</a>`)
+      ? field("E-posta", mailtoLink(data.user.email))
       : "",
     field("Tarih", escapeHtml(dateText)),
   ];

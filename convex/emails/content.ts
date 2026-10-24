@@ -163,6 +163,10 @@ export function fieldTable(rows: string[]): string {
   return `<table cellpadding="0" cellspacing="0" border="0" width="100%">${rows.filter(Boolean).join("")}</table>`;
 }
 
+export function mailtoLink(email: string): string {
+  return `<a href="mailto:${escapeHtml(email)}" style="color:#09090b;font-weight:600;text-decoration:none;">${escapeHtml(email)}</a>`;
+}
+
 export function cta(href: string, label: string): string {
   return `<div style="text-align:center;margin:20px 0 8px 0;">
   <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 24px;background-color:#09090b;color:#ffffff !important;text-decoration:none;font-size:13px;font-weight:600;border-radius:8px;letter-spacing:-0.01em;">${escapeHtml(label)}</a>

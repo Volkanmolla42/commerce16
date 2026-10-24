@@ -22,7 +22,7 @@ import { useAdminResource } from "./_components/admin-api";
 import { adminPath } from "@/lib/admin/routes";
 import { formatMoney } from "@/lib/format-money";
 import { formatDateTime } from "@/lib/format-date";
-import { getOrderCode, isRevenueOrder } from "@/lib/orders";
+import { formatOrderCode, isRevenueOrder } from "@/lib/orders";
 
 
 type LowStockItem = {
@@ -242,7 +242,7 @@ export default function AdminOverviewPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-bold text-muted-foreground">
-                              {getOrderCode(order, true)}
+                              {formatOrderCode(order, true)}
                             </span>
                             <span className="truncate text-sm font-medium text-foreground">
                               {order.customerName || order.customerEmail}
@@ -318,7 +318,7 @@ export default function AdminOverviewPage() {
 
                 {data.lowStock.productCount === 0 ? (
                   <div className="p-5 flex items-center gap-2.5 text-xs text-muted-foreground">
-                    <CheckCircleIcon className="size-4 text-emerald-600 shrink-0" />
+                    <CheckCircleIcon className="size-4 text-emerald-700 shrink-0" />
                     <span>Tüm ürün stokları yeterli seviyede.</span>
                   </div>
                 ) : (

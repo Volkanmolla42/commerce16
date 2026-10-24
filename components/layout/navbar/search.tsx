@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -13,7 +15,7 @@ import {
   Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import { formatMoney } from "@/lib/format-money";
-import { normalizeSearchText } from "@/lib/catalog/smart-search";
+import { normalizeSearchText } from "@/lib/text";
 import { createUrl } from "@/lib/utils";
 
 type SearchOption = {
@@ -27,7 +29,7 @@ type SearchOption = {
 };
 
 const headerInputClassName =
-  "min-h-10 w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-3 text-sm text-black transition placeholder:text-neutral-500 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900";
+  "min-h-10 w-full rounded-full border border-neutral-200 bg-neutral-100/80 py-2 pl-9 pr-3 text-sm text-black transition placeholder:text-neutral-600 focus:border-neutral-400 focus:bg-white focus:outline-hidden dark:border-neutral-800 dark:bg-neutral-800/80 dark:text-white dark:placeholder:text-neutral-400 dark:focus:border-neutral-600 dark:focus:bg-neutral-900";
 
 const SEARCH_PLACEHOLDER = "Ürün veya kategori ara...";
 
@@ -118,7 +120,7 @@ export default function Search() {
         key: `recent:${term}`,
         kind: "query",
         title: term,
-        href: `/search?q=${encodeURIComponent(term)}`,
+        href: routes.searchQuery(term),
       }))
     : [];
   const visibleOptions = isDiscovery ? recentOptions : isQuerySettled ? options : [];
@@ -171,7 +173,7 @@ export default function Search() {
     setIsOpen(false);
     const params = new URLSearchParams();
     if (trimmed) params.set("q", trimmed);
-    router.push(createUrl("/search", params));
+    router.push(createUrl(routes.search, params));
   };
 
   const renderOption = (option: SearchOption, index: number) => {
@@ -260,7 +262,7 @@ export default function Search() {
         )
         : null}
 
-      <form action="/search" method="get" className="relative w-full" onSubmit={handleSubmit}>
+      <form action={routes.search} method="get" className="relative w-full" onSubmit={handleSubmit}>
         <label htmlFor={`${componentId}-input`} className="sr-only">
           Ürün veya kategori ara
         </label>
@@ -353,7 +355,7 @@ export default function Search() {
           )}
           {!isDiscovery ? (
             <Link
-              href={{ pathname: "/search", query: { q: query.trim() } }}
+              href={{ pathname: routes.search, query: { q: query.trim() } }}
               onClick={() => {
                 const term = query.trim();
                 if (term) rememberSearch(term);

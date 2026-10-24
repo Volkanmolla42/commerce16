@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { CheckIcon, LinkIcon, ShareIcon } from "@heroicons/react/24/outline";
-import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
-import { TelegramIcon } from "@/components/icons/telegram-icon";
-import { FacebookIcon } from "@/components/icons/facebook-icon";
-import { InstagramIcon } from "@/components/icons/instagram-icon";
+import { WhatsAppIcon, TelegramIcon, FacebookIcon, InstagramIcon } from "@/components/icons/social-icons";
 
 type CopyStatus = "idle" | "copied" | "failed";
 

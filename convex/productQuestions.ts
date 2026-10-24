@@ -1,3 +1,4 @@
+import { routes } from "../lib/storefront-routes";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { v } from "convex/values";
@@ -7,7 +8,7 @@ import { assertAdminApiSecret } from "./adminAuth";
 import { adminAlertTo, adminLink, siteLink } from "./emails/config";
 import { sendEmail } from "./emails/send";
 import { renderProductQuestionEmail } from "./emails/templates/alerts";
-import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 import { resolveFirstImageUrl } from "./productMedia";
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
@@ -256,10 +257,8 @@ export const getQuestionAlertDetails = internalQuery({
       ctx.db.get(item.productId),
       ctx.db.get(item.userId),
     ]);
-    const { storeName } = await readStoreSettings(ctx);
-
     return {
-      storeName,
+      storeName: storeConfig.name,
       productTitle: product?.title ?? null,
       productSlug: product?.slug ?? null,
       user: user
@@ -289,11 +288,11 @@ export const sendQuestionAlert = internalAction({
       content: renderProductQuestionEmail({
         storeName: data.storeName,
         productTitle: data.productTitle,
-        productUrl: data.productSlug ? siteLink(`/product/${data.productSlug}`) : "",
+        productUrl: data.productSlug ? siteLink(routes.product(data.productSlug)) : "",
         user: data.user ?? { name: "Müşteri", email: null },
         question: data.question,
         _creationTime: data._creationTime,
-        adminQuestionsUrl: adminLink("questions"),
+        adminQuestionsUrl: adminLink("sorular"),
       }),
       replyTo: data.user?.email ?? undefined,
       idempotencyKey: `product-question/${args.questionId}`,

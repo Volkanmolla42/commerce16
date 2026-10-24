@@ -58,15 +58,29 @@ export function ProductInfoTabs({ product }: { product: Product }) {
   return (
     <section>
       <div role="tablist" aria-label="Ürün bilgileri" className="flex gap-6 border-b border-border/70">
-        {tabs.map((item) => (
+        {tabs.map((item, index) => (
           <button
             key={item.id}
             type="button"
             role="tab"
+            id={`product-tab-${item.id}`}
+            aria-controls={`product-panel-${item.id}`}
             aria-selected={tab === item.id}
+            tabIndex={tab === item.id ? 0 : -1}
             onClick={() => {
               setTab(item.id);
               if (item.id === "questions") setQuestionsMounted(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+              event.preventDefault();
+              const nextIndex = event.key === "ArrowRight"
+                ? (index + 1) % tabs.length
+                : (index - 1 + tabs.length) % tabs.length;
+              const next = tabs[nextIndex]!;
+              setTab(next.id);
+              if (next.id === "questions") setQuestionsMounted(true);
+              document.getElementById(`product-tab-${next.id}`)?.focus();
             }}
             className={`-mb-px border-b-2 py-3 text-sm font-semibold transition-colors ${
               tab === item.id
@@ -80,7 +94,13 @@ export function ProductInfoTabs({ product }: { product: Product }) {
       </div>
 
       {tab === "product" ? (
-        <div className="pt-5 sm:pt-6">
+        <div
+          role="tabpanel"
+          id="product-panel-product"
+          aria-labelledby="product-tab-product"
+          tabIndex={0}
+          className="pt-5 sm:pt-6"
+        >
           <div className={`grid gap-6 ${descriptionImage ? "md:grid-cols-[220px_minmax(0,1.2fr)_minmax(0,0.8fr)]" : "md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)]"}`}>
             {descriptionImage ? (
               <div className="space-y-2">
@@ -180,7 +200,13 @@ export function ProductInfoTabs({ product }: { product: Product }) {
       ) : null}
 
       {questionsMounted ? (
-        <div className={tab === "questions" ? "pt-5 sm:pt-6" : "hidden pt-5 sm:pt-6"}>
+        <div
+          role="tabpanel"
+          id="product-panel-questions"
+          aria-labelledby="product-tab-questions"
+          tabIndex={0}
+          className={tab === "questions" ? "pt-5 sm:pt-6" : "hidden pt-5 sm:pt-6"}
+        >
           <ProductQuestions productId={product.id} />
         </div>
       ) : null}
@@ -190,6 +216,7 @@ export function ProductInfoTabs({ product }: { product: Product }) {
           images={descriptionImages}
           index={previewIndex}
           onClose={() => setPreviewIndex(null)}
+          alt={`${product.title} açıklama görseli`}
         />
       ) : null}
     </section>

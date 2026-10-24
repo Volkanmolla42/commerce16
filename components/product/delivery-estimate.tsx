@@ -55,9 +55,9 @@ export function DeliveryEstimate({
     available && cutoffHour > 0
       ? parts
         ? parts.weekday >= 1 && parts.weekday <= 5 && parts.hour < cutoffHour
-          ? `Bugün ${cutoffLabel}'a kadar sipariş verirseniz aynı gün kargoda.`
-          : "Siparişiniz sonraki iş günü kargoda."
-        : `Hafta içi ${cutoffLabel}'a kadar verilen siparişler aynı gün kargoda.`
+          ? `Bugün ${cutoffLabel}'a kadar sipariş verirseniz aynı gün kargoya teslim etmeyi hedefliyoruz.`
+          : "Siparişiniz sonraki iş günü kargoya verilir."
+        : `Hafta içi ${cutoffLabel}'a kadar verilen siparişlerde aynı gün kargo hedeflenir.`
       : null;
   const estimateText = estimate.trim() ? `Tahmini teslimat: ${estimate.trim()}` : null;
 

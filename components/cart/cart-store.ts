@@ -1,11 +1,10 @@
-import type { Product } from "../../lib/catalog/types";
+import type { Product, ProductImage } from "@/lib/catalog/types";
 import { MAX_CART_QUANTITY, getVariantStock } from "@/lib/catalog/variants";
 import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackPixelAddToCart } from "@/lib/analytics/meta-pixel";
-import type { ProductImage } from "@/lib/catalog/types";
 
 export type CartItem = { product: Product; quantity: number; variantId?: string };
-export const CART_STORAGE_KEY = "commerce_cart_v2";
+const CART_STORAGE_KEY = "commerce_cart_v2";
 const EMPTY_CART: CartItem[] = [];
 
 export function cartLineKey(productId: string, variantId?: string) {

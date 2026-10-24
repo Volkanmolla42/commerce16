@@ -1,8 +1,9 @@
-import { getCategories, getMenu, getStoreSettings } from "@/lib/catalog";
+import { routes } from "@/lib/storefront-routes";
+import { getCategories, getMenu } from "@/lib/catalog";
 import Link from "next/link";
 import { Suspense } from "react";
 import Image from "next/image";
-import StoreInitial from "@/components/store-initial";
+import { storeConfig } from "@/lib/store-config";
 import MobileMenu from "./mobile-menu";
 import { AllCategoriesMenu } from "./all-categories-menu";
 import { HeaderSearch, HeaderSearchFallback } from "./header-search";
@@ -11,12 +12,11 @@ import { CartButton } from "@/components/cart/cart-button";
 import { FavoritesLink } from "@/components/favorites/favorites-link";
 
 export async function Navbar() {
-  const [menu, categoryList, settings] = await Promise.all([
+  const [menu, categoryList] = await Promise.all([
     getMenu(),
     getCategories(),
-    getStoreSettings(),
   ]);
-  const categories = menu.filter((item) => item.path !== "/search");
+  const categories = menu.filter((item) => item.path !== routes.search);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
@@ -24,38 +24,29 @@ export async function Navbar() {
         {/* Sol: mobil menü + mağaza adı + masaüstü kategoriler */}
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:flex-none lg:gap-6">
           <Suspense fallback={null}>
-            <MobileMenu
-              categories={categoryList}
-              storeName={settings.storeName}
-              logoUrl={settings.logoUrl}
-            />
+            <MobileMenu categories={categoryList} />
           </Suspense>
 
           <Link
             href="/"
             prefetch={true}
-            aria-label={settings.storeName}
+            aria-label={storeConfig.name}
             className="flex min-w-0 items-center gap-2.5 text-xs font-semibold tracking-wider uppercase text-black transition hover:opacity-90 sm:text-sm dark:text-white"
           >
             <span className="hidden md:flex shrink-0 items-center">
-              {settings.logoUrl ? (
-                <Image
-                  src={settings.logoUrl}
-                  alt={settings.storeName}
-                  width={32}
-                  height={32}
-                  unoptimized
-                  className="size-8 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-neutral-950"
-                />
-              ) : (
-                <StoreInitial storeName={settings.storeName} size="sm" />
-              )}
+              <Image
+                src={storeConfig.logo}
+                alt=""
+                width={32}
+                height={32}
+                className="size-8 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700"
+              />
             </span>
-            <span className="truncate">{settings.storeName}</span>
+            <span className="truncate">{storeConfig.name}</span>
           </Link>
 
           {categories.length ? (
-            <nav className="hidden lg:flex lg:items-center lg:gap-6">
+            <nav aria-label="Ana menü" className="hidden lg:flex lg:items-center lg:gap-6">
               <AllCategoriesMenu categories={categories} />
               {categories.slice(0, 5).map((item) => (
                 <Link

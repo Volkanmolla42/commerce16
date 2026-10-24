@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { Suspense, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Search, { SearchSkeleton } from "./search";
@@ -31,7 +33,7 @@ export function HeaderSearch() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [pathname]);
 
-  const isSearchRoute = pathname === "/" || pathname.startsWith("/search");
+  const isSearchRoute = pathname === "/" || pathname.startsWith(routes.search);
 
   return (
     <div

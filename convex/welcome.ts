@@ -4,7 +4,7 @@ import { internalAction, internalQuery } from "./_generated/server";
 import { siteUrl } from "./emails/config";
 import { renderWelcomeEmail } from "./emails/templates/account";
 import { sendEmail } from "./emails/send";
-import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 
 // 1. Karşılama e-postası için kullanıcı ve mağaza verilerini getiren internal query
 export const getWelcomeEmailData = internalQuery({
@@ -23,12 +23,10 @@ export const getWelcomeEmailData = internalQuery({
     const user = await ctx.db.get(args.userId);
     if (!user?.email) return null;
 
-    const { storeName } = await readStoreSettings(ctx);
-
     return {
       email: user.email,
       name: user.name?.trim() || null,
-      storeName,
+      storeName: storeConfig.name,
     };
   },
 });

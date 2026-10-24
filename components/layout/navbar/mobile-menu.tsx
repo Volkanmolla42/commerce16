@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import {
   Dialog,
   DialogPanel,
@@ -23,7 +25,8 @@ import {
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { useFavorites } from "@/components/favorites/favorites-context";
 import { useCart } from "@/components/cart/cart-context";
-import StoreInitial from "@/components/store-initial";
+import { CountBadge } from "@/components/ui/count-badge";
+import { storeConfig } from "@/lib/store-config";
 import type { Category } from "@/lib/catalog/types";
 
 import { useQuery } from "convex/react";
@@ -31,12 +34,8 @@ import { api } from "@/convex/_generated/api";
 
 export default function MobileMenu({
   categories,
-  storeName = "Mağaza",
-  logoUrl,
 }: {
   categories: Category[];
-  storeName?: string;
-  logoUrl?: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -114,20 +113,15 @@ export default function MobileMenu({
                   onClick={closeMobileMenu}
                   className="flex min-w-0 items-center gap-2.5"
                 >
-                  {logoUrl ? (
-                    <Image
-                      src={logoUrl}
-                      alt={storeName}
-                      width={32}
-                      height={32}
-                      unoptimized
-                      className="size-8 shrink-0 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700 dark:bg-neutral-950"
-                    />
-                  ) : (
-                    <StoreInitial storeName={storeName} size="sm" />
-                  )}
+                  <Image
+                    src={storeConfig.logo}
+                    alt={storeConfig.name}
+                    width={32}
+                    height={32}
+                    className="size-8 shrink-0 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700"
+                  />
                   <DialogTitle className="truncate text-xs font-semibold tracking-wider uppercase text-neutral-900 dark:text-white">
-                    {storeName}
+                    {storeConfig.name}
                   </DialogTitle>
                 </Link>
                 <button
@@ -195,7 +189,7 @@ export default function MobileMenu({
                 <ul className="flex flex-col gap-0.5">
                   <li>
                     <Link
-                      href={isAuthenticated ? "/account/orders" : "/login"}
+                      href={isAuthenticated ? routes.accountOrders : routes.login}
                       onClick={closeMobileMenu}
                       className="group flex min-h-9 items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:bg-neutral-100 hover:text-black dark:text-neutral-200 dark:hover:bg-neutral-900 dark:hover:text-white"
                     >
@@ -215,7 +209,7 @@ export default function MobileMenu({
 
                   <li>
                     <Link
-                      href="/account/favorites"
+                      href={routes.accountFavorites}
                       onClick={closeMobileMenu}
                       className="group flex min-h-9 items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:bg-neutral-100 hover:text-black dark:text-neutral-200 dark:hover:bg-neutral-900 dark:hover:text-white"
                     >
@@ -227,11 +221,7 @@ export default function MobileMenu({
                         <span>Favorilerim</span>
                       </span>
                       <div className="flex items-center gap-2">
-                        {favoritesCount > 0 ? (
-                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
-                            {favoritesCount > 99 ? "99+" : favoritesCount}
-                          </span>
-                        ) : null}
+                        <CountBadge count={favoritesCount} />
                         <ChevronRightIcon
                           className="size-3.5 shrink-0 text-neutral-400 transition-colors group-hover:text-black dark:text-neutral-500 dark:group-hover:text-white"
                           aria-hidden="true"
@@ -242,7 +232,7 @@ export default function MobileMenu({
 
                   <li>
                     <Link
-                      href="/cart"
+                      href={routes.cart}
                       onClick={closeMobileMenu}
                       className="group flex min-h-9 items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:bg-neutral-100 hover:text-black dark:text-neutral-200 dark:hover:bg-neutral-900 dark:hover:text-white"
                     >
@@ -254,11 +244,7 @@ export default function MobileMenu({
                         <span>Sepetim</span>
                       </span>
                       <div className="flex items-center gap-2">
-                        {cartCount > 0 ? (
-                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
-                            {cartCount > 99 ? "99+" : cartCount}
-                          </span>
-                        ) : null}
+                        <CountBadge count={cartCount} />
                         <ChevronRightIcon
                           className="size-3.5 shrink-0 text-neutral-400 transition-colors group-hover:text-black dark:text-neutral-500 dark:group-hover:text-white"
                           aria-hidden="true"
@@ -316,7 +302,7 @@ function CategoryProducts({
         return (
           <li key={product.id}>
             <Link
-              href={`/product/${product.slug}`}
+              href={routes.product(product.slug)}
               onClick={onNavigate}
               className="group block"
             >
@@ -324,7 +310,7 @@ function CategoryProducts({
                 {imageUrl ? (
                   <Image
                     src={imageUrl}
-                    alt={product.title}
+                    alt=""
                     fill
                     sizes="(min-width: 640px) 140px, 120px"
                     className="object-cover transition-transform duration-300 group-hover:scale-105"

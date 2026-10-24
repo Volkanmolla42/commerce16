@@ -1,6 +1,9 @@
+import { routes } from "@/lib/storefront-routes";
 import { CategoryShortcuts, HomeHero, HomeValueProps } from "@/components/home/home-sections";
 import Link from "next/link";
 import { ProductGrid } from "@/components/product/product-grid";
+import { storeOgImage, storeTwitterImage } from "@/lib/seo";
+import { storeConfig } from "@/lib/store-config";
 import { baseUrl } from "@/lib/utils";
 import { getCategories, getRecommendationCatalog, getStoreSettings } from "@/lib/catalog";
 import { PersonalizedRecommendationShelf } from "@/components/product/recommendation-shelves";
@@ -8,34 +11,32 @@ import type { Metadata } from "next";
 
 export const prefetch = "partial";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const { storeName, slogan } = await getStoreSettings();
-  const title = `${storeName} | Online Mağaza`;
-  const description = slogan?.trim() || `${storeName} online mağazası.`;
+const homeTitle = `${storeConfig.name} | ${storeConfig.slogan}`;
 
-  return {
-    title: { absolute: title },
-    description,
-    openGraph: {
-      type: "website",
-      title,
-      description,
-      siteName: storeName,
-      url: baseUrl,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-    },
-    alternates: {
-      canonical: baseUrl,
-    },
-  };
-}
+export const metadata: Metadata = {
+  title: { absolute: homeTitle },
+  description: storeConfig.description,
+  openGraph: {
+    type: "website",
+    title: homeTitle,
+    description: storeConfig.description,
+    siteName: storeConfig.name,
+    url: baseUrl,
+    images: [storeOgImage],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: homeTitle,
+    description: storeConfig.description,
+    images: [storeTwitterImage],
+  },
+  alternates: {
+    canonical: baseUrl,
+  },
+};
 
 export default async function HomePage() {
-  const [{ storeName, slogan, logoUrl, freeShippingThreshold }, products, categories] = await Promise.all([
+  const [{ freeShippingThreshold, phone, email }, products, categories] = await Promise.all([
     getStoreSettings(),
     getRecommendationCatalog(30),
     getCategories(),
@@ -46,13 +47,13 @@ export default async function HomePage() {
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: storeName,
+    name: storeConfig.name,
     url: new URL("/", baseUrl).toString(),
     potentialAction: {
       "@type": "SearchAction",
       target: {
         "@type": "EntryPoint",
-        urlTemplate: `${new URL("/search", baseUrl).toString()}?q={search_term_string}`,
+        urlTemplate: `${new URL(routes.search, baseUrl).toString()}?q={search_term_string}`,
       },
       "query-input": "required name=search_term_string",
     },
@@ -61,9 +62,33 @@ export default async function HomePage() {
   const organizationJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: storeName,
+    name: storeConfig.name,
     url: new URL("/", baseUrl).toString(),
-    ...(logoUrl ? { logo: new URL(logoUrl, baseUrl).toString() } : {}),
+    logo: new URL(storeConfig.logo, baseUrl).toString(),
+    description: storeConfig.description,
+    ...(storeConfig.address
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: storeConfig.address,
+            addressCountry: storeConfig.country,
+          },
+        }
+      : {}),
+    ...(phone ? { telephone: phone } : {}),
+    ...(email ? { email } : {}),
+    ...(phone || email
+      ? {
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer service",
+            ...(phone ? { telephone: phone } : {}),
+            ...(email ? { email } : {}),
+            areaServed: storeConfig.country,
+            availableLanguage: ["tr"],
+          },
+        }
+      : {}),
   };
 
   const featuredItemsJsonLd = {
@@ -73,7 +98,7 @@ export default async function HomePage() {
       "@type": "ListItem",
       position: index + 1,
       name: product.title,
-      url: new URL(`/product/${product.slug}`, baseUrl).toString(),
+      url: new URL(routes.product(product.slug), baseUrl).toString(),
     })),
   };
 
@@ -99,8 +124,8 @@ export default async function HomePage() {
       />
       <div className="mx-auto max-w-screen-2xl px-4">
         <HomeHero
-          storeName={storeName}
-          slogan={slogan}
+          storeName={storeConfig.name}
+          slogan={storeConfig.slogan}
           featuredProduct={availableProducts.find((product) => product.images.length > 0)}
           hasCategories={categories.some((category) => category.slug !== "")}
         />
@@ -112,7 +137,7 @@ export default async function HomePage() {
                 Öne Çıkan Ürünler
               </h2>
               <Link
-                href="/search"
+                href={routes.search}
                 className="shrink-0 rounded-md border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 Tümünü Gör

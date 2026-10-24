@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConvex } from "convex/react";
@@ -22,7 +24,7 @@ import {
 } from "@/lib/catalog/variants";
 import type { Product } from "@/lib/catalog/types";
 
-export type ReorderItem = {
+type ReorderItem = {
   productId: string;
   variantId?: string;
   title: string;
@@ -134,7 +136,7 @@ export function OrderReorderButton({
       }
 
       if (skipped.length === 0 && addedCount > 0) {
-        router.push("/cart");
+        router.push(routes.cart);
       } else {
         setResultModal({
           open: true,
@@ -200,7 +202,7 @@ export function OrderReorderButton({
                 className="w-full sm:w-auto flex-1 rounded-2xl font-semibold shadow-xs"
                 onClick={() => {
                   closeModal();
-                  router.push("/cart");
+                  router.push(routes.cart);
                 }}
               >
                 Sepete Git

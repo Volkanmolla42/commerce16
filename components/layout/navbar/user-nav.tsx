@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useConvexAuth } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -29,7 +31,7 @@ export function UserNav() {
   if (isAuthenticated) {
     return (
       <Link
-        href="/account/orders"
+        href={routes.accountOrders}
         aria-label={displayName}
         className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:text-black sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:text-white"
       >
@@ -41,7 +43,7 @@ export function UserNav() {
 
   return (
     <Link
-      href="/login"
+      href={routes.login}
       aria-label="Giriş Yap"
       className="flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white p-0 text-xs font-medium text-neutral-800 transition hover:border-neutral-400 hover:text-black sm:w-auto sm:justify-start sm:px-3 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:text-white"
     >

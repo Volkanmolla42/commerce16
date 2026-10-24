@@ -1,3 +1,5 @@
+import { normalizeTurkishText } from "../text";
+
 export type CategoryAttributeType = "text" | "number" | "select" | "multiselect" | "boolean";
 
 export type CategoryAttributeDefinition = {
@@ -19,7 +21,7 @@ export const ATTRIBUTE_TYPES: Record<CategoryAttributeType, string> = {
 };
 
 export function normalizeAttributeLabel(value: string) {
-  return value.trim().toLocaleLowerCase("tr-TR");
+  return normalizeTurkishText(value.trim());
 }
 
 export function isChoiceAttribute(type: CategoryAttributeType) {

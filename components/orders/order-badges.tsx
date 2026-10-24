@@ -28,11 +28,11 @@ const ORDER_STATUS_PRESENTATION: Record<
   },
   delivered: {
     icon: CheckBadgeIcon,
-    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
   },
   cancelled: {
     icon: XCircleIcon,
-    className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
   },
 };
 
@@ -41,9 +41,9 @@ export const ORDER_STATUS_ICONS = Object.fromEntries(
 ) as Record<OrderStatus, typeof ClockIcon>;
 
 export const ORDER_PAYMENT_STATUS_STYLES: Record<OrderPaymentStatus, string> = {
-  paid: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  pending: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
-  failed: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20",
+  paid: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/20",
+  failed: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/20",
   refunded: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20",
 };
 

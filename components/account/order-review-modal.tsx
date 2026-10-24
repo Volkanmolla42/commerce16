@@ -36,7 +36,6 @@ type OrderItem = {
 type OrderReviewModalProps = {
   orderId: Id<"orders">;
   items: OrderItem[];
-  customerName?: string;
 };
 
 export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
@@ -54,8 +53,8 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
   const [productComments, setProductComments] = useState<Record<string, string>>({});
 
   // Mağaza / Alışveriş deneyimi state'i
-  const [storeRating, setStoreRating] = useState<number>(5);
-  const [deliveryRating, setDeliveryRating] = useState<number>(5);
+  const [storeRating, setStoreRating] = useState<number>(0);
+  const [deliveryRating, setDeliveryRating] = useState<number>(0);
   const [storeComment, setStoreComment] = useState<string>("");
 
   const handleProductRatingChange = (productId: string, rating: number) => {
@@ -80,10 +79,15 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
       }[] = [];
 
       for (const item of items) {
-        const rating = productRatings[item.productId] ?? 5;
+        const rating = productRatings[item.productId] ?? 0;
         const comment = productComments[item.productId]?.trim();
 
         if (comment) {
+          if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            setErrorMessage(`"${item.title}" için 1-5 arasında bir puan seçin.`);
+            setIsSubmitting(false);
+            return;
+          }
           if (comment.length < 3) {
             setErrorMessage(`"${item.title}" için ürün yorumu en az 3 karakter olmalıdır.`);
             setIsSubmitting(false);
@@ -97,14 +101,25 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
         }
       }
 
+      const hasStoreFeedback = storeRating > 0 || deliveryRating > 0 || storeComment.trim().length > 0;
+      if (hasStoreFeedback && (storeRating < 1 || storeRating > 5)) {
+        setErrorMessage("Alışveriş deneyimi için 1-5 arasında bir puan seçin.");
+        setIsSubmitting(false);
+        return;
+      }
+
       await submitReviewMutation({
         orderId,
         productReviews: productReviewsPayload,
-        storeFeedback: {
-          storeRating,
-          deliveryRating,
-          comment: storeComment.trim() ? storeComment.trim() : undefined,
-        },
+        ...(hasStoreFeedback
+          ? {
+              storeFeedback: {
+                storeRating,
+                ...(deliveryRating > 0 ? { deliveryRating } : {}),
+                ...(storeComment.trim() ? { comment: storeComment.trim() } : {}),
+              },
+            }
+          : {}),
       });
 
       setFeedbackSuccess(true);
@@ -130,7 +145,7 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
           size="sm"
           className={
             isAlreadyReviewed
-              ? "rounded-xl border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50"
+              ? "rounded-xl border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50"
               : "rounded-xl font-medium shadow-xs"
           }
         >
@@ -156,12 +171,13 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
             Satın aldığınız ürünleri puanlayabilir ve alışveriş deneyiminizi doğrudan mağaza yönetimine iletebilirsiniz.
+            Ürün yorumlarınız yayınlanırken adınız soyadınızın baş harfleriyle gösterilir.
           </DialogDescription>
         </DialogHeader>
 
         {feedbackSuccess ? (
-          <div className="py-12 text-center space-y-3">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+          <div role="status" className="py-12 text-center space-y-3">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
               <CheckCircleIcon className="h-8 w-8" />
             </div>
             <h3 className="text-lg font-bold text-foreground">Değerlendirmeniz Alındı!</h3>
@@ -191,7 +207,7 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
 
               <div className="space-y-4">
                 {items.map((item) => {
-                  const currentRating = productRatings[item.productId] ?? 5;
+                  const currentRating = productRatings[item.productId] ?? 0;
                   const currentComment = productComments[item.productId] ?? "";
                   const wasReviewed = reviewedIds.includes(item.productId);
 
@@ -223,10 +239,10 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
                               onRate={(val) => handleProductRatingChange(item.productId, val)}
                             />
                             <span className="text-xs font-semibold text-foreground">
-                              {currentRating} / 5 Yıldız
+                              {currentRating > 0 ? `${currentRating} / 5 Yıldız` : "Puan seçilmedi"}
                             </span>
                             {wasReviewed && (
-                              <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
                                 Daha önce yorumlandı
                               </span>
                             )}
@@ -278,7 +294,7 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
                       showText={false}
                       onRate={setStoreRating}
                     />
-                    <span className="text-xs font-bold text-foreground">{storeRating} / 5</span>
+                    <span className="text-xs font-bold text-foreground">{storeRating > 0 ? `${storeRating} / 5` : "Puan seçilmedi"}</span>
                   </div>
                 </div>
 
@@ -296,7 +312,7 @@ export function OrderReviewModal({ orderId, items }: OrderReviewModalProps) {
                       showText={false}
                       onRate={setDeliveryRating}
                     />
-                    <span className="text-xs font-bold text-foreground">{deliveryRating} / 5</span>
+                    <span className="text-xs font-bold text-foreground">{deliveryRating > 0 ? `${deliveryRating} / 5` : "Puan seçilmedi"}</span>
                   </div>
                 </div>
               </div>

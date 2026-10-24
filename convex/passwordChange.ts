@@ -11,7 +11,7 @@ import {
 } from "@convex-dev/auth/server";
 import { renderOtpEmail } from "./emails/templates/account";
 import { sendEmail } from "./emails/send";
-import { readStoreSettings } from "./settings";
+import { storeConfig } from "../lib/store-config";
 
 const PROVIDER = "password";
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -34,10 +34,9 @@ export const getChangeContext = internalQuery({
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
     if (!user?.email) return null;
-    const { storeName } = await readStoreSettings(ctx);
     return {
       email: user.email,
-      storeName,
+      storeName: storeConfig.name,
     };
   },
 });

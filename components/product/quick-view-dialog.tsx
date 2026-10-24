@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/lib/storefront-routes";
+
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -77,6 +79,7 @@ function QuickViewContent({
         <Gallery
           product={product}
           selectedVariant={activeVariant}
+          sizes="(min-width: 1024px) 420px, (min-width: 640px) 380px, 100vw"
           onSelectVariant={(variant) => {
             setSelectedOptions(() => {
               const next: Record<string, string> = {};
@@ -148,7 +151,7 @@ function QuickViewContent({
                             ? "bg-primary text-primary-foreground shadow-xs ring-2 ring-primary ring-offset-2 ring-offset-background"
                             : isOptionSellable
                               ? "border border-border/80 bg-background text-foreground hover:border-primary/40 hover:bg-muted"
-                              : "border border-dashed border-border/60 bg-muted/40 text-muted-foreground/50 line-through cursor-not-allowed"
+                              : "border border-dashed border-border/60 bg-muted/40 text-muted-foreground line-through cursor-not-allowed"
                         }`}
                       >
                         {value}
@@ -196,7 +199,7 @@ function QuickViewContent({
             </Button>
           </div>
           <Link
-            href={`/product/${product.slug}`}
+            href={routes.product(product.slug)}
             onClick={() => onOpenChange(false)}
             className="block text-center text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
           >
