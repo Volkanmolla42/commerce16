@@ -89,9 +89,9 @@ export default async function Footer() {
               </ul>
             )}
 
-            {(storeConfig.legalName || storeConfig.taxOffice || storeConfig.taxNumber || storeConfig.mersis) ? (
+            {storeConfig.legalName ? (
               <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-                {storeConfig.legalName ? <><span className="font-medium text-neutral-700 dark:text-neutral-300">Unvan:</span> {storeConfig.legalName}</> : null}
+                <span className="font-medium text-neutral-700 dark:text-neutral-300">Unvan:</span> {storeConfig.legalName}
                 {storeConfig.taxOffice ? <> · <span className="font-medium text-neutral-700 dark:text-neutral-300">Vergi Dairesi:</span> {storeConfig.taxOffice}</> : null}
                 {storeConfig.taxNumber ? <> · <span className="font-medium text-neutral-700 dark:text-neutral-300">Vergi No / TCKN:</span> {storeConfig.taxNumber}</> : null}
                 {storeConfig.mersis ? <> · <span className="font-medium text-neutral-700 dark:text-neutral-300">MERSİS:</span> {storeConfig.mersis}</> : null}

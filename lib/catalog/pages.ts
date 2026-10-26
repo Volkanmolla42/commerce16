@@ -25,11 +25,7 @@ function pageArguments(params: CatalogSearchParams, categorySlug?: string) {
   };
 }
 
-export async function getCatalogPage(params: CatalogSearchParams, categorySlug?: string) {
-  "use cache";
-  cacheTag("products", "categories");
-  // Sipariş kaynaklı stok değişimi tag'i invalidate etmiyor; bu pencere listeleme için tazelik sınırı.
-  cacheLife({ stale: 300, revalidate: 300, expire: 3600 });
+async function fetchCatalogPage(params: CatalogSearchParams, categorySlug?: string) {
   const { queryArgs, rawFilters, rawAttributes } = pageArguments(params, categorySlug);
   const [result, rawAttributesList, rawOptionsList] = await Promise.all([
     fetchQuery(api.catalog.page, queryArgs),
@@ -46,6 +42,28 @@ export async function getCatalogPage(params: CatalogSearchParams, categorySlug?:
     filters: rawFilters,
     attributeFilters: rawAttributes,
   };
+}
+
+async function getDefaultCatalogPage(categorySlug?: string) {
+  "use cache";
+  cacheTag("products", "categories");
+  // Sipariş kaynaklı stok değişimi tag'i invalidate etmiyor; bu pencere listeleme için tazelik sınırı.
+  cacheLife({ stale: 300, revalidate: 300, expire: 3600 });
+  return fetchCatalogPage({}, categorySlug);
+}
+
+export async function getCatalogPage(params: CatalogSearchParams, categorySlug?: string) {
+  const { filters, attributes } = readCatalogFilters(params);
+  const hasFilters = Boolean(
+    filters.minPrice ||
+    filters.maxPrice ||
+    Object.values(filters.options ?? {}).some((values) => values.length > 0) ||
+    Object.values(attributes).some((filter) => filter.values.length > 0 || filter.min || filter.max),
+  );
+  const hasSearchOrPagination = Boolean(param(params, "q") || param(params, "sort") || param(params, "cursor"));
+
+  if (!hasFilters && !hasSearchOrPagination) return getDefaultCatalogPage(categorySlug);
+  return fetchCatalogPage(params, categorySlug);
 }
 
 export async function getAdminProductPage(params: CatalogSearchParams) {

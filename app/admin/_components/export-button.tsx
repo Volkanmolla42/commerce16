@@ -21,7 +21,7 @@ export function ExportMenu({ type }: { type: string }) {
         <span>İndir</span>
         <ChevronDownIcon aria-hidden="true" className="size-3 text-muted-foreground" />
       </summary>
-      <ul className="absolute right-0 z-20 mt-1 w-32 rounded-lg border border-border bg-card p-1 shadow-lg">
+      <ul className="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-border bg-card p-1 shadow-lg">
         {exportFormats.map((option) => (
           <li key={option.format}>
             <a
@@ -34,6 +34,9 @@ export function ExportMenu({ type }: { type: string }) {
             </a>
           </li>
         ))}
+        <li className="px-2.5 pb-1 pt-1.5 text-[10px] leading-4 text-muted-foreground">
+          En fazla 10.000 satır
+        </li>
       </ul>
     </DetailsDropdown>
   );

@@ -40,8 +40,30 @@ export default function SearchPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   return (
-    <Suspense fallback={<SearchSkeleton />}>
-      <SearchContent searchParams={props.searchParams} />
-    </Suspense>
+    <div className="space-y-4">
+      <Suspense fallback={<SearchHeadingSkeleton />}>
+        <SearchHeading searchParams={props.searchParams} />
+      </Suspense>
+      <Suspense fallback={<SearchSkeleton />}>
+        <SearchContent searchParams={props.searchParams} />
+      </Suspense>
+    </div>
   );
+}
+
+async function SearchHeading(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const searchParams = await props.searchParams;
+  const query = typeof searchParams?.q === "string" ? searchParams.q.trim() : "";
+
+  return (
+    <h1 className="text-2xl font-semibold tracking-tight">
+      {query ? `“${query}” sonuçları` : "Tüm ürünler"}
+    </h1>
+  );
+}
+
+function SearchHeadingSkeleton() {
+  return <div aria-hidden="true" className="h-8 w-40 animate-pulse rounded bg-muted" />;
 }

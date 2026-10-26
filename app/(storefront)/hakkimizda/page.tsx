@@ -115,9 +115,9 @@ export default async function AboutPage() {
                     )}
                   </ul>
 
-                  {(seller.legalName.trim() || seller.taxOffice.trim() || seller.taxNumber.trim() || seller.mersis.trim()) ? (
+                  {seller.legalName.trim() ? (
                     <div className="space-y-1 border-t border-border/70 pt-4 text-xs text-muted-foreground">
-                      {seller.legalName.trim() ? <p><span className="font-medium text-foreground">Unvan:</span> {seller.legalName}</p> : null}
+                      <p><span className="font-medium text-foreground">Unvan:</span> {seller.legalName}</p>
                       {seller.taxOffice.trim() ? <p><span className="font-medium text-foreground">Vergi Dairesi:</span> {seller.taxOffice}</p> : null}
                       {seller.taxNumber.trim() ? <p><span className="font-medium text-foreground">Vergi No / TCKN:</span> {seller.taxNumber}</p> : null}
                       {seller.mersis.trim() ? <p><span className="font-medium text-foreground">MERSİS:</span> {seller.mersis}</p> : null}

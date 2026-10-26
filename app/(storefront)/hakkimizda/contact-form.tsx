@@ -52,7 +52,6 @@ export default function ContactForm() {
         subject: subject.trim(),
         message: message.trim(),
         consentVersion: COOKIE_CONSENT_POLICY_VERSION,
-        consentedAt: Date.now(),
       });
       setSuccess(true);
       setName("");

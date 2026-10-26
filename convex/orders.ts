@@ -233,9 +233,6 @@ export const createOrder = mutation({
       throw new Error("Fatura adresi en fazla 500 karakter olabilir.");
     }
     const storeSettings = await readStoreSettings(ctx);
-    if (!storeSettings.isOpen) {
-      throw new Error("Mağaza şu anda sipariş kabul etmiyor.");
-    }
     const { distanceSalesAgreement: agreement, preInformationForm: preInformation } =
       getLegalDocuments(getSellerInfo(storeSettings));
     if (!agreement.ready || !preInformation.ready) {

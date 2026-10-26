@@ -59,7 +59,6 @@ export function RestockNotificationDialog({
         variantId,
         email,
         consentVersion: COOKIE_CONSENT_POLICY_VERSION,
-        consentedAt: Date.now(),
       });
 
       setStatus("success");

@@ -27,10 +27,10 @@ export function ProductSocialProof({
     api.orders.getRecentPurchaseActivity,
     now > 0 ? { productId: productId as Id<"products">, now } : "skip",
   );
-  const favoriteCount = useQuery(api.favorites.getProductFavoriteCount, { productSlug });
+  const favoriteCount = useQuery(api.favorites.getProductFavoriteCount, now > 0 ? { productSlug } : "skip");
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setNow(Date.now()), 0);
+    const timer = window.setTimeout(() => setNow(Date.now()), 1200);
     return () => window.clearTimeout(timer);
   }, []);
 

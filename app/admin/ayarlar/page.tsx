@@ -32,7 +32,6 @@ type TextSettingKey =
   | "announcement"
   | "shippingEstimate";
 type SettingsEdits = Partial<Pick<StoreSettings, TextSettingKey>> & {
-  isOpen?: boolean;
   lowStockThreshold?: number;
   newBadgeDays?: number;
   freeShippingThreshold?: number;
@@ -72,7 +71,6 @@ function AdminSettingsContent() {
   const [resetting, setResetting] = useState(false);
 
   const text = (key: TextSettingKey) => edits[key] ?? data?.[key] ?? "";
-  const isOpen = edits.isOpen ?? data?.isOpen ?? true;
   const lowStockThreshold = edits.lowStockThreshold ?? data?.lowStockThreshold ?? 5;
   const newBadgeDays = edits.newBadgeDays ?? data?.newBadgeDays ?? DEFAULT_NEW_BADGE_DAYS;
   const freeShippingThreshold = edits.freeShippingThreshold ?? data?.freeShippingThreshold ?? 0;
@@ -95,7 +93,6 @@ function AdminSettingsContent() {
         phone: text("phone"),
         email: text("email"),
         announcement: text("announcement"),
-        isOpen,
         lowStockThreshold,
         newBadgeDays,
         freeShippingThreshold,
@@ -172,8 +169,8 @@ function AdminSettingsContent() {
       <form id="settings-form" onSubmit={save} className="space-y-6">
         <div className="grid items-start gap-6 xl:grid-cols-2">
           <SettingsSection
-            title="Duyuru ve Durum"
-            description="Üst duyuru ve satış durumu."
+            title="Duyuru"
+            description="Sitenin üst bandında görünecek kısa duyuru."
           >
             <div className="space-y-1.5">
               <Label htmlFor="store-announcement">Üst Bant Duyurusu</Label>
@@ -190,23 +187,6 @@ function AdminSettingsContent() {
               </p>
             </div>
 
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border p-3 transition-colors hover:bg-muted/30">
-              <span className="text-sm font-medium text-foreground">
-                Mağaza Durumu
-                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                  Kapalıyken sipariş alınmaz.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                name="isOpen"
-                checked={isOpen}
-                onChange={(event) =>
-                  setEdits((current) => ({ ...current, isOpen: event.target.checked }))
-                }
-                className="size-4 shrink-0 rounded accent-primary"
-              />
-            </label>
           </SettingsSection>
 
           <div className="space-y-6">

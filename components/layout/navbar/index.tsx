@@ -77,3 +77,34 @@ export async function Navbar() {
     </header>
   );
 }
+
+export function NavbarFallback() {
+  return (
+    <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-x-2 gap-y-2.5 px-3 py-2 sm:px-4 sm:py-3.5">
+        <Link
+          href="/"
+          aria-label={storeConfig.name}
+          className="flex min-w-0 items-center gap-2.5 text-xs font-semibold tracking-wider uppercase text-black sm:text-sm dark:text-white"
+        >
+          <span className="hidden shrink-0 items-center md:flex">
+            <Image
+              src={storeConfig.logo}
+              alt=""
+              width={32}
+              height={32}
+              className="size-8 rounded-lg border border-neutral-200 bg-white object-contain dark:border-neutral-700"
+            />
+          </span>
+          <span className="truncate">{storeConfig.name}</span>
+        </Link>
+        <HeaderSearchFallback />
+        <div className="flex min-h-10 shrink-0 items-center gap-2.5">
+          <UserNav />
+          <FavoritesLink />
+          <CartButton />
+        </div>
+      </div>
+    </header>
+  );
+}

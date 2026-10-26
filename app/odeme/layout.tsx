@@ -1,7 +1,6 @@
 import { CookieConsentManager, CookiePreferencesButton } from "@/components/privacy/cookie-consent-manager";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { MetaPixelProvider } from "@/components/analytics/meta-pixel-provider";
-import { getStoreSettings } from "@/lib/catalog";
 import { storeConfig } from "@/lib/store-config";
 import { LockClosedIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import type { Metadata } from "next";
@@ -14,30 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function CheckoutLayout({ children }: { children: ReactNode }) {
-  const settings = await getStoreSettings();
-
-  if (!settings.isOpen) {
-    return (
-      <>
-        <Suspense fallback={null}>
-          <AnalyticsProvider />
-          <MetaPixelProvider />
-        </Suspense>
-        <main className="mx-auto grid min-h-[100dvh] w-full max-w-xl place-items-center px-4">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">{storeConfig.name} şu anda kapalı</h1>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              Kısa süre sonra yeniden hizmetinizdeyiz.
-              {[settings.phone, settings.email].filter(Boolean).join(" · ") || null}
-            </p>
-          </div>
-        </main>
-        <CookieConsentManager />
-      </>
-    );
-  }
-
+export default function CheckoutLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <Suspense fallback={null}>

@@ -378,7 +378,6 @@ export async function POST(request: NextRequest) {
           phone: text(input.phone),
           email: text(input.email),
           announcement: text(input.announcement),
-          isOpen: input.isOpen !== false,
           lowStockThreshold: Number.isSafeInteger(lowStockThreshold) ? lowStockThreshold : DEFAULT_LOW_STOCK_THRESHOLD,
           ...(Number.isSafeInteger(newBadgeDays) ? { newBadgeDays } : {}),
           freeShippingThreshold: Number.isFinite(freeShippingThreshold) ? freeShippingThreshold : 0,
@@ -387,7 +386,6 @@ export async function POST(request: NextRequest) {
           shippingEstimate,
         });
         revalidateTag("store-settings", { expire: 0 });
-        revalidatePath("/", "layout");
         return NextResponse.json({ success: true, ...result });
       }
       case "payments.update": {

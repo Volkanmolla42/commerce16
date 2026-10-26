@@ -3,6 +3,7 @@ import {
   productPageClassName,
   productGridClassName,
   productDetailsClassName,
+  productGalleryClassName,
 } from "@/components/product/product-layout";
 import { Gallery } from "@/components/product/gallery";
 import {
@@ -18,13 +19,11 @@ import { ProductReviews } from "@/components/product/product-reviews";
 import {
   ProductSkeleton,
   ProductGallerySkeleton,
-  ProductDescriptionSkeleton,
 } from "@/components/product/product-skeleton";
 import {
   getProduct,
   getProductRecommendations,
   getRecommendationCatalog,
-  getStoreSettings,
 } from "@/lib/catalog";
 import type { Metadata, ResolvingMetadata } from "next";
 import Link from "next/link";
@@ -32,6 +31,19 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { baseUrl } from "@/lib/utils";
 import { formatMoney } from "@/lib/format-money";
+import { PLACEHOLDER_HANDLE } from "@/lib/static-params";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "@/convex/_generated/api";
+import Image from "next/image";
+
+export async function generateStaticParams() {
+  try {
+    const [product] = await fetchQuery(api.products.list, { limit: 1 });
+    return [{ slug: product?.slug ?? PLACEHOLDER_HANDLE }];
+  } catch {
+    return [{ slug: PLACEHOLDER_HANDLE }];
+  }
+}
 
 function getProductUrl(slug: string) {
   return new URL(routes.product(slug), baseUrl).toString();
@@ -65,6 +77,7 @@ export async function generateMetadata(
   parent: ResolvingMetadata,
 ): Promise<Metadata> {
   const params = await props.params;
+  if (params.slug === PLACEHOLDER_HANDLE) return {};
   const product = await getProduct(params.slug);
 
   if (!product) return notFound();
@@ -117,7 +130,8 @@ async function ProductContent({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [product, settings] = await Promise.all([getProduct(slug), getStoreSettings()]);
+  if (slug === PLACEHOLDER_HANDLE) return notFound();
+  const product = await getProduct(slug);
 
   if (!product) return notFound();
 
@@ -203,22 +217,18 @@ async function ProductContent({
         {/* Product Details Grid */}
         <div className={productGridClassName}>
           <div className="min-w-0 lg:sticky lg:top-24 lg:self-start lg:z-30">
-            <Suspense fallback={<ProductGallerySkeleton />}>
+            <Suspense fallback={<ProductGalleryShell product={product} />}>
               <Gallery key={product.id} product={product} defaultVariant={defaultVariant} />
             </Suspense>
           </div>
 
           <div className={productDetailsClassName}>
-            <Suspense fallback={<ProductDescriptionSkeleton />}>
-              <ProductDescription
-                key={product.id}
-                product={product}
-                defaultVariant={defaultVariant}
-                shippingCutoffHour={settings.shippingCutoffHour}
-                shippingEstimate={settings.shippingEstimate}
-                shareUrl={productUrl}
-              />
-            </Suspense>
+            <ProductDescription
+              key={product.id}
+              product={product}
+              defaultVariant={defaultVariant}
+              shareUrl={productUrl}
+            />
           </div>
         </div>
 
@@ -233,6 +243,39 @@ async function ProductContent({
         </Suspense>
       </div>
     </>
+  );
+}
+
+function ProductGalleryShell({
+  product,
+}: {
+  product: NonNullable<Awaited<ReturnType<typeof getProduct>>>;
+}) {
+  const firstImage = product.images[0];
+
+  if (!firstImage) return <ProductGallerySkeleton />;
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className={`${productGalleryClassName} bg-neutral-100 dark:bg-neutral-900`}>
+        <Image
+          src={firstImage.url}
+          alt={product.title}
+          fill
+          sizes="(max-width: 1024px) 100vw, 540px"
+          preload
+          fetchPriority="high"
+          className="object-contain"
+        />
+      </div>
+      {product.images.length > 1 ? (
+        <div className="flex items-center gap-2 py-1" aria-hidden="true">
+          {product.images.slice(0, 5).map((image) => (
+            <div key={image.url} className="size-16 rounded-xl bg-muted sm:size-20" />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

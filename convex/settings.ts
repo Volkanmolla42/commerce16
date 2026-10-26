@@ -10,7 +10,6 @@ const settingsShape = v.object({
   phone: v.string(),
   email: v.string(),
   announcement: v.string(),
-  isOpen: v.boolean(),
   lowStockThreshold: v.number(),
   newBadgeDays: v.number(),
   freeShippingThreshold: v.number(),
@@ -23,7 +22,6 @@ function withDefaults(settings?: {
   phone?: string;
   email?: string;
   announcement?: string;
-  isOpen?: boolean;
   lowStockThreshold?: number;
   newBadgeDays?: number;
   freeShippingThreshold?: number;
@@ -35,7 +33,6 @@ function withDefaults(settings?: {
     phone: settings?.phone ?? "",
     email: settings?.email ?? "",
     announcement: settings?.announcement ?? "",
-    isOpen: settings?.isOpen ?? true,
     lowStockThreshold: settings?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD,
     newBadgeDays: settings?.newBadgeDays ?? DEFAULT_NEW_BADGE_DAYS,
     freeShippingThreshold: settings?.freeShippingThreshold ?? 0,
@@ -89,7 +86,6 @@ export const updateStoreSettings = mutation({
     phone: v.string(),
     email: v.string(),
     announcement: v.string(),
-    isOpen: v.boolean(),
     lowStockThreshold: v.number(),
     newBadgeDays: v.optional(v.number()),
     freeShippingThreshold: v.optional(v.number()),
@@ -119,7 +115,6 @@ export const updateStoreSettings = mutation({
       phone: clean(args.phone, 40),
       email,
       announcement: clean(args.announcement, 160),
-      isOpen: args.isOpen,
       lowStockThreshold: args.lowStockThreshold,
       newBadgeDays,
       freeShippingThreshold: Math.max(0, args.freeShippingThreshold ?? 0),

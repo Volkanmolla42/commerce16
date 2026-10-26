@@ -287,7 +287,6 @@ export default defineSchema({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     announcement: v.optional(v.string()),
-    isOpen: v.optional(v.boolean()),
     lowStockThreshold: v.optional(v.number()),
     newBadgeDays: v.optional(v.number()),
     freeShippingThreshold: v.optional(v.number()),

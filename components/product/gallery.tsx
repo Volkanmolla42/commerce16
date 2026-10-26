@@ -119,7 +119,8 @@ export function Gallery({
                     : "opacity-0 pointer-events-none z-0"
                 )}
                 preload={index === 0}
-                loading={index === 0 ? undefined : "eager"}
+                fetchPriority={index === 0 ? "high" : undefined}
+                loading={index === 0 ? undefined : "lazy"}
               />
             ))}
 

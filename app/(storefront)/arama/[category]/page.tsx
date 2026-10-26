@@ -8,14 +8,26 @@ import { Suspense } from "react";
 import { baseUrl } from "@/lib/utils";
 import { FacetedProductGrid } from "@/components/layout/faceted-product-grid";
 import { getCatalogPage } from "@/lib/catalog/pages";
+import { PLACEHOLDER_HANDLE } from "@/lib/static-params";
 import { SearchSkeleton } from "../loading";
 
 export const prefetch = "partial";
+
+export async function generateStaticParams() {
+  try {
+    const categories = await getCategories();
+    const params = categories.flatMap(({ slug }) => slug ? [{ category: slug }] : []);
+    return params.length ? params : [{ category: PLACEHOLDER_HANDLE }];
+  } catch {
+    return [{ category: PLACEHOLDER_HANDLE }];
+  }
+}
 
 export async function generateMetadata(props: {
   params: Promise<{ category: string }>;
 }, parent: ResolvingMetadata): Promise<Metadata> {
   const params = await props.params;
+  if (params.category === PLACEHOLDER_HANDLE) return {};
   const category = await getCategory(params.category);
 
   if (!category) return notFound();
@@ -49,15 +61,16 @@ async function CategoryContent(props: {
   params: Promise<{ category: string }>;
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const searchParams = await props.searchParams;
   const params = await props.params;
-  const [category, categories] = await Promise.all([
+  if (params.category === PLACEHOLDER_HANDLE) return notFound();
+  const searchParams = await props.searchParams;
+  const [category, categories, catalog] = await Promise.all([
     getCategory(params.category),
     getCategories(),
+    getCatalogPage(searchParams ?? {}, params.category),
   ]);
 
   if (!category) return notFound();
-  const catalog = await getCatalogPage(searchParams ?? {}, params.category);
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -95,7 +108,6 @@ async function CategoryContent(props: {
         selectedCategory={params.category}
         query={typeof searchParams?.q === "string" ? searchParams.q : undefined}
         categoryAttributes={category.attributes}
-        title={category.title}
         emptyMessage="Bu kategoride henüz ürün bulunmuyor."
       />
     </>
@@ -107,11 +119,35 @@ export default function CategoryPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   return (
-    <Suspense fallback={<SearchSkeleton />}>
-      <CategoryContent
-        params={props.params}
-        searchParams={props.searchParams}
-      />
-    </Suspense>
+    <div className="space-y-4">
+      <Suspense fallback={<CategoryHeadingSkeleton />}>
+        <CategoryHeading params={props.params} />
+      </Suspense>
+      <Suspense fallback={<SearchSkeleton />}>
+        <CategoryContent
+          params={props.params}
+          searchParams={props.searchParams}
+        />
+      </Suspense>
+    </div>
   );
+}
+
+async function CategoryHeading({ params }: { params: Promise<{ category: string }> }) {
+  const { category: slug } = await params;
+  const category = slug === PLACEHOLDER_HANDLE ? undefined : await getCategory(slug);
+  if (!category) return null;
+
+  return (
+    <header>
+      <h1 className="text-2xl font-semibold tracking-tight">{category.title}</h1>
+      {category.description ? (
+        <p className="mt-1 text-sm text-muted-foreground">{category.description}</p>
+      ) : null}
+    </header>
+  );
+}
+
+function CategoryHeadingSkeleton() {
+  return <div aria-hidden="true" className="h-8 w-40 animate-pulse rounded bg-muted" />;
 }

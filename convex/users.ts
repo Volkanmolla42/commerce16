@@ -36,7 +36,6 @@ export const acceptTerms = mutation({
   args: {
     termsVersion: v.string(),
     privacyVersion: v.string(),
-    acceptedAt: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -44,7 +43,7 @@ export const acceptTerms = mutation({
     if (!userId) throw new Error("Giriş yapmanız gerekmektedir.");
     const termsVersion = args.termsVersion.trim();
     const privacyVersion = args.privacyVersion.trim();
-    if (!termsVersion || termsVersion.length > 40 || !privacyVersion || privacyVersion.length > 40 || !Number.isFinite(args.acceptedAt)) {
+    if (!termsVersion || termsVersion.length > 40 || !privacyVersion || privacyVersion.length > 40) {
       throw new Error("Onay bilgileri geçersiz.");
     }
     const existing = await ctx.db
@@ -55,14 +54,14 @@ export const acceptTerms = mutation({
       await ctx.db.patch(existing._id, {
         termsVersion,
         privacyVersion,
-        acceptedAt: args.acceptedAt,
+        acceptedAt: Date.now(),
       });
     } else {
       await ctx.db.insert("legalAcceptances", {
         userId,
         termsVersion,
         privacyVersion,
-        acceptedAt: args.acceptedAt,
+        acceptedAt: Date.now(),
       });
     }
     return null;

@@ -38,7 +38,6 @@ export function FacetedProductGrid({
   selectedCategory,
   categoryAttributes = [],
   query,
-  title,
   emptyMessage = "Ürün bulunamadı.",
   continueCursor, isDone, facets, initialFilters, initialAttributeFilters,
 }: {
@@ -47,7 +46,6 @@ export function FacetedProductGrid({
   selectedCategory?: string;
   categoryAttributes?: CategoryAttributeDefinition[];
   query?: string;
-  title?: string;
   emptyMessage?: string;
   continueCursor: string; isDone: boolean; facets: CatalogFacetOptions;
   initialFilters: CatalogFilters; initialAttributeFilters: CategoryAttributeFilters;
@@ -143,14 +141,9 @@ export function FacetedProductGrid({
     onOptionChange: updateOption,
   };
 
-  const categoryTitle = categories?.find((category) => category.slug === selectedCategory)?.title;
-  const pageTitle = title ?? categoryTitle ?? (query ? `“${query}” sonuçları` : "Tüm ürünler");
-
   return (
     <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
     <div className="min-w-0">
-      <h1 className="sr-only">{pageTitle}</h1>
-
       <div className="grid min-w-0 gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="hidden min-w-0 xl:block">
           <Card className="sticky top-20 rounded-2xl bg-card/60 p-5 shadow-none space-y-4">

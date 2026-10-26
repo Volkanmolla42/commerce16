@@ -34,7 +34,6 @@ export const subscribe = mutation({
     variantId: v.optional(v.string()),
     email: v.string(),
     consentVersion: v.string(),
-    consentedAt: v.number(),
   },
   returns: v.object({
     ok: v.boolean(),
@@ -44,7 +43,7 @@ export const subscribe = mutation({
   handler: async (ctx, args) => {
     const email = cleanEmail(args.email);
     const consentVersion = args.consentVersion.trim();
-    if (!consentVersion || consentVersion.length > 40 || !Number.isFinite(args.consentedAt)) {
+    if (!consentVersion || consentVersion.length > 40) {
       throw new Error("Gizlilik onayı kaydedilemedi. Lütfen formu yenileyip tekrar deneyin.");
     }
     const emailHash = await hash(`restock:${email}`);
@@ -103,7 +102,7 @@ export const subscribe = mutation({
       status: "pending",
       unsubscribeToken,
       consentVersion,
-      consentedAt: args.consentedAt,
+      consentedAt: Date.now(),
       consentSource: "restock_dialog",
     });
 

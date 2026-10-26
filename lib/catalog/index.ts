@@ -2,7 +2,7 @@ import type { FunctionReturnType } from "convex/server";
 import { routes } from "../storefront-routes";
 import type { Category, Menu, Product } from "./types";
 import { fetchQuery } from "convex/nextjs";
-import { cacheTag } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { api } from "@/convex/_generated/api";
 import { getSimilarProducts } from "./recommendations";
 
@@ -45,6 +45,7 @@ export type StoreSettings = FunctionReturnType<typeof api.settings.getStoreSetti
 
 export async function getStoreSettings(): Promise<StoreSettings> {
   "use cache";
+  cacheLife("max");
   cacheTag("store-settings");
   return await fetchQuery(api.settings.getStoreSettings, {});
 }
@@ -52,7 +53,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
 async function getProducts(): Promise<Product[]> {
   "use cache";
   cacheTag("products");
-  return await fetchQuery(api.products.list, { limit: 100 });
+  return await fetchQuery(api.products.list, { limit: 24 });
 }
 
 export async function getSitemapProducts() {
@@ -72,8 +73,9 @@ export async function getGoogleShoppingProducts(): Promise<Product[]> {
 }
 
 export async function getProduct(slug: string): Promise<Product | undefined> {
-  "use cache";
-  cacheTag("products");
+  "use cache: remote";
+  cacheLife("max");
+  cacheTag("products", `product-${slug}`);
   return (await fetchQuery(api.products.getBySlug, { slug })) ?? undefined;
 }
 

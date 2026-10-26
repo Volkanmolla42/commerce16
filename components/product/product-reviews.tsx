@@ -2,7 +2,7 @@
 
 import { routes } from "@/lib/storefront-routes";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -28,15 +28,31 @@ function formatDate(timestamp: number) {
 }
 
 export function ProductReviews({ productId }: { productId: string }) {
-  const reviewsData = useQuery(api.reviews.getByProduct, {
-    productId: productId as Id<"products">,
-    limit: 100,
-  });
-  const eligibility = useQuery(api.reviews.getProductReviewEligibility, {
-    productId: productId as Id<"products">,
-  });
+  const sectionRef = useRef<HTMLElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
 
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setShouldLoad(true);
+      observer.disconnect();
+    }, { rootMargin: "600px" });
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
+  const reviewsData = useQuery(api.reviews.getByProduct, shouldLoad
+    ? {
+        productId: productId as Id<"products">,
+        limit: showAll ? 100 : 3,
+      }
+    : "skip");
+  const eligibility = useQuery(api.reviews.getProductReviewEligibility, shouldLoad
+    ? { productId: productId as Id<"products"> }
+    : "skip");
   const averageRating = reviewsData?.averageRating ?? 0;
   const reviewCount = reviewsData?.reviewCount ?? 0;
   const commentCount = reviewsData?.commentCount ?? 0;
@@ -45,8 +61,10 @@ export function ProductReviews({ productId }: { productId: string }) {
 
   return (
     <section
+      ref={sectionRef}
       id="degerlendirmeler"
       aria-label="Ürün Değerlendirmeleri"
+      aria-busy={!reviewsData}
       className="mt-16 border-t border-border/70 pt-10 pb-16"
     >
       <div className="w-full">
@@ -67,7 +85,7 @@ export function ProductReviews({ productId }: { productId: string }) {
           Değerlendirmeler yalnızca teslim edilmiş sipariş sahipleri tarafından yapılabilir; doğrulanmamış yorum yayınlanmaz.
         </p>
 
-        {reviewCount === 0 ? (
+        {!reviewsData ? null : reviewCount === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-10 text-center">
             <ChatBubbleLeftRightIcon className="mx-auto size-9 text-muted-foreground/60" aria-hidden="true" />
             <h3 className="mt-3 text-sm font-semibold text-foreground">

@@ -19,7 +19,6 @@ export const submitContactMessage = mutation({
     subject: v.string(),
     message: v.string(),
     consentVersion: v.string(),
-    consentedAt: v.number(),
   },
   returns: v.object({
     success: v.boolean(),
@@ -48,7 +47,7 @@ export const submitContactMessage = mutation({
       throw new Error("Lütfen en az 5 karakterlik bir mesaj yazınız (maksimum 3000 karakter).");
     }
     const consentVersion = args.consentVersion.trim();
-    if (!consentVersion || consentVersion.length > 40 || !Number.isFinite(args.consentedAt)) {
+    if (!consentVersion || consentVersion.length > 40) {
       throw new Error("Gizlilik onayı kaydedilemedi. Lütfen formu yenileyip tekrar deneyin.");
     }
 
@@ -71,7 +70,7 @@ export const submitContactMessage = mutation({
       message: cleanMessage,
       status: "new",
       consentVersion,
-      consentedAt: args.consentedAt,
+      consentedAt: Date.now(),
     });
 
     // Yöneticiye anlık e-posta uyarısı tetikle

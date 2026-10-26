@@ -66,7 +66,6 @@ export default function CustomerLoginPage() {
           await acceptTerms({
             termsVersion: TERMS_VERSION,
             privacyVersion: COOKIE_CONSENT_POLICY_VERSION,
-            acceptedAt: Date.now(),
           }).catch(() => undefined);
         }
         router.push(routes.accountOrders);
